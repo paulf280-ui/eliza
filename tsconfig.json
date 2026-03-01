@@ -15,12 +15,7 @@
     "declaration": true,
     "declarationMap": true,
     "strict": true,
-    "jsx": "react-jsx",
-    "baseUrl": ".",
-    "paths": {
-      "@elizaos/core": ["packages/typescript/src/index.node.ts"],
-      "@elizaos/core/*": ["packages/typescript/src/*"]
-    }
+    "jsx": "react-jsx"
   },
   "exclude": [
     "**/node_modules/**",
