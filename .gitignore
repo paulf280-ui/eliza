@@ -10,6 +10,9 @@ node_modules
 .env.bak
 .env_main
 
+# Local character/agent JSON files that may contain secrets
+trader.json
+
 .idea
 .zed
 .DS_Store
@@ -266,3 +269,15 @@ skills/.cache/
 # Local vendored experiments (do not commit)
 /plugins/plugin-local-ai/rust/vendor/llama_cpp_rs/
 /vendor/llama_cpp_rs/
+
+# Runtime artifacts (local only)
+elizaos.out
+elizaos.pid
+.venv_py/
+
+# Ad-hoc debug/patch files
+prompt_debug.txt
+fix-core-coldstart.bundle
+fix-core-coldstart.patch
+resolve_plugin_path.mjs
+run-eliza-cli.mjs

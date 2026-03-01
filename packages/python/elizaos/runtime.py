@@ -973,10 +973,8 @@ class AgentRuntime(IAgentRuntime):
             for a in self._actions:
                 if a and getattr(a, "name", None):
                     m[a.name] = a
-                    try:
+                    with contextlib.suppress(Exception):
                         m[a.name.upper()] = a
-                    except Exception:
-                        pass
             self._action_by_name = m
 
         # Try exact match first, then a case-insensitive lookup.
@@ -1652,6 +1650,46 @@ class AgentRuntime(IAgentRuntime):
 
     def register_send_handler(self, source: str, handler: SendHandlerFunction) -> None:
         self._send_handlers[source] = handler
+
+    async def send_message(
+        self,
+        text: str,
+        user_id: UUID | None = None,
+        room_id: UUID | None = None,
+    ) -> Memory:
+        """Convenience method: send a text message into the agent loop and return the response.
+
+        This creates a Memory from the given text, routes it through the
+        DefaultMessageService, and returns the agent's response Memory.
+        Useful for REPL loops and simple integrations.
+        """
+        import time as _time
+
+        _user_id = user_id or as_uuid(str(uuid.uuid4()))
+        _room_id = room_id or as_uuid(str(uuid.uuid4()))
+        message = Memory(
+            id=as_uuid(str(uuid.uuid4())),
+            entity_id=_user_id,
+            agent_id=self.agent_id,
+            room_id=_room_id,
+            content=Content(text=text, source="interactive"),
+            created_at=int(_time.time() * 1000),
+        )
+
+        result = await self.message_service.handle_message(self, message)
+
+        if result.response_messages:
+            return result.response_messages[0]
+
+        # Return a minimal response Memory when the agent chose not to respond
+        return Memory(
+            id=as_uuid(str(uuid.uuid4())),
+            entity_id=self.agent_id,
+            agent_id=self.agent_id,
+            room_id=_room_id,
+            content=Content(text=result.response_content.text if result.response_content else ""),
+            created_at=int(_time.time() * 1000),
+        )
 
     async def send_message_to_target(self, target: TargetInfo, content: Content) -> None:
         if target.source and target.source in self._send_handlers:

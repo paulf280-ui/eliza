@@ -19,6 +19,7 @@ from .relationships import relationships_provider
 from .roles import roles_provider
 from .settings import settings_provider
 from .time import time_provider
+from .solana_wallet import solana_wallet_provider
 from .world import world_provider
 
 __all__ = [
@@ -42,6 +43,7 @@ __all__ = [
     "relationships_provider",
     "roles_provider",
     "settings_provider",
+    "solana_wallet_provider",
     "time_provider",
     "world_provider",
     "BASIC_PROVIDERS",
@@ -75,6 +77,8 @@ EXTENDED_PROVIDERS = [
     roles_provider,
     agent_settings_provider,
     settings_provider,
+    # solana_wallet_provider is excluded here; use elizaos.plugins.solana instead
+    # (the plugin's wallet provider is richer and avoids duplication)
 ]
 
 ALL_PROVIDERS = BASIC_PROVIDERS + EXTENDED_PROVIDERS

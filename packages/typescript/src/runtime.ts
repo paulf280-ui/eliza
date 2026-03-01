@@ -1777,6 +1777,23 @@ export class AgentRuntime implements IAgentRuntime {
             }
           }
         }
+        // Skip IGNORE/NONE silently — these are non-actionable LLM responses
+        if (
+          !action &&
+          (normalizedResponseAction === "ignore" ||
+            normalizedResponseAction === "none")
+        ) {
+          this.logger.debug(
+            {
+              src: "agent",
+              agentId: this.agentId,
+              action: responseAction,
+            },
+            "Skipping non-actionable response",
+          );
+          actionIndex++;
+          continue;
+        }
         if (!action) {
           const errorMsg = `Action not found: ${responseAction}`;
           this.logger.error(

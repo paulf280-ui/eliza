@@ -1,5 +1,5 @@
 {
-  "name": "@elizaos/core",
+  "name": "@elizaos/typescript",
   "version": "2.0.0-alpha.26",
   "description": "",
   "type": "module",
@@ -56,7 +56,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "pnpm exec playwright test",
     "test:watch": "vitest",
-    "lint": "pnpm exec @biomejs/biome check --write ./src",
+    "lint": "bunx @biomejs/biome check --write ./src",
     "lint:check": "pnpm exec @biomejs/biome check ./src",
     "lint:fix": "pnpm exec @biomejs/biome check --write ./src",
     "typecheck": "tsc --noEmit -p ./tsconfig.json",

@@ -1,5 +1,11 @@
 import { v4 } from "uuid";
-import { parseActionParams } from "../actions";
+import {
+  parseActionParams,
+  formatActionNames,
+  formatActions,
+  composeActionExamples,
+} from "../actions";
+import { addHeader } from "../utils";
 import { createUniqueUuid } from "../entities";
 import { logger } from "../logger";
 import {
@@ -1549,9 +1555,70 @@ export class DefaultMessageService implements IMessageService {
 
     if (!state.values || !state.values.actionNames) {
       runtime.logger.warn(
-        { src: "service:message" },
-        "actionNames data missing from state",
+        {
+          src: "service:message",
+          providerCount: runtime.providers?.length,
+          actionCount: runtime.actions?.length,
+        },
+        "actionNames data missing from state — injecting fallback from runtime.actions",
       );
+
+      // Fallback: build action metadata directly from runtime.actions when the
+      // ACTIONS provider (from plugin-bootstrap) failed to populate state.
+      if (runtime.actions && runtime.actions.length > 0) {
+        const validActions: Action[] = [];
+        for (const action of runtime.actions) {
+          try {
+            const valid = await action.validate(runtime, message, state);
+            if (valid) validActions.push(action);
+          } catch {
+            // skip actions that fail validation
+          }
+        }
+
+        const actionNames = `Possible response actions: ${formatActionNames(validActions)}`;
+        const actionsWithDescriptions =
+          validActions.length > 0
+            ? addHeader("# Available Actions", formatActions(validActions))
+            : "";
+        const actionExamples =
+          validActions.length > 0
+            ? addHeader(
+                "# Action Examples",
+                composeActionExamples(validActions, 10),
+              )
+            : "";
+
+        if (!state.values) state.values = {} as Record<string, string>;
+        state.values.actionNames = actionNames;
+        state.values.actionsWithDescriptions = actionsWithDescriptions;
+        state.values.actionExamples = actionExamples;
+
+        const actionsText = [actionNames, actionsWithDescriptions, actionExamples]
+          .filter(Boolean)
+          .join("\n\n");
+        state.values.providers = state.values.providers
+          ? state.values.providers + "\n\n" + actionsText
+          : actionsText;
+        state.text = state.values.providers;
+
+        if (!state.data) state.data = {};
+        if (!state.data.providers) state.data.providers = {};
+        (state.data.providers as Record<string, unknown>)["ACTIONS"] = {
+          data: { actionsData: validActions },
+          values: { actionNames, actionsWithDescriptions, actionExamples },
+          text: actionsText,
+        };
+
+        runtime.logger.info(
+          {
+            src: "service:message",
+            validActionCount: validActions.length,
+            actionNames: validActions.map((a) => a.name),
+          },
+          "Fallback ACTIONS injected into state",
+        );
+      }
     }
 
     let responseContent: Content | null = null;

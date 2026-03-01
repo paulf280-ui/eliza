@@ -1,8 +1,11 @@
 import asyncio
 from uuid import uuid4
-from elizaos import Character, AgentRuntime
+
+from elizaos import AgentRuntime, Character
+
 # Avoid importing optional local plugins so the lightweight agent can run
 # in environments where those packages are not installed.
+
 
 async def main():
     character = Character(
@@ -22,6 +25,7 @@ async def main():
         user_input = input("You: ")
         response = await runtime.send_message(user_input, user_id, room_id)
         print("Eliza:", response.content.text)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
