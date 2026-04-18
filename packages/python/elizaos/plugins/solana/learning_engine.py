@@ -407,7 +407,7 @@ Respond with JSON only:
                     "content-type": "application/json",
                 },
                 json={
-                    "model": "claude-opus-4-6",
+                    "model": "claude-opus-4-7",
                     "max_tokens": 1024,
                     "messages": [{"role": "user", "content": prompt}],
                 },

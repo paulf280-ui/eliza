@@ -1,0 +1,1171 @@
+"""
+trade_monitor.py — Per-position intelligent exit monitor with 4-tier AI cascade.
+
+PRIMARY exit handler for all monitored positions. The hard SL in the price
+refresh task is demoted to a safety-net backstop (-20%) for monitor failures.
+
+Architecture per position:
+  TradeMonitor
+    ├── DataFeed: snapshots every 2s (DexScreener + Helius)
+    ├── AICascade: 4-tier AI evaluation on a rolling schedule
+    │     Tier 1: Groq llama-3.3-70b  — gut-check every 30s (PRIMARY exit signal)
+    │     Tier 2: Gemini 2.0-flash     — confirmation / pattern recog every 2min
+    │     Tier 3: Claude Sonnet 4.6    — deep analysis every 5min
+    │     Tier 4: Claude Opus 4.6      — emergency escalation only
+    ├── AdaptiveExitEngine: ATR trailing stop + AI override
+    └── DecisionLog: records every AI decision for debrief reports
+
+Exit criteria (AI is PRIMARY for monitored positions):
+  - Groq SELL + confidence ≥ 0.75 → execute exit immediately
+  - Gemini SELL + confidence ≥ 0.70 → execute exit
+  - Claude Sonnet SELL + confidence ≥ 0.65 → execute exit
+  - BSR emergency (< 0.25) or liq rug (50% drop) → immediate exit
+  - ATR trail stop breach (moonbag phase) → exit
+  - Opus emergency → always execute
+
+Decision log (per mint) is accessible via get_decision_log(mint) for
+the DebriefReporter to include brain activity in post-trade reports.
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+import time
+from collections import deque
+from dataclasses import dataclass, field
+from typing import Any
+
+import aiohttp
+from elizaos.plugins.solana import brain_memory as _bm
+
+# ── Active monitor registry ───────────────────────────────────────────────────
+_active_monitors: dict[str, "TradeMonitor"] = {}
+
+# Decision logs preserved after monitor stops (for debrief reporter).
+# Keyed by mint, contains full decision history for each position.
+_closed_logs: dict[str, dict] = {}
+
+_DIR = os.path.dirname(__file__)
+_MONITOR_STATE_PATH = os.path.join(_DIR, "monitor_state.json")
+
+
+def is_monitored(mint: str) -> bool:
+    return mint in _active_monitors
+
+
+def get_decision_log(mint: str) -> dict | None:
+    """Return the decision log for a position (active or recently closed).
+
+    Used by DebriefReporter to show what each brain did during the trade.
+    Cleaned up after the debrief report consumes it.
+    """
+    mon = _active_monitors.get(mint)
+    if mon:
+        return mon.get_log_snapshot()
+    return _closed_logs.get(mint)
+
+
+def consume_decision_log(mint: str) -> dict | None:
+    """Retrieve and remove a closed position's decision log."""
+    return _closed_logs.pop(mint, None)
+
+
+def stop_monitor(mint: str) -> None:
+    """Cancel and remove the monitor for a closed position.
+    The decision log is preserved in _closed_logs for the debrief reporter.
+    """
+    mon = _active_monitors.pop(mint, None)
+    if mon:
+        # Preserve the decision log before cancelling
+        log = mon.get_log_snapshot()
+        if log:
+            _closed_logs[mint] = log
+            # Keep at most 100 closed logs in memory
+            if len(_closed_logs) > 100:
+                oldest = next(iter(_closed_logs))
+                del _closed_logs[oldest]
+        mon.cancel()
+
+
+async def ask_moonbag_hold(
+    mint: str,
+    current_price: float,
+    pnl_pct: float,
+    drop_from_peak: float,
+    session: aiohttp.ClientSession,
+) -> bool:
+    """Ask Groq whether to hold through a moonbag trail-stop trigger.
+
+    Called the FIRST TIME the price crosses the -30% from peak threshold.
+    Returns True (AI says HOLD — grant 45s grace) or False (fire trail stop now).
+
+    Only one consultation per moonbag high — the AI gets a single chance.
+    After the 45s grace expires the trail stop fires unconditionally.
+    """
+    mon = _active_monitors.get(mint)
+    if not mon or not mon._ai._groq_key:
+        return False  # no monitor or no Groq key → rule fires immediately
+
+    try:
+        from elizaos.plugins.solana.axiom_copy_trader import _paper_positions  # no circular: lazy
+        pos = _paper_positions.get(mint, {})
+
+        ctx = json.dumps({
+            "mint":               mint[:8],
+            "token":              pos.get("token_name", mint[:8]),
+            "whale_wallet":       pos.get("wallet_name", "?"),
+            "age_min":            round((time.time() - pos.get("entry_ts", time.time())) / 60, 1),
+            "pnl_pct":            round(pnl_pct, 1),
+            "peak_pnl_pct":       round(pos.get("peak_pnl_pct", 0.0) or 0.0, 1),
+            "drop_from_peak_pct": round(drop_from_peak, 1),
+            "tp1_hit":            True,
+            "locked_sol":         round(pos.get("locked_sol") or 0.0, 4),
+            "narrative":          pos.get("narrative", "unknown"),
+            "situation": (
+                "MOONBAG TRAIL STOP TRIGGERED: price has dropped past -30% from moonbag peak. "
+                "Cost basis is already recovered (TP1 already fired). Locked SOL is safe regardless. "
+                "HOLD = delay exit 45s for potential recovery. SELL = exit moonbag now."
+            ),
+        })
+
+        decision = await mon._ai._call_groq(ctx, session)
+        if decision is None:
+            return False
+
+        # Record in monitor log so it appears in debrief report
+        mon._ai._record(decision)
+
+        if decision.action == "HOLD" and decision.confidence >= 0.60:
+            print(
+                f"[monitor] 🤖 MOONBAG TRAIL: Groq HOLD "
+                f"({decision.confidence:.2f}) — {decision.reason[:80]} — 45s grace granted"
+            )
+            return True
+
+        print(
+            f"[monitor] 🤖 MOONBAG TRAIL: Groq {decision.action} "
+            f"({decision.confidence:.2f}) — trail stop fires now"
+        )
+        return False
+
+    except Exception as _e:
+        print(f"[monitor] ask_moonbag_hold error: {_e}")
+        return False
+
+
+async def entry_scan_position(
+    mint: str,
+    session: aiohttp.ClientSession,
+) -> None:
+    """Run a quick entry-quality scan immediately when a position opens.
+
+    Uses Groq (fast/free) to rate the token as RUNNER/NORMAL/RUG_RISK based on
+    entry conditions. Stores verdict on the position dict so the ongoing monitor
+    and exit decisions can reference it.
+    """
+    from elizaos.plugins.solana.axiom_copy_trader import _paper_positions
+
+    pos = _paper_positions.get(mint)
+    if not pos:
+        return
+
+    groq_key = os.getenv("GROQ_API_KEY", "")
+    if not groq_key:
+        return
+
+    ctx = json.dumps({
+        "token":        pos.get("token_name", mint[:8]),
+        "whale_wallet": pos.get("wallet_name", "?"),
+        "narrative":    pos.get("narrative", "unknown"),
+        "sol_spent":    round(pos.get("sol_spent", 0.0), 3),
+        "liq_usd":      pos.get("_learning_entry_liq"),
+        "mc_usd":       pos.get("_learning_entry_mc"),
+        "holders":      pos.get("_learning_entry_holders"),
+        "entry_price":  pos.get("entry_price"),
+    })
+
+    patterns = _get_learned_patterns()
+    system_note = "You assess new Solana meme-coin positions for rug risk.\n" + patterns if patterns else "You assess new Solana meme-coin positions for rug risk."
+    prompt = _ENTRY_SCAN_PROMPT.format(context=ctx)
+
+    try:
+        async with session.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": system_note},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.1,
+                "max_tokens": 200,
+                "response_format": {"type": "json_object"},
+            },
+            timeout=aiohttp.ClientTimeout(total=8),
+        ) as r:
+            if r.status != 200:
+                return
+            data = await r.json()
+            raw = data["choices"][0]["message"]["content"]
+            verdict_data = json.loads(raw)
+            verdict = verdict_data.get("verdict", "NORMAL")
+            confidence = float(verdict_data.get("confidence", 0.5))
+            reason = str(verdict_data.get("reason", ""))[:150]
+            risks = verdict_data.get("key_risks", [])
+
+            _paper_positions[mint]["ai_entry_verdict"] = verdict.lower()
+            _paper_positions[mint]["ai_entry_confidence"] = confidence
+            _paper_positions[mint]["ai_entry_reason"] = reason
+
+            emoji = "🚀" if verdict == "RUNNER" else ("🚨" if verdict == "RUG_RISK" else "✅")
+            print(
+                f"[monitor/entry-scan] {emoji} {pos.get('token_name', mint[:8])} → "
+                f"{verdict} ({confidence:.0%}) — {reason}"
+                + (f" | risks: {', '.join(risks[:2])}" if risks else "")
+            )
+
+            # Push rug risk alert to dashboard
+            if verdict == "RUG_RISK" and confidence >= 0.65:
+                try:
+                    from elizaos.plugins.solana.axiom_copy_trader import _push_alert
+                    _push_alert(
+                        f"🚨 <b>RUG RISK SIGNAL</b> — {pos.get('token_name', mint[:8])}\n"
+                        f"Entry scan: {reason}\n"
+                        f"Confidence: {confidence:.0%} | Watching for exit trigger"
+                    )
+                except Exception:
+                    pass
+
+    except Exception as exc:
+        print(f"[monitor/entry-scan] {mint[:8]} error: {exc}")
+
+
+async def spawn_monitor(
+    mint: str,
+    session: aiohttp.ClientSession,
+    runtime: Any,
+) -> None:
+    """Spawn a TradeMonitor for a newly opened position.
+
+    Called after position is saved to _paper_positions.
+    The monitor reads position state from the shared _paper_positions dict.
+    """
+    # Avoid importing at module level to prevent circular dependency
+    from elizaos.plugins.solana.axiom_copy_trader import (
+        _paper_positions,
+        _close_paper_position,
+        _get_market_data,
+        _resolve_pool_address,
+    )
+
+    pos = _paper_positions.get(mint)
+    if not pos:
+        return
+
+    if mint in _active_monitors:
+        return  # already watching
+
+    monitor = TradeMonitor(
+        mint=mint,
+        pos_ref=_paper_positions,
+        close_fn=_close_paper_position,
+        market_data_fn=_get_market_data,
+        pool_resolve_fn=_resolve_pool_address,
+        runtime=runtime,
+    )
+    _active_monitors[mint] = monitor
+    asyncio.get_event_loop().create_task(monitor.run(session))
+    # Fire entry scan immediately (non-blocking — result stored on pos within ~3s)
+    asyncio.get_event_loop().create_task(entry_scan_position(mint, session))
+    # Ensure brain memory refresh loop is running (no-op if already started)
+    _bm.ensure_memory_loop_started()
+    print(f"[monitor] 🚀 TradeMonitor spawned for {pos.get('token_name', mint[:8])} ({mint[:8]})")
+
+
+# ── Price snapshot ─────────────────────────────────────────────────────────────
+
+@dataclass
+class PriceSnapshot:
+    ts: float
+    price: float
+    mc: float | None
+    liq: float | None
+    vol_h1: float
+    buys_h1: int
+    sells_h1: int
+    buy_sell_ratio: float | None
+    vol_mc_ratio: float | None
+    holders: int | None
+
+
+# ── DataFeed ──────────────────────────────────────────────────────────────────
+
+class DataFeed:
+    """Collects market data snapshots every FEED_INTERVAL seconds."""
+
+    FEED_INTERVAL = 2.0
+    MAX_SNAPSHOTS = 300   # 10 minutes of 2s snapshots
+
+    def __init__(self, mint: str, market_data_fn, pool_resolve_fn, runtime: Any) -> None:
+        self.mint = mint
+        self._market_data_fn = market_data_fn
+        self._pool_resolve_fn = pool_resolve_fn
+        self._runtime = runtime
+        self.snapshots: deque[PriceSnapshot] = deque(maxlen=self.MAX_SNAPSHOTS)
+        self._running = False
+
+    def stop(self) -> None:
+        self._running = False
+
+    async def run(self, session: aiohttp.ClientSession) -> None:
+        self._running = True
+        while self._running:
+            try:
+                await self._collect(session)
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                print(f"[monitor/feed] {self.mint[:8]} error: {exc}")
+            await asyncio.sleep(self.FEED_INTERVAL)
+
+    async def _collect(self, session: aiohttp.ClientSession) -> None:
+        # Try Helius real-time price first for PumpSwap positions
+        from elizaos.plugins.solana.axiom_copy_trader import _paper_positions
+        pos = _paper_positions.get(self.mint, {})
+        pool_addr = pos.get("pool_address")
+        helius_price: float | None = None
+
+        if pool_addr and self._runtime:
+            try:
+                ray_svc = self._runtime.get_service("lp_pool")
+                if ray_svc:
+                    helius_price = await asyncio.wait_for(
+                        ray_svc.get_pumpswap_price_helius(pool_addr), timeout=2.5
+                    )
+            except Exception:
+                pass
+
+        # DexScreener for full market data
+        mdata = await self._market_data_fn(self.mint, session)
+        if not mdata:
+            return
+
+        price = helius_price if (helius_price and helius_price > 0) else mdata.get("price")
+        if not price or price <= 0:
+            return
+
+        snap = PriceSnapshot(
+            ts=time.time(),
+            price=price,
+            mc=mdata.get("mc"),
+            liq=mdata.get("liq"),
+            vol_h1=float(mdata.get("vol_h1") or 0),
+            buys_h1=int(mdata.get("buys_h1") or 0),
+            sells_h1=int(mdata.get("sells_h1") or 0),
+            buy_sell_ratio=mdata.get("buy_sell_ratio"),
+            vol_mc_ratio=mdata.get("vol_mc_ratio"),
+            holders=mdata.get("holders"),
+        )
+        self.snapshots.append(snap)
+
+    def latest_price(self) -> float | None:
+        return self.snapshots[-1].price if self.snapshots else None
+
+    def price_window(self, secs: float) -> list[PriceSnapshot]:
+        cutoff = time.time() - secs
+        return [s for s in self.snapshots if s.ts >= cutoff]
+
+    def compute_atr(self, periods: int = 20) -> float | None:
+        """Average True Range over the last N snapshots (2s each → 40s window at N=20).
+
+        For crypto with no OHLCV we use abs(price[i] - price[i-1]) as the range.
+        Returns None if insufficient data.
+        """
+        recent = list(self.snapshots)[-periods - 1:]
+        if len(recent) < 5:
+            return None
+        ranges = [abs(recent[i].price - recent[i - 1].price) for i in range(1, len(recent))]
+        return sum(ranges) / len(ranges) if ranges else None
+
+
+# ── AICascade ─────────────────────────────────────────────────────────────────
+
+@dataclass
+class AIDecision:
+    action: str        # "HOLD" | "SELL" | "REDUCE" | "WATCH"
+    confidence: float  # 0.0 – 1.0
+    reason: str
+    urgency: str       # "low" | "medium" | "high"
+    tier: str          # "groq" | "gemini" | "sonnet" | "opus"
+    ts: float = field(default_factory=time.time)
+    triggered_exit: bool = False  # True if this decision caused the position to close
+
+
+class AICascade:
+    """Tiered AI evaluation of position health.
+
+    Tier schedule (wall-clock since last call):
+      Groq:         every 30s  (fast, cheap)
+      Gemini Flash: every 2min
+      Claude Sonnet: every 5min
+      Claude Opus:  escalation only (called when Groq/Gemini both signal SELL
+                    or when emergency conditions detected)
+    """
+
+    GROQ_INTERVAL   = 30
+    GEMINI_INTERVAL = 120
+    SONNET_INTERVAL = 300
+
+    def __init__(self) -> None:
+        self._last_groq   = 0.0
+        self._last_gemini = 0.0
+        self._last_sonnet = 0.0
+        self._last_opus   = 0.0
+        # Set by TradeMonitor before each evaluate() call
+        self._mint:        str   = ""
+        self._token_name:  str   = ""
+        self._last_pnl_pct: float | None = None
+        self.decisions:   list[AIDecision] = []
+        self._pending_escalation = False
+
+        # Load API keys once
+        self._groq_key     = os.getenv("GROQ_API_KEY", "")
+        self._gemini_key   = os.getenv("GEMINI_API_KEY", "")
+        self._anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
+
+    def last_decision(self) -> AIDecision | None:
+        return self.decisions[-1] if self.decisions else None
+
+    def _record(self, d: AIDecision) -> None:
+        self.decisions.append(d)
+        if len(self.decisions) > 50:
+            self.decisions = self.decisions[-50:]
+
+    async def evaluate(
+        self,
+        mint: str,
+        pos: dict,
+        feed: DataFeed,
+        session: aiohttp.ClientSession,
+    ) -> AIDecision | None:
+        """Run the appropriate AI tier and return an actionable decision.
+
+        AI is now PRIMARY for monitored positions. Thresholds are set to fire
+        BEFORE the -20% safety-net SL in the price refresh task.
+
+        Exit thresholds:
+          Groq:   SELL + confidence ≥ 0.75 → immediate exit
+          Gemini: SELL + confidence ≥ 0.70 → exit
+          Sonnet: SELL + confidence ≥ 0.65 → exit
+          Opus:   any SELL → exit
+        """
+        now = time.time()
+        age_secs = now - pos.get("entry_ts", now)
+
+        ctx = _build_context(mint, pos, feed, age_secs)
+        if not ctx:
+            return None
+
+        decision: AIDecision | None = None
+
+        # ── Tier 1: Groq — PRIMARY exit signal (every 30s) ───────────────────
+        if now - self._last_groq >= self.GROQ_INTERVAL and self._groq_key:
+            d = await self._call_groq(ctx, session)
+            if d:
+                self._last_groq = now
+                self._record(d)
+                if d.action == "SELL" and d.confidence >= 0.75:
+                    # Groq is confident — exit now, no escalation needed
+                    decision = d
+                elif d.action == "SELL" and d.confidence >= 0.55:
+                    # Groq sees a signal but not confident enough alone — escalate
+                    self._pending_escalation = True
+                elif d.action == "HOLD" and not decision:
+                    decision = d   # propagate HOLD for logging
+
+        # ── Tier 2: Gemini Flash (every 2min, age ≥ 60s) ────────────────────
+        if now - self._last_gemini >= self.GEMINI_INTERVAL and self._gemini_key and age_secs >= 60:
+            d = await self._call_gemini(ctx, session)
+            if d:
+                self._last_gemini = now
+                self._record(d)
+                if d.action == "SELL" and d.confidence >= 0.70:
+                    decision = d  # Gemini exit — overrides any prior HOLD
+
+        # ── Tier 3: Claude Sonnet (every 5min, age ≥ 3min) ──────────────────
+        if now - self._last_sonnet >= self.SONNET_INTERVAL and self._anthropic_key and age_secs >= 180:
+            d = await self._call_claude(ctx, session, model="claude-opus-4-7", tier="sonnet")
+            if d:
+                self._last_sonnet = now
+                self._record(d)
+                if d.action == "SELL" and d.confidence >= 0.65:
+                    decision = d
+
+        # ── Tier 4: Claude Opus (emergency only) ─────────────────────────────
+        _drawdown = _calc_drawdown(pos)
+        _is_emergency = (
+            (_drawdown is not None and _drawdown <= -12.0) or
+            self._pending_escalation
+        ) and (now - self._last_opus >= 120)
+
+        if _is_emergency and self._anthropic_key:
+            d = await self._call_claude(ctx, session, model="claude-opus-4-7", tier="opus")
+            if d:
+                self._last_opus = now
+                self._pending_escalation = False
+                self._record(d)
+                if d.action == "SELL":
+                    decision = d
+
+        return decision
+
+    def _is_meteora(self, ctx: str) -> bool:
+        """Return True if the context is for a Meteora DLMM position."""
+        try:
+            return json.loads(ctx).get("dex") == "meteora"
+        except Exception:
+            return False
+
+    async def _call_groq(self, ctx: str, session: aiohttp.ClientSession) -> AIDecision | None:
+        is_meteora = self._is_meteora(ctx)
+        patterns = _get_learned_patterns("meteora" if is_meteora else "")
+        brain_ctx = _bm.brain_memory_as_prompt("groq")
+        system_note = (
+            "You are a Solana meme-coin trading exit advisor. Respond with JSON only.\n"
+            + patterns + brain_ctx
+        )
+        prompt_tmpl = _METEORA_HOLD_SELL_PROMPT if is_meteora else _HOLD_SELL_PROMPT
+        prompt = prompt_tmpl.format(context=ctx)
+        full_prompt = f"{system_note}\n\n{prompt}"
+        try:
+            async with session.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {self._groq_key}", "Content-Type": "application/json"},
+                json={
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": [{"role": "user", "content": full_prompt}],
+                    "temperature": 0.1,
+                    "max_tokens": 150,
+                    "response_format": {"type": "json_object"},
+                },
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as r:
+                if r.status != 200:
+                    return None
+                data = await r.json()
+                raw = data["choices"][0]["message"]["content"]
+                dec = _parse_ai_decision(raw, tier="groq")
+                if dec:
+                    _bm.record_decision("groq", self._mint, self._token_name,
+                                        dec.action, dec.reason, self._last_pnl_pct, dec.confidence)
+                return dec
+        except Exception as exc:
+            print(f"[monitor/groq] {exc}")
+            return None
+
+    async def _call_gemini(self, ctx: str, session: aiohttp.ClientSession) -> AIDecision | None:
+        is_meteora = self._is_meteora(ctx)
+        patterns = _get_learned_patterns("meteora" if is_meteora else "")
+        brain_ctx = _bm.brain_memory_as_prompt("gemini")
+        system_note = (
+            "You are a Solana meme-coin trading exit advisor. Respond with JSON only.\n"
+            + patterns + brain_ctx
+        )
+        prompt_tmpl = _METEORA_HOLD_SELL_PROMPT if is_meteora else _HOLD_SELL_PROMPT
+        prompt = prompt_tmpl.format(context=ctx)
+        full_prompt = f"{system_note}\n\n{prompt}"
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"gemini-2.0-flash:generateContent?key={self._gemini_key}"
+        )
+        body = {
+            "contents": [{"parts": [{"text": full_prompt}]}],
+            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 200},
+        }
+        try:
+            async with session.post(url, json=body, timeout=aiohttp.ClientTimeout(total=15)) as r:
+                if r.status != 200:
+                    return None
+                data = await r.json()
+                raw = data["candidates"][0]["content"]["parts"][0]["text"]
+                dec = _parse_ai_decision(raw, tier="gemini")
+                if dec:
+                    _bm.record_decision("gemini", self._mint, self._token_name,
+                                        dec.action, dec.reason, self._last_pnl_pct, dec.confidence)
+                return dec
+        except Exception as exc:
+            print(f"[monitor/gemini] {exc}")
+            return None
+
+    async def _call_claude(
+        self,
+        ctx: str,
+        session: aiohttp.ClientSession,
+        model: str,
+        tier: str,
+    ) -> AIDecision | None:
+        brain_key = "claude"
+        is_meteora = self._is_meteora(ctx)
+        brain_ctx = _bm.brain_memory_as_prompt(brain_key)
+        system = _CLAUDE_SYSTEM + _get_learned_patterns("meteora" if is_meteora else "") + brain_ctx
+        prompt_tmpl = _METEORA_HOLD_SELL_PROMPT if is_meteora else _HOLD_SELL_PROMPT
+        prompt = prompt_tmpl.format(context=ctx)
+        try:
+            async with session.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": self._anthropic_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "max_tokens": 300,
+                    "system": system,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as r:
+                if r.status != 200:
+                    return None
+                data = await r.json()
+                raw = data["content"][0]["text"]
+                dec = _parse_ai_decision(raw, tier=tier)
+                if dec:
+                    _bm.record_decision(brain_key, self._mint, self._token_name,
+                                        dec.action, dec.reason, self._last_pnl_pct, dec.confidence)
+                return dec
+        except Exception as exc:
+            print(f"[monitor/{tier}] {exc}")
+            return None
+
+
+# ── AdaptiveExitEngine ────────────────────────────────────────────────────────
+
+class AdaptiveExitEngine:
+    """Combines ATR trailing stop and AI override into exit signals.
+
+    Priority order:
+    1. Emergency override (rug signal: liq drop > 50% in 60s, BSR < 0.3)
+    2. ATR trailing stop (dynamic — widens in volatility, tightens in trend)
+    3. AI SELL signal with confidence ≥ 0.80
+    """
+
+    ATR_MULTIPLIER  = 2.5   # stop = peak - 2.5 * ATR
+    ATR_MIN_FRAC    = 0.05  # minimum stop distance (5% of price)
+    BSR_EMERGENCY   = 0.25  # buy/sell ratio below this = mass exit
+    LIQ_DROP_FRAC   = 0.50  # liquidity drops 50%+ in 60s = rug
+
+    def __init__(self) -> None:
+        self._entry_liq: float | None = None
+        self._atr_peak: float | None  = None
+
+    def evaluate(
+        self,
+        pos: dict,
+        feed: DataFeed,
+        ai_decision: AIDecision | None,
+    ) -> tuple[bool, str]:
+        """Return (should_exit, reason). Called every price tick."""
+        if not feed.snapshots:
+            return False, ""
+
+        snap = feed.snapshots[-1]
+        price = snap.price
+        entry = pos.get("entry_price", 0.0)
+        if not entry or entry <= 0:
+            return False, ""
+
+        # Only run after TP1 has fired (before TP1 the hard SL handles things)
+        tp1_hit = pos.get("tp1_hit", False)
+
+        # ── Emergency: BSR collapse (mass exit signal) ─────────────────────
+        bsr = snap.buy_sell_ratio
+        if bsr is not None and bsr < self.BSR_EMERGENCY:
+            return True, f"emergency_bsr_{bsr:.2f}"
+
+        # ── Emergency: liquidity rug (only if we have baseline) ──────────
+        liq = snap.liq
+        if liq and liq > 0:
+            if self._entry_liq is None:
+                self._entry_liq = liq
+            elif liq < self._entry_liq * (1.0 - self.LIQ_DROP_FRAC):
+                drop_pct = (1.0 - liq / self._entry_liq) * 100
+                return True, f"emergency_liq_rug_{drop_pct:.0f}pct"
+
+        # ── ATR trailing stop (moonbag phase only) ─────────────────────────
+        if tp1_hit:
+            atr = feed.compute_atr(periods=20)
+            if atr is not None and atr > 0:
+                # Track ATR-based peak
+                if self._atr_peak is None or price > self._atr_peak:
+                    self._atr_peak = price
+
+                # Dynamic stop: peak - max(2.5*ATR, 5% of price)
+                min_distance = price * self.ATR_MIN_FRAC
+                stop_dist = max(self.ATR_MULTIPLIER * atr, min_distance)
+                atr_stop = self._atr_peak - stop_dist
+
+                if price <= atr_stop:
+                    drop_pct = (price - self._atr_peak) / self._atr_peak * 100
+                    return True, f"atr_trail_{abs(drop_pct):.1f}pct"
+
+        # ── AI SELL signal ────────────────────────────────────────────────
+        if ai_decision and ai_decision.action == "SELL" and ai_decision.confidence >= 0.80:
+            return True, f"ai_{ai_decision.tier}_sell_conf{ai_decision.confidence:.0%}"
+
+        return False, ""
+
+
+# ── TradeMonitor ──────────────────────────────────────────────────────────────
+
+class TradeMonitor:
+    """Orchestrates DataFeed + AICascade + AdaptiveExitEngine for one position."""
+
+    EVAL_INTERVAL = 2.0   # seconds between engine evaluations
+
+    def __init__(
+        self,
+        mint: str,
+        pos_ref: dict,
+        close_fn,
+        market_data_fn,
+        pool_resolve_fn,
+        runtime: Any,
+    ) -> None:
+        self.mint = mint
+        self._pos_ref = pos_ref
+        self._close_fn = close_fn
+        self._runtime = runtime
+        self._task: asyncio.Task | None = None
+        self._running = False
+        self._start_ts = time.time()
+        self._exit_reason: str | None = None
+
+        self._feed   = DataFeed(mint, market_data_fn, pool_resolve_fn, runtime)
+        self._ai     = AICascade()
+        self._engine = AdaptiveExitEngine()
+
+    def get_log_snapshot(self) -> dict:
+        """Return a structured log of all AI decisions for the debrief reporter."""
+        decisions = self._ai.decisions
+        all_d = [
+            {
+                "ts":        d.ts,
+                "tier":      d.tier,
+                "action":    d.action,
+                "confidence": d.confidence,
+                "reason":    d.reason,
+                "urgency":   d.urgency,
+                "triggered_exit": d.triggered_exit,
+            }
+            for d in decisions
+        ]
+
+        # Tier breakdown counts
+        def _tier_stats(tier_name: str) -> dict:
+            td = [d for d in decisions if d.tier == tier_name]
+            return {
+                "total_calls":  len(td),
+                "hold_count":   sum(1 for d in td if d.action == "HOLD"),
+                "watch_count":  sum(1 for d in td if d.action == "WATCH"),
+                "sell_count":   sum(1 for d in td if d.action == "SELL"),
+                "alert_count":  sum(1 for d in td if d.urgency in ("high", "critical")),
+                "last_action":  td[-1].action    if td else None,
+                "last_confidence": td[-1].confidence if td else None,
+                "last_reason":  td[-1].reason    if td else None,
+            }
+
+        groq_d   = _tier_stats("groq")
+        gemini_d = _tier_stats("gemini")
+        sonnet_d = _tier_stats("sonnet")
+        opus_d   = _tier_stats("opus")
+
+        # Last alert reason from Groq
+        groq_alerts = [d for d in decisions if d.tier == "groq" and d.urgency in ("high", "critical")]
+        groq_d["last_alert_reason"] = groq_alerts[-1].reason if groq_alerts else None
+
+        return {
+            "mint":          self.mint,
+            "start_ts":      self._start_ts,
+            "exit_reason":   self._exit_reason,
+            "all_decisions": all_d,
+            "groq":          groq_d,
+            "gemini":        gemini_d,
+            "claude":        sonnet_d,
+            "opus":          opus_d,
+            "total_decisions": len(decisions),
+        }
+
+    def cancel(self) -> None:
+        self._running = False
+        self._feed.stop()
+        if self._task and not self._task.done():
+            self._task.cancel()
+
+    async def run(self, session: aiohttp.ClientSession) -> None:
+        self._running = True
+
+        # Start data feed as a sibling task
+        feed_task = asyncio.get_event_loop().create_task(self._feed.run(session))
+        self._task = feed_task
+
+        # Give the feed a few seconds to warm up
+        await asyncio.sleep(6)
+
+        try:
+            while self._running:
+                pos = self._pos_ref.get(self.mint)
+                if not pos:
+                    break  # position closed externally
+
+                # Run AI cascade on schedule — give cascade current position context
+                ai_dec: AIDecision | None = None
+                try:
+                    _entry = pos.get("entry_price", 0)
+                    _cur   = pos.get("current_price") or _entry
+                    _pnl   = round((_cur / _entry - 1) * 100, 1) if _entry else None
+                    self._ai._mint        = self.mint
+                    self._ai._token_name  = pos.get("token_name", self.mint[:8])
+                    self._ai._last_pnl_pct = _pnl
+                    ai_dec = await self._ai.evaluate(self.mint, pos, self._feed, session)
+                except Exception as exc:
+                    print(f"[monitor/ai] {self.mint[:8]} cascade error: {exc}")
+
+                # Log notable AI decisions
+                if ai_dec and ai_dec.action != "HOLD":
+                    tok = pos.get("token_name", self.mint[:8])
+                    pnl = pos.get("pnl_pct", 0.0) or 0.0
+                    print(
+                        f"[monitor] 🤖 {ai_dec.tier.upper()} → {ai_dec.action} "
+                        f"conf={ai_dec.confidence:.0%} [{tok} {pnl:+.1f}%] — {ai_dec.reason[:80]}"
+                    )
+
+                # Exit engine evaluation
+                should_exit, exit_reason = self._engine.evaluate(pos, self._feed, ai_dec)
+                if should_exit and self.mint in self._pos_ref:
+                    tok = pos.get("token_name", self.mint[:8])
+                    print(f"[monitor] ⚡ EXIT signal: {tok} ({self.mint[:8]}) — {exit_reason}")
+                    self._exit_reason = exit_reason
+                    # Mark the triggering AI decision
+                    if ai_dec and "ai_" in exit_reason:
+                        ai_dec.triggered_exit = True
+                    # Notify learning engine before close
+                    try:
+                        from elizaos.plugins.solana.learning_engine import (
+                            on_monitor_exit_signal,
+                        )
+                        on_monitor_exit_signal(self.mint, exit_reason, self._feed)
+                    except Exception:
+                        pass
+                    # Resolve brain memory outcomes
+                    try:
+                        _final_pnl = pos.get("pnl_pct") or 0.0
+                        _outcome = (
+                            "TP_HIT"      if "tp" in exit_reason.lower() else
+                            "SL_HIT"      if "sl" in exit_reason.lower() or "stop" in exit_reason.lower() else
+                            "WALLET_EXIT" if "wallet" in exit_reason.lower() else
+                            "MANUAL"
+                        )
+                        for _b in ("groq", "gemini", "claude"):
+                            _bm.resolve_outcome(_b, self.mint, _outcome, _final_pnl)
+                        # For Meteora positions, record detailed signal state so brains learn
+                        if pos.get("dex") == "meteora":
+                            _snap = self._feed.snapshots[-1] if self._feed.snapshots else None
+                            _w5m  = self._feed.price_window(300)
+                            _liq_chg: float | None = None
+                            _liq_trend = "stable"
+                            _holder_trend = "stable"
+                            _h_delta: int | None = None
+                            if _snap and len(_w5m) >= 2:
+                                _l5 = _w5m[0].liq
+                                _ln = _snap.liq
+                                if _l5 and _ln and _l5 > 0:
+                                    _liq_chg = round((_ln - _l5) / _l5 * 100, 1)
+                                    _liq_trend = "growing" if _liq_chg > 5 else "draining" if _liq_chg < -5 else "stable"
+                                _h5 = _w5m[0].holders
+                                _hn = _snap.holders
+                                if _h5 and _hn:
+                                    _h_delta = _hn - _h5
+                                    _holder_trend = "growing" if _h_delta > 5 else "declining" if _h_delta < -5 else "stable"
+                            _tok_name = pos.get("token_name", self.mint[:8])
+                            for _b in ("groq", "gemini", "claude"):
+                                _bm.record_meteora_exit(
+                                    _b, self.mint, _tok_name,
+                                    _liq_trend, _holder_trend, _final_pnl,
+                                    exit_reason, _liq_chg, _h_delta,
+                                )
+                    except Exception:
+                        pass
+                    # Execute close via the shared close function
+                    try:
+                        await self._close_fn(self.mint, exit_reason, session, self._runtime)
+                    except Exception as exc:
+                        print(f"[monitor] Close error for {self.mint[:8]}: {exc}")
+                    break  # position is gone
+
+                await asyncio.sleep(self.EVAL_INTERVAL)
+
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            print(f"[monitor] {self.mint[:8]} monitor crashed: {exc}")
+        finally:
+            self._feed.stop()
+            feed_task.cancel()
+            _active_monitors.pop(self.mint, None)
+
+
+# ── Context builder ───────────────────────────────────────────────────────────
+
+def _build_context(mint: str, pos: dict, feed: DataFeed, age_secs: float) -> str | None:
+    """Build a concise JSON context string for the AI prompt."""
+    if not feed.snapshots:
+        return None
+
+    snap = feed.snapshots[-1]
+    entry = pos.get("entry_price", 0.0)
+    if not entry or entry <= 0:
+        return None
+
+    pnl_pct   = (snap.price - entry) / entry * 100.0
+    peak_pnl  = pos.get("peak_pnl_pct", 0.0) or 0.0
+    tp1_hit   = pos.get("tp1_hit", False)
+    locked    = pos.get("locked_sol", 0.0) or 0.0
+
+    # Price changes
+    w30  = feed.price_window(30)
+    w5m  = feed.price_window(300)
+    chg_30s  = ((snap.price - w30[0].price) / w30[0].price * 100)  if len(w30) >= 2 else 0.0
+    chg_5min = ((snap.price - w5m[0].price) / w5m[0].price * 100)  if len(w5m) >= 2 else 0.0
+
+    atr = feed.compute_atr()
+
+    # Holder count delta (key rug signal: falling holders = distribution/dump)
+    holder_delta: int | None = None
+    w5m_snaps = feed.price_window(300)
+    if len(w5m_snaps) >= 2:
+        h_now  = snap.holders
+        h_5ago = w5m_snaps[0].holders
+        if h_now is not None and h_5ago is not None and h_5ago > 0:
+            holder_delta = h_now - h_5ago
+
+    # Liquidity change (key rug signal: liq draining fast)
+    liq_chg_5min_pct: float | None = None
+    if len(w5m_snaps) >= 2:
+        l_now  = snap.liq
+        l_5ago = w5m_snaps[0].liq
+        if l_now and l_5ago and l_5ago > 0:
+            liq_chg_5min_pct = round((l_now - l_5ago) / l_5ago * 100, 1)
+
+    ctx = {
+        "mint":              mint[:8],
+        "token":             pos.get("token_name", mint[:8]),
+        "whale":             pos.get("wallet_name", "?"),
+        "age_min":           round(age_secs / 60, 1),
+        "pnl_pct":           round(pnl_pct, 1),
+        "peak_pnl_pct":      round(peak_pnl, 1),
+        "chg_30s_pct":       round(chg_30s, 1),
+        "chg_5min_pct":      round(chg_5min, 1),
+        "tp1_hit":           tp1_hit,
+        "locked_sol":        round(locked, 4),
+        "bsr":               round(snap.buy_sell_ratio, 2) if snap.buy_sell_ratio else None,
+        "vol_mc":            round(snap.vol_mc_ratio, 3)   if snap.vol_mc_ratio   else None,
+        "liq_usd":           round(snap.liq or 0),
+        "liq_chg_5min_pct":  liq_chg_5min_pct,
+        "mc_usd":            round(snap.mc  or 0),
+        "holders":           snap.holders,
+        "holder_delta_5min": holder_delta,
+        "atr_pct":           round(atr / snap.price * 100, 2) if (atr and snap.price) else None,
+        "dex":               pos.get("dex", "unknown"),
+        "narrative":         pos.get("narrative", "unknown"),
+        "entry_verdict":     pos.get("ai_entry_verdict"),
+    }
+    return json.dumps(ctx)
+
+
+def _calc_drawdown(pos: dict) -> float | None:
+    """Return drawdown from peak as a negative %. None if no peak data."""
+    current = pos.get("current_price") or pos.get("entry_price")
+    peak    = pos.get("peak_price") or pos.get("entry_price")
+    if not current or not peak or peak <= 0:
+        return None
+    return (current - peak) / peak * 100.0
+
+
+def _parse_ai_decision(raw: str, tier: str) -> AIDecision | None:
+    """Parse AI JSON response into an AIDecision. Lenient parsing."""
+    try:
+        # Strip markdown code fences if present
+        text = raw.strip()
+        if text.startswith("```"):
+            lines = text.split("\n")
+            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+        d = json.loads(text)
+        action     = str(d.get("action", "HOLD")).upper()
+        confidence = float(d.get("confidence", 0.5))
+        reason     = str(d.get("reason", ""))[:200]
+        urgency    = str(d.get("urgency", "low")).lower()
+        if action not in ("HOLD", "SELL", "REDUCE", "WATCH"):
+            action = "HOLD"
+        confidence = max(0.0, min(1.0, confidence))
+        return AIDecision(action=action, confidence=confidence, reason=reason,
+                          urgency=urgency, tier=tier)
+    except Exception:
+        return None
+
+
+# ── Prompts ───────────────────────────────────────────────────────────────────
+
+_CLAUDE_SYSTEM = """You are the depth tier of a three-brain cascade (Groq 30s → Gemini 2m → YOU 5m) running live on Solana meme coins. Groq flags immediate rugs; Gemini confirms patterns; your job is the quant decision with full context.
+
+MINDSET: You are a quantitative meme-coin trader. You feed off accumulated trade data (win/loss patterns, wallet-behaviour history, bad_token_dna, learned patterns injected into your prompt) and the live token makeup (holders, liquidity, BSR, narrative, DEX, pair age, entry verdict, prior brain decisions on this mint). Every decision is data-backed and falsifiable. You are not cautious by default — you are *logical*. A rising position with expanding holders and stable liq is a HOLD even if it's already up 80%; a stalled position with holders leaving is a SELL even at +5%.
+
+TOKEN MAKEUP REASONING: Before deciding, mentally assess:
+ 1. Is this token's profile (age, liq, holder count, narrative) consistent with winners in our history, or with losers?
+ 2. What's the active flow: accumulation (growing holders + rising BSR + stable liq) or distribution (holders falling + BSR < 0.45 + liq draining)?
+ 3. Is P&L at a level where giving back is acceptable to capture the runner, or are we in "protect gains" mode?
+ 4. Does the learned-patterns block contradict or confirm what I see?
+
+OUTPUT: Respond with valid JSON only — no prose. SELL only when the data shows a clear danger signal; HOLD when momentum is intact; WATCH when signals are mixed and another tick will clarify.
+"""
+
+_HOLD_SELL_PROMPT = """Analyse this open Solana meme-coin position and decide whether to HOLD or SELL.
+
+POSITION DATA:
+{context}
+
+KEY SIGNALS (in order of importance):
+1. holder_delta_5min < -50 → holders leaving fast = distribution/dump = SELL urgency=high
+2. liq_chg_5min_pct < -30 → liquidity draining = rug in progress = SELL urgency=high
+3. bsr < 0.35 → mass sell pressure = SELL urgency=high
+4. chg_5min_pct < -8 with no bounce = token dying = SELL confidence=0.8
+5. entry_verdict = "rug_risk" → be quick to sell on any negative signal
+6. P&L rising with bsr > 0.55 and stable liq → HOLD
+7. tp1_hit=true → moonbag phase, tolerate more volatility, only sell on emergency signals
+
+Respond with JSON only:
+{{"action": "HOLD"|"SELL"|"WATCH", "confidence": 0.0-1.0, "reason": "one sentence", "urgency": "low"|"medium"|"high"}}"""
+
+
+_METEORA_HOLD_SELL_PROMPT = """You are a quant trader managing a Meteora DLMM meme-coin position. Think precisely.
+There is NO fixed take-profit — you decide when to exit based on real signals.
+
+POSITION DATA:
+{context}
+
+YOUR JOB: Read the liquidity and holder signals like a quant. If momentum is building, let it run.
+If momentum is dying, exit cleanly and preserve capital.
+
+METEORA SIGNAL RULES (apply in order):
+
+EXIT signals — act decisively:
+1. liq_chg_5min_pct < -15% → liquidity draining, smart money exiting = SELL high confidence
+2. holder_delta_5min < -30 → holders distributing = SELL urgency=high
+3. liq_chg_5min_pct < -8% AND holder_delta_5min < 0 → both declining = SELL
+4. chg_5min_pct < -6% with liq flat or declining = momentum dead = SELL
+5. bsr < 0.40 → sell pressure overwhelming buys = SELL
+
+HOLD / RUN signals — stay in and let it work:
+6. liq_chg_5min_pct > +5% AND holder_delta_5min > 0 → liquidity AND holders growing = HOLD, this can run further
+7. holder_delta_5min > +20 → new buyers piling in = strong HOLD
+8. chg_5min_pct > +3% with growing liq = active momentum = HOLD
+9. bsr > 0.60 with stable or growing liq = buying pressure dominant = HOLD
+10. P&L > 20% with no exit signals = let winners run, HOLD
+
+CONTEXT: Meteora has deeper liquidity than PumpSwap. Sustained moves of 50-200% are normal
+when the dual-DEX structure holds. Do not exit at 15% if the signals say the move is continuing.
+
+Respond with JSON only:
+{{"action": "HOLD"|"SELL"|"WATCH", "confidence": 0.0-1.0, "reason": "one sentence stating key signal observed", "urgency": "low"|"medium"|"high", "liq_trend": "growing"|"stable"|"draining", "holder_trend": "growing"|"stable"|"declining"}}"""
+
+
+_ENTRY_SCAN_PROMPT = """You are assessing a new Solana meme-coin position just opened by a copy-trade bot.
+Rate whether this token is likely a RUNNER or a RUG_RISK based on entry conditions.
+
+ENTRY DATA:
+{context}
+
+Rate based on:
+- Liquidity: < $5k = rug risk, $5-20k = normal, > $20k = healthy
+- Holder count: < 100 = risky, > 300 = healthy
+- Narrative: animal/meme tokens rug more than utility/ai/defi
+- Whale quality: known profitable whale = better signal
+- Momentum: are conditions favorable for a run?
+
+Respond with JSON only:
+{{"verdict": "RUNNER"|"NORMAL"|"RUG_RISK", "confidence": 0.0-1.0, "reason": "one sentence", "key_risks": ["...", "..."]}}"""
+
+
+# ── Learned patterns injection ────────────────────────────────────────────────
+
+_PATTERNS_PATH = os.path.join(_DIR, "winning_patterns.json")
+_LESSONS_PATH = os.path.join(_DIR, "eliza_lessons.txt")
+_cached_patterns: str = ""
+_patterns_loaded_ts: float = 0.0
+_cached_lessons: str = ""
+_lessons_loaded_ts: float = 0.0
+
+
+def _get_eliza_lessons() -> str:
+    """Load eliza_lessons.txt and return first 3000 chars. Cached 10min."""
+    global _cached_lessons, _lessons_loaded_ts
+    if time.time() - _lessons_loaded_ts < 600:
+        return _cached_lessons
+    try:
+        if os.path.exists(_LESSONS_PATH):
+            with open(_LESSONS_PATH) as f:
+                raw = f.read(3000)
+            _cached_lessons = "\n\nELIZA ON-CHAIN LESSONS:\n" + raw
+        else:
+            _cached_lessons = ""
+        _lessons_loaded_ts = time.time()
+    except Exception:
+        _cached_lessons = ""
+    return _cached_lessons
+
+
+def _get_learned_patterns(strategy_hint: str = "") -> str:
+    """Return learned patterns + eliza lessons as system prompt injection. Cached 5min."""
+    global _cached_patterns, _patterns_loaded_ts
+    if time.time() - _patterns_loaded_ts < 300 and not strategy_hint:
+        return _cached_patterns
+    try:
+        lines = []
+        if os.path.exists(_PATTERNS_PATH):
+            with open(_PATTERNS_PATH) as f:
+                data = json.load(f)
+            patterns = data.get("patterns", [])
+            meteora_verdict = data.get("meteora_verdict", "")
+            lines.append("\n\nLEARNED PATTERNS FROM PAST TRADES:")
+            if strategy_hint == "meteora" and meteora_verdict:
+                lines.append(f"METEORA INSIGHT: {meteora_verdict}")
+            for p in patterns[:10]:
+                lines.append(f"- {p}")
+        lessons = _get_eliza_lessons()
+        result = "\n".join(lines) + lessons if lines else lessons
+        if not strategy_hint:
+            _cached_patterns = result
+            _patterns_loaded_ts = time.time()
+        return result
+    except Exception:
+        if not strategy_hint:
+            _cached_patterns = ""
+        return ""
+
+
+# ── State persistence (lightweight — just monitor count for diagnostics) ──────
+
+def save_monitor_state() -> None:
+    try:
+        state = {
+            "ts": time.time(),
+            "active_monitors": list(_active_monitors.keys()),
+            "count": len(_active_monitors),
+        }
+        with open(_MONITOR_STATE_PATH, "w") as f:
+            json.dump(state, f)
+    except Exception:
+        pass

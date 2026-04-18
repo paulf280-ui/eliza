@@ -47,9 +47,11 @@ BRAIN_ROLES: dict[str, str] = {
         "Check holder trends, liquidity shifts, momentum direction. SELL confidence≥0.70 exits."
     ),
     "claude": (
-        "CLAUDE DEPTH BRAIN (claude-sonnet). You fire every 5 minutes. "
-        "Your job: strategic review with full context. Make the final call. "
-        "Your decisions carry the most weight. SELL confidence≥0.65 exits."
+        "CLAUDE DEPTH BRAIN (claude-opus-4-7) — the quant meme-coin trader. "
+        "You fire every 5 minutes. Your job: strategic review with full context, "
+        "feeding off every trade outcome and token-makeup signal we've accumulated. "
+        "You make data-driven calls — accumulation vs distribution, winner-profile vs "
+        "loser-profile — and your decisions carry the most weight. SELL confidence≥0.65 exits."
     ),
 }
 
