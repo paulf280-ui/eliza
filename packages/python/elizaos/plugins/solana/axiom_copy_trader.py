@@ -1427,6 +1427,91 @@ async def _handle_partial_tp(
     _push_alert(msg)
 
 
+async def _handle_copy_ladder_tp(
+    mint: str,
+    tranche: int,
+    session: aiohttp.ClientSession,
+    runtime: Any = None,
+) -> None:
+    """Execute a single tranche of the copy-trade partial TP ladder.
+
+    Scales out of the position on the way up so a late wallet_exit closes
+    a moonbag instead of the whole position. Tranche sizes are expressed as
+    fractions of the ORIGINAL position; we compute the fraction of CURRENT
+    holdings at fire time (because prior tranches already reduced the float).
+
+    Defaults: L1 sells 40% at +8%, L2 sells 30% at +15%, L3 sells 20% at +30%.
+    Remaining 10% runs until wallet_exit, SL, peak-protection, or moonbag trail.
+    """
+    global _paper_balance
+    pos = _paper_positions.get(mint)
+    if not pos:
+        return
+    flag = f"cp_l{tranche}_hit"
+    if pos.get(flag):
+        return
+
+    from elizaos.plugins.solana import live_config as _lc_lad
+    fracs = {
+        1: float(_lc_lad.get("copy_trade_ladder_l1_frac", 0.40)),
+        2: float(_lc_lad.get("copy_trade_ladder_l2_frac", 0.30)),
+        3: float(_lc_lad.get("copy_trade_ladder_l3_frac", 0.20)),
+    }
+    thresholds = {
+        1: float(_lc_lad.get("copy_trade_ladder_l1_pct", 8.0)),
+        2: float(_lc_lad.get("copy_trade_ladder_l2_pct", 15.0)),
+        3: float(_lc_lad.get("copy_trade_ladder_l3_pct", 30.0)),
+    }
+    l_frac_orig  = fracs.get(tranche, 0.0)
+    l_threshold  = thresholds.get(tranche, 100.0)
+
+    remaining = float(pos.get("remaining_fraction", 1.0))
+    if remaining <= 0.01 or l_frac_orig <= 0.0:
+        return
+    sell_frac_of_current = min(l_frac_orig / remaining, 1.0)
+
+    entry_price = pos.get("entry_price") or 0.0
+    current     = pos.get("current_price") or entry_price
+    pnl_now     = (current - entry_price) / entry_price * 100.0 if entry_price > 0 else 0.0
+    token_name  = pos["token_name"]
+
+    print(
+        f"[copy-trade] 🪜 LADDER L{tranche} ({l_threshold:.0f}%): {token_name} ({mint[:8]}) "
+        f"at {pnl_now:+.1f}% — selling {l_frac_orig*100:.0f}% of original"
+    )
+
+    ok, sig, sol_received = await _execute_partial_sell(
+        mint, token_name, sell_frac_of_current, session, runtime,
+        priority_fee=0.005,
+    )
+    if not ok:
+        print(f"[copy-trade] ⚠️  Ladder L{tranche} sell FAILED for {token_name} — will retry")
+        return
+
+    new_remaining = remaining * (1.0 - sell_frac_of_current)
+    new_locked    = pos.get("locked_sol", 0.0) + sol_received
+    _paper_positions[mint][flag]                = True
+    _paper_positions[mint]["remaining_fraction"] = new_remaining
+    _paper_positions[mint]["locked_sol"]         = new_locked
+    _paper_positions[mint].setdefault("partial_exits", []).append({
+        "tp_level":        f"L{tranche}_ladder_{l_threshold:.0f}pct",
+        "ts":              time.time(),
+        "pnl_pct_at_exit": round(pnl_now, 1),
+        "fraction_sold":   round(sell_frac_of_current, 4),
+        "sol_received":    round(sol_received, 4),
+        "sig":             sig,
+    })
+    _paper_balance += sol_received
+    _save_all()
+
+    msg = (
+        f"🪜 LADDER L{tranche} ({l_threshold:.0f}%): {token_name} ({mint[:8]}...)\n"
+        f"   Sold {l_frac_orig*100:.0f}% at {pnl_now:+.1f}% — locked {sol_received:.4f} SOL\n"
+        f"   Remaining: {new_remaining*100:.0f}%  •  Balance: {_paper_balance:.3f} SOL"
+    )
+    _push_alert(msg)
+
+
 async def _open_position(mint: str, token_name: str, sol_spent: float,
                          wallet_name: str, session: aiohttp.ClientSession,
                          runtime: Any = None, whale_buy_ts: float = 0.0) -> None:
@@ -2358,7 +2443,8 @@ async def run_copy_trade_monitor(runtime: Any = None) -> None:
                     # Hard TP: full exit at this level. 0 = disabled → use moonbag system.
                     hard_tp_pct   = float(_cfg("copy_trade_tp_pct", 0.0))
                     to_stop:    list[tuple[str, str]] = []  # (mint, reason) — full close
-                    to_partial: list[tuple[str, int]]  = []  # (mint, tp_level) — partial exit
+                    to_partial: list[tuple[str, int]]  = []  # (mint, tp_level) — partial exit (moonbag system)
+                    to_ladder:  list[tuple[str, int]]  = []  # (mint, tranche) — copy-trade partial TP ladder
                     now = time.time()
 
                     for mint, pos in list(_paper_positions.items()):
@@ -2509,6 +2595,33 @@ async def run_copy_trade_monitor(runtime: Any = None) -> None:
                                 to_stop.append((mint, f"peak_protection_{_peak_now:.0f}pct"))
                                 continue
 
+                        # ── Copy-trade partial TP ladder ─────────────────────────────────
+                        # Data: 52 wallet_exits gave back avg 21pp from peak → tranche profits
+                        # on the way up so a late wallet_exit closes a moonbag, not the whole
+                        # position. Defaults: L1 sells 40% at +8%, L2 sells 30% at +15%,
+                        # L3 sells 20% at +30%. Remaining 10% runs until wallet_exit / SL /
+                        # PP / trailing stop. Disabled by default; toggle with
+                        # copy_trade_ladder_enabled=true. When ON, hard TP is suppressed
+                        # (L2 at +15% does the same job with only 30% of the position).
+                        _ladder_on = bool(_cfg("copy_trade_ladder_enabled", False))
+                        if _ladder_on:
+                            _l1 = float(_cfg("copy_trade_ladder_l1_pct", 8.0))
+                            _l2 = float(_cfg("copy_trade_ladder_l2_pct", 15.0))
+                            _l3 = float(_cfg("copy_trade_ladder_l3_pct", 30.0))
+                            if not pos.get("cp_l1_hit") and pnl_now >= _l1:
+                                to_ladder.append((mint, 1))
+                                continue
+                            if pos.get("cp_l1_hit") and not pos.get("cp_l2_hit") and pnl_now >= _l2:
+                                to_ladder.append((mint, 2))
+                                continue
+                            if pos.get("cp_l2_hit") and not pos.get("cp_l3_hit") and pnl_now >= _l3:
+                                to_ladder.append((mint, 3))
+                                continue
+                            # Ladder active → suppress hard TP (L2 already handles +15%)
+                            _paper_positions[mint]["_spike_confirm"] = 0
+                            # fall through to moonbag / health checks on the 10% runner
+                            # (don't continue — let remaining logic inspect position)
+
                         # ── Hard TP: full exit at configured level (skips moonbag system) ──
                         # Single-tick for normal pumps, but with a DexScreener lag-spike guard.
                         # Root cause The Felon (-5.6% loss on +38.6% peak): price was frozen at
@@ -2518,7 +2631,7 @@ async def run_copy_trade_monitor(runtime: Any = None) -> None:
                         # >15% absolute (a DexScreener catch-up spike), require 1 more
                         # confirmation. Normal progressive pumps (0→5→12→15%) have max 7%
                         # single-tick jumps and fire immediately.
-                        if hard_tp_pct > 0 and pnl_now >= hard_tp_pct:
+                        if not _ladder_on and hard_tp_pct > 0 and pnl_now >= hard_tp_pct:
                             _prev_pnl = _cps[-2]["pnl_pct"] if len(_cps) >= 2 else 0.0
                             _single_tick_jump = pnl_now - _prev_pnl
                             SPIKE_GUARD_PCT = 15.0  # DexScreener catch-up threshold
@@ -2708,6 +2821,11 @@ async def run_copy_trade_monitor(runtime: Any = None) -> None:
                     for mint, tp_level in to_partial:
                         if mint in _paper_positions:
                             await _handle_partial_tp(mint, tp_level, session, runtime)
+
+                    # ── Execute copy-trade ladder tranches ────────────────────────────
+                    for mint, tranche in to_ladder:
+                        if mint in _paper_positions:
+                            await _handle_copy_ladder_tp(mint, tranche, session, runtime)
 
                     # ── Execute full closes ───────────────────────────────────────────
                     for mint, reason in to_stop:

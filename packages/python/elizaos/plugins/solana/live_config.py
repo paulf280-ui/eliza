@@ -148,6 +148,16 @@ _config: dict = {
     "copy_trade_max_hold_mins":   60.0,    # force-close position after N minutes
     "copy_trade_daily_loss_halt_sol": 0.5,  # halt new entries if daily loss exceeds this SOL amount
     "copy_trade_min_balance_halt_sol": 1.0, # halt if wallet balance drops below this SOL amount
+    # ── Partial TP ladder (2026-04-18) — scale out in tranches so a late wallet_exit
+    # closes a moonbag instead of the whole position. Historical data: 52 wallet_exits
+    # gave back avg 21pp from peak; this ladder traps those gains.
+    "copy_trade_ladder_enabled": True,    # master toggle
+    "copy_trade_ladder_l1_pct":   8.0,    # Tranche 1: fire at +8% pnl
+    "copy_trade_ladder_l1_frac":  0.40,   # sell 40% of ORIGINAL position
+    "copy_trade_ladder_l2_pct":  15.0,    # Tranche 2: +15% — replaces hard TP when ladder on
+    "copy_trade_ladder_l2_frac":  0.30,   # sell 30% of original
+    "copy_trade_ladder_l3_pct":  30.0,    # Tranche 3: +30%
+    "copy_trade_ladder_l3_frac":  0.20,   # sell 20% of original (10% runner left)
     "copy_trade_compound_pct":   0.20,    # position size = wallet_balance × 20% (quant-locked, REQUIRED_COMPOUND_PCT)
     "copy_trade_enabled":        False,   # live mode — set True to execute real trades
     "copy_trade_paused":         False,   # dashboard pause button — blocks new entries only
