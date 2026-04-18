@@ -352,6 +352,14 @@ def get_paper_stats() -> dict:
                 "remaining_fraction": round(p.get("remaining_fraction") or 1.0, 3),
                 "narrative":          p.get("narrative", "unknown"),
                 "moonbag_ceiling_pct": p.get("moonbag_ceiling_pct", 400.0),
+                # Copy-trade partial TP ladder state (2026-04-18)
+                "cp_l1_hit":          p.get("cp_l1_hit", False),
+                "cp_l2_hit":          p.get("cp_l2_hit", False),
+                "cp_l3_hit":          p.get("cp_l3_hit", False),
+                "peak_pnl_pct":       round(p.get("peak_pnl_pct") or 0.0, 1),
+                "ai_entry_verdict":   p.get("ai_entry_verdict"),
+                # Keep last 5 partial exits — dashboard shows tranche chips
+                "partial_exits":      (p.get("partial_exits") or [])[-5:],
             }
             for mint, p in _paper_positions.items()
         ],
