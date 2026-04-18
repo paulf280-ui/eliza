@@ -1258,13 +1258,15 @@ async def _execute_partial_sell(
     entry_price   = pos.get("entry_price", 0.0) or 0.0
     current_price = pos.get("current_price") or entry_price
     sol_spent_orig = pos.get("sol_spent", 0.0)
+    remaining_frac = float(pos.get("remaining_fraction", 1.0))
 
-    # Estimated SOL at current price for this fraction
+    # sell_fraction is fraction of CURRENT holdings (already reduced by prior
+    # partials), so scale by remaining_frac to get cost basis being sold.
     if entry_price > 0 and current_price > 0:
         price_ratio  = current_price / entry_price
-        est_sol_out  = sol_spent_orig * sell_fraction * price_ratio
+        est_sol_out  = sol_spent_orig * remaining_frac * sell_fraction * price_ratio
     else:
-        est_sol_out  = sol_spent_orig * sell_fraction
+        est_sol_out  = sol_spent_orig * remaining_frac * sell_fraction
 
     # Paper mode: no live execution needed
     try:
@@ -2613,22 +2615,30 @@ async def run_copy_trade_monitor(runtime: Any = None) -> None:
                         # (L2 at +15% does the same job with only 30% of the position).
                         _ladder_on = bool(_cfg("copy_trade_ladder_enabled", False))
                         if _ladder_on:
-                            _l1 = float(_cfg("copy_trade_ladder_l1_pct", 8.0))
-                            _l2 = float(_cfg("copy_trade_ladder_l2_pct", 15.0))
-                            _l3 = float(_cfg("copy_trade_ladder_l3_pct", 30.0))
+                            _l1 = float(_cfg("copy_trade_ladder_l1_pct", 12.0))
+                            _l2 = float(_cfg("copy_trade_ladder_l2_pct", 20.0))
+                            _l3 = float(_cfg("copy_trade_ladder_l3_pct", 35.0))
+                            # Cascade fire: when a tick shows price already past multiple
+                            # thresholds, queue ALL qualifying tiers at once so they execute
+                            # back-to-back in this tick's _handle_copy_ladder_tp loop.
+                            # Root cause Saleem Wif Hat (-2.7% on +41% peak): ladder fired one
+                            # tier per 2s tick, giving the wallet dump time to crash real
+                            # execution prices below the cached pnl reading between tiers.
+                            _cascade: list[int] = []
                             if not pos.get("cp_l1_hit") and pnl_now >= _l1:
-                                to_ladder.append((mint, 1))
+                                _cascade.append(1)
+                            if not pos.get("cp_l2_hit") and pnl_now >= _l2:
+                                _cascade.append(2)
+                            if not pos.get("cp_l3_hit") and pnl_now >= _l3:
+                                _cascade.append(3)
+                            if _cascade:
+                                for _t in _cascade:
+                                    to_ladder.append((mint, _t))
+                                _paper_positions[mint]["_spike_confirm"] = 0
                                 continue
-                            if pos.get("cp_l1_hit") and not pos.get("cp_l2_hit") and pnl_now >= _l2:
-                                to_ladder.append((mint, 2))
-                                continue
-                            if pos.get("cp_l2_hit") and not pos.get("cp_l3_hit") and pnl_now >= _l3:
-                                to_ladder.append((mint, 3))
-                                continue
-                            # Ladder active → suppress hard TP (L2 already handles +15%)
+                            # Ladder active but no tier triggered → suppress hard TP and
+                            # fall through to moonbag / health checks on the runner
                             _paper_positions[mint]["_spike_confirm"] = 0
-                            # fall through to moonbag / health checks on the 10% runner
-                            # (don't continue — let remaining logic inspect position)
 
                         # ── Hard TP: full exit at configured level (skips moonbag system) ──
                         # Single-tick for normal pumps, but with a DexScreener lag-spike guard.
