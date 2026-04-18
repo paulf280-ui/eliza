@@ -60,10 +60,14 @@ WATCHED_WALLETS: dict[str, str] = {
     #   Negative expectancy + low fill rate = remove.
     "Frost":   "4nwfXw7n98jEQn93VWY7Cuf1jnn1scHXuXCPGVYS9k6T",  # Kolscan #12 weekly | +0.408 SOL net (62% WR, 8 trades) | median hold 7 min
     "Walta":   "39q2g5tTQn9n7KnuapzwS2smSx3NGYqBoea11tBjsGEt",  # Kolscan #9 weekly | +0.076 SOL (14% WR, 7 trades) — KEEP for ASTEROID-class 89x signals
-    # SLOT OPEN ×2 — replacements should be auto-promoted by wallet_promotion.py
-    # from copy_trade_signal_log when a wallet hits >=3 trades and WR>=50%.
-    # Manual candidate: Wallet_3BLj (1 trade @ +174%, 100% WR — needs full address
-    # lookup via Helius; address starts with "3BLj…", run scripts/resolve_wallet.py).
+    # ── RE-PROMOTED 2026-04-18: clukz — 20 trades, 45% WR, +0.397 SOL net. 73%
+    #   zero-peak losses (bundler-adjacent) BUT 2 monster wins (+141.6%, +149.9%).
+    #   Original removal reason (sub-1s scalper) may have been premature — 20 fills
+    #   on live paper trading actually materialised. With 10% hard SL capping the
+    #   zero-peak rugs at -0.035 SOL each, monster-win expectancy is net positive.
+    "clukz":   "G6fUXjMKPJzCY1rveAE6Qm7wy5U3vZgKDJmN1VPAdiZC",  # 20 trades, 45%WR, +0.397 SOL
+    # SLOT OPEN ×1 — candidates Wallet_PMJA / Teddy detected in signal log but 0
+    # paper trade history yet. Consider after 3+ trades via wallet_promotion.py.
 }
 
 # Wallets using trading terminals/aggregators that never appear in logsSubscribe.
@@ -81,7 +85,7 @@ _BLACKLISTED_WALLETS: set[str] = {
     "5hAgYC8TJCcEZV7LTXAzkTrm7YL29YXyQQJPCNrG84zM",  # Schoen — pump-and-dump, -0.33 SOL (-0.12/day), 87% stale signals, cut 2026-04-16
     # ── Retired 2026-04-13 (all confirmed micro-scalpers, 0% hold >5 min) ──
     "DsqRyTUh1R37asYcVf1KdX4CNnz5DKEFmnXvgT4NfTPE",  # Axiom_W1 — sub-1s scalper
-    "G6fUXjMKPJzCY1rveAE6Qm7wy5U3vZgKDJmN1VPAdiZC",  # clukz — sub-1s scalper
+    # clukz RE-PROMOTED 2026-04-18 — see WATCHED_WALLETS above
     "G3gZWqrYkNmYFKYCyfRCNtGuxdyuE2wiYKkZpiZn4WSS",  # Goyim — inactive 24h+
     "Dvbv5TdAyPpJk16X9mUxWFVicYtCUxTLhuof8TGuUaRv",  # CookDoc — sub-1s scalper
 }

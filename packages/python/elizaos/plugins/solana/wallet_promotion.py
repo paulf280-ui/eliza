@@ -47,7 +47,7 @@ BLACKLIST: set[str] = {
     "Whale_CyaE",   # Cented alias
     "Schoen",
     "Axiom_W1",
-    "clukz",
+    # clukz un-blacklisted 2026-04-18 — 20 trades +0.397 SOL, re-promoted to WATCHED
     "Goyim",
     "CookDoc",
     "huvey",
