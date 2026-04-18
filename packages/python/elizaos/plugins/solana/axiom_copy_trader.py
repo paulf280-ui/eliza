@@ -1226,7 +1226,20 @@ async def _execute_live_buy(mint: str, token_name: str, sol_amount: float,
             except Exception:
                 pass
 
-        sig = await pump_svc.buy(mint, sol_amount, slippage=0.50, pool=pool)
+        try:
+            sig = await pump_svc.buy(mint, sol_amount, slippage=0.50, pool=pool)
+        except Exception as e1:
+            # PumpPortal HTTP 400: pool type mismatch (bonding-curve vs graduated AMM).
+            # DexScreener indexing lags graduation by 30-120s, so our pool detection
+            # can be wrong for freshly-graduated mints. Retry with the other pool type.
+            _err = str(e1)
+            if "400" in _err or "Bad Request" in _err:
+                _alt_pool = "pump-amm" if pool == "pump" else "pump"
+                print(f"[copy-trade LIVE] Pool={pool} rejected ({_err[:80]}) — retrying with pool={_alt_pool}")
+                sig = await pump_svc.buy(mint, sol_amount, slippage=0.50, pool=_alt_pool)
+                pool = _alt_pool
+            else:
+                raise
         print(f"[copy-trade LIVE] BUY CONFIRMED: {token_name} ({mint[:8]}) {sol_amount:.3f} SOL pool={pool} sig={str(sig)[:16]}...")
         return True, str(sig), pool
     except Exception as e:

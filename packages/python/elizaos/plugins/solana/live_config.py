@@ -140,7 +140,7 @@ _config: dict = {
     "copy_trade_paper_enabled":  True,    # always-on for paper tracking
     "copy_trade_paper_buy_sol":  0.35,    # SOL per copy-trade position
     "copy_trade_paper_balance":  2.08,    # current wallet balance (updated on restart)
-    "copy_trade_min_sol":        0.5,     # ignore whale entries smaller than 0.5 SOL
+    "copy_trade_min_sol":        0.2,     # ignore whale entries smaller than 0.2 SOL (2026-04-18: was 0.5, too strict — missed 10+ Walta signals/day)
     "copy_trade_consensus":      1,       # 1 = any single whale triggers entry
     "copy_trade_sl_pct":         10.0,    # stop-loss: -10% hard exit
     "copy_trade_tp_pct":         15.0,    # take-profit: +15% exit (quant-locked, see axiom_copy_trader.py REQUIRED_TP_PCT)
