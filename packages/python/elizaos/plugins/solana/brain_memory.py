@@ -354,6 +354,21 @@ def brain_memory_as_prompt(brain: str) -> str:
         for p in patterns[:3]:
             lines.append(f"  - {p}")
 
+    # Historical summary (from backfill — 119 closed trades as of 2026-04-18)
+    hist = mem.get("historical_summary") or {}
+    if hist.get("total_trades"):
+        lines.append(
+            f"Historical: {hist['total_trades']} trades, "
+            f"WR={hist.get('win_rate_pct','?')}%, net={hist.get('net_sol','?'):+.2f} SOL "
+            f"(median {hist.get('median_pnl_pct','?'):+.1f}%, best {hist.get('best_pnl_pct','?'):+.1f}%, worst {hist.get('worst_pnl_pct','?'):+.1f}%)"
+        )
+        # Top 3 profitable wallets
+        top_w = [(w, s) for w, s in (hist.get("by_wallet") or {}).items() if s.get("net_sol", 0) > 0][:3]
+        if top_w:
+            lines.append("Profitable wallets copied: " + ", ".join(
+                f"{w}({s['wr']}%WR {s['net_sol']:+.2f}SOL)" for w, s in top_w
+            ))
+
     # Peer summary — what the OTHER two brains recently decided
     peers: dict = mem.get("peer_summary", {}) or {}
     peer_lines: list[str] = []
