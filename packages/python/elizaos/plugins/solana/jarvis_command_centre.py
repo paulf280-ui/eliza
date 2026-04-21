@@ -1210,6 +1210,83 @@ def _gather_live_positions_direct() -> str:
         return f"[live positions direct read failed: {_e}]\n\n"
 
 
+def _gather_monster_positions_direct() -> str:
+    """Read strategy_e_monster._monster_positions + _monster_closed DIRECTLY.
+
+    Monster positions live in a SEPARATE pool from copy-trade — this block makes
+    them visible to Jarvis so sitreps reflect actual open monster slots and
+    recent closes. Without this, Jarvis reports 0 open when monster holds real
+    positions.
+    """
+    try:
+        import time as _t
+        from elizaos.plugins.solana import strategy_e_monster as _mon
+        positions = _mon.open_positions()
+        closed = getattr(_mon, "_monster_closed", []) or []
+        if not positions and not closed:
+            return ""
+
+        lines: list[str] = []
+        if positions:
+            lines += [
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"👾 MONSTER POSITIONS — {len(positions)}/{_mon.MONSTER_MAX_CONCURRENT} slots in use"
+                f"  (mode={'PAPER' if _mon.MONSTER_PAPER_ONLY else 'LIVE'},"
+                f" size={_mon.MONSTER_DEFAULT_SIZE_SOL} SOL)",
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            ]
+            for mint, p in positions.items():
+                age_secs = _t.time() - float(p.get("entry_ts") or _t.time())
+                age_str  = f"{age_secs/60:.0f}min" if age_secs < 3600 else f"{age_secs/3600:.1f}h"
+                entry    = float(p.get("entry_price") or 0)
+                current  = float(p.get("current_price") or entry)
+                pnl_pct  = ((current/entry) - 1.0) * 100 if entry > 0 else 0.0
+                icon     = "🟢" if pnl_pct >= 0 else "🔴"
+                name     = p.get("token_name", mint[:8])[:22]
+                sol_in   = float(p.get("sol_spent", 0))
+                src      = p.get("signal_source", "?")
+                tp1      = p.get("tp1_fired", False)
+                rem      = int(float(p.get("remaining_fraction", 1.0)) * 100)
+                stage = (f"🎯 TP1 fired — {rem}% riding moonbag" if tp1
+                         else f"📍 pre-TP1 — SL at {_mon.MONSTER_PRE_TP1_FLOOR_PCT:+.0f}%")
+                lines.append(
+                    f"  {icon} {name:22s}  src={src}  entry={entry:.2e}"
+                    f"  age={age_str}  P&L={pnl_pct:+.1f}%"
+                )
+                lines.append(f"    → {stage}  |  invested={sol_in:.3f} SOL")
+            lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+        # Recently closed monster trades (last 24h, up to 10)
+        now = _t.time()
+        recent = [c for c in closed[-20:] if now - float(c.get("close_ts") or 0) < 86400]
+        if recent:
+            lines.append("")
+            lines.append(f"📊 MONSTER RECENT CLOSES (last 24h, {len(recent)} trades):")
+            net = 0.0
+            for rec in recent[-10:]:
+                pnl_pct = float(rec.get("final_pnl_pct") or 0)
+                pnl_sol = float(rec.get("final_pnl_sol") or 0)
+                net += pnl_sol
+                rsn = rec.get("close_reason", "?")
+                name = rec.get("token_name", "?")[:22]
+                age_min = (now - float(rec.get("close_ts") or 0)) / 60
+                age_s = f"{age_min:.0f}m ago" if age_min < 60 else f"{age_min/60:.1f}h ago"
+                tag = "✅" if pnl_sol >= 0 else "❌"
+                lines.append(
+                    f"  {tag} {name:22s}  P&L={pnl_pct:+.1f}%  ({pnl_sol:+.4f} SOL)"
+                    f"  reason={rsn}  {age_s}"
+                )
+            wins = [r for r in recent if (r.get("final_pnl_sol") or 0) > 0]
+            wr = len(wins) / len(recent) * 100 if recent else 0
+            lines.append(
+                f"  ── 24h net: {net:+.4f} SOL  |  WR {wr:.0f}% ({len(wins)}/{len(recent)})"
+            )
+
+        return "\n".join(lines) + "\n\n" if lines else ""
+    except Exception as _e:
+        return f"[monster positions direct read failed: {_e}]\n\n"
+
+
 async def _build_context(runtime: AgentRuntime) -> str:
     """Assemble a rich trading context for Claude to reason over.
 
@@ -1382,13 +1459,28 @@ async def _build_context(runtime: AgentRuntime) -> str:
         wallet_display = f"{wallet_sol:.4f} SOL"
 
     live_positions_block = _gather_live_positions_direct()
+    monster_positions_block = _gather_monster_positions_direct()
+
+    # Short-circuit the copy-trade banner when copy-trade is disabled at config
+    # level — otherwise Jarvis keeps reporting on Frost/clukz/Walta wallets
+    # even though no trades are running there. Emits a single status line
+    # instead of the full 60-line "PRIMARY STRATEGY" block.
+    copy_trade_active = bool(cfg.get("copy_trade_enabled", False))
+    if copy_trade_active:
+        copy_trade_section = _load_copy_trade_context()
+    else:
+        copy_trade_section = (
+            "COPY-TRADE: ⏸ DISABLED (copy_trade_enabled=false) — no watched-wallet entries. "
+            "Monster strategy is the PRIMARY active strategy.\n"
+        )
 
     monster_intel = _load_monster_intel()
     return (
         f"=== JARVIS TRADING CONTEXT — {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')} ===\n\n"
         f"REAL WALLET: {wallet_display}  |  Market: Fear & Greed {fng_str}\n\n"
         + live_positions_block
-        + f"{_load_copy_trade_context()}\n"
+        + monster_positions_block
+        + f"{copy_trade_section}\n"
         + f"{monster_intel}\n"
         f"ALL LEARNED LESSONS:\n{lessons_str}\n\n"
         f"RECENT BOT ACTIVITY (live log — copy trade + scout):\n{log_tail}\n"
@@ -1632,6 +1724,30 @@ async def _cmd_positions(runtime: AgentRuntime) -> str:
                     f"  **{mint[:12]}...** | {dex} | entry {entry:.2e} | "
                     f"size {size:.3f} SOL | held {elapsed/60:.0f}m | P&L {pnl_str}"
                 )
+
+    # ── Monster strategy (Strategy E — separate slot pool) ──────────────────
+    try:
+        from elizaos.plugins.solana import strategy_e_monster as _mon
+        mon_positions = _mon.open_positions()
+        if mon_positions:
+            lines.append(f"\n**Monster Strategy — {len(mon_positions)}/{_mon.MONSTER_MAX_CONCURRENT} open:**\n")
+            now_m = time.time()
+            for mint, mp in mon_positions.items():
+                token   = mp.get("token_name", mint[:12])
+                src     = mp.get("signal_source", "?")
+                entry   = float(mp.get("entry_price") or 0)
+                cur     = float(mp.get("current_price") or entry)
+                size    = float(mp.get("sol_spent") or 0)
+                elapsed = now_m - float(mp.get("entry_ts") or now_m)
+                pnl     = ((cur / entry) - 1.0) * 100 if entry > 0 else 0.0
+                peak    = float(mp.get("peak_pnl_pct") or 0)
+                tp1     = "✅" if mp.get("tp1_fired") else "—"
+                lines.append(
+                    f"  **{token}** [{src}] | entry {entry:.2e} | size {size:.3f} SOL | "
+                    f"held {elapsed/60:.0f}m | P&L {pnl:+.1f}% | peak {peak:+.1f}% | tp1={tp1}"
+                )
+    except Exception as _me:
+        lines.append(f"  (monster read error: {_me})")
 
     # ── Recently closed (last 10 min) — so user never sees blank response ────────
     try:
@@ -2830,6 +2946,35 @@ async def _execute_tool(name: str, inputs: dict, runtime) -> str:
         except Exception as exc:
             lines.append(f"  (copy trade data unavailable: {exc})")
 
+        # ── Monster strategy positions (separate slot pool) ──────────────────
+        try:
+            from elizaos.plugins.solana import strategy_e_monster as _mon
+            mon_positions = _mon.open_positions()
+            if lines:
+                lines.append("")
+            lines.append(
+                f"=== MONSTER POSITIONS ({len(mon_positions)}/{_mon.MONSTER_MAX_CONCURRENT} slots) ==="
+            )
+            if mon_positions:
+                for mint, mp in mon_positions.items():
+                    age_secs = int(_time.time() - float(mp.get("entry_ts") or _time.time()))
+                    age_str  = f"{age_secs//3600}h{(age_secs%3600)//60}m" if age_secs >= 3600 else f"{age_secs//60}m{age_secs%60}s"
+                    entry    = float(mp.get("entry_price") or 0)
+                    cur      = float(mp.get("current_price") or entry)
+                    pnl      = ((cur / entry) - 1.0) * 100 if entry > 0 else 0.0
+                    peak     = float(mp.get("peak_pnl_pct") or 0)
+                    src      = mp.get("signal_source", "?")
+                    tp1      = "✅" if mp.get("tp1_fired") else "—"
+                    lines.append(
+                        f"  {'🟢' if pnl >= 0 else '🔴'} {str(mp.get('token_name', mint[:10]))[:18]} "
+                        f"({mint[:8]}…) src={src} size={float(mp.get('sol_spent') or 0):.2f}SOL "
+                        f"entry={entry:.2e} age={age_str} P&L={pnl:+.1f}% peak={peak:+.1f}% tp1={tp1}"
+                    )
+            else:
+                lines.append("  (no monster positions — scouts watching lifecycle/cluster/deployer)")
+        except Exception as exc:
+            lines.append(f"  (monster data unavailable: {exc})")
+
         return "\n".join(lines) if lines else "No open positions."
 
     if name == "close_position":
@@ -2882,6 +3027,23 @@ async def _execute_tool(name: str, inputs: dict, runtime) -> str:
                     results.append(f"✅ Force-closed strategy position {pos_key[:12]}…")
                 except Exception as exc:
                     results.append(f"❌ Close failed for {pos_key[:12]}…: {exc}")
+
+        # ── Monster strategy positions (separate pool) ────────────────────────
+        try:
+            from elizaos.plugins.solana import strategy_e_monster as _mon
+            mon_positions = _mon.open_positions()
+            matched_mon = [k for k in mon_positions if k == mint or k.startswith(mint)]
+            for m in matched_mon:
+                mp = mon_positions[m]
+                token = mp.get("token_name", m[:10])
+                cur   = float(mp.get("current_price") or mp.get("entry_price") or 0.0)
+                try:
+                    await _mon._apply_exit(m, "jarvis_close", 1.0, runtime, cur)
+                    results.append(f"✅ Closed monster position: {token}")
+                except Exception as exc:
+                    results.append(f"❌ Monster close failed for {token}: {exc}")
+        except Exception as exc:
+            results.append(f"⚠️ Monster close error: {exc}")
 
         if not results:
             return f"No open position found matching '{mint[:16]}'. Use get_positions to see what's open."
@@ -3213,12 +3375,16 @@ async def _cmd_free_chat(text: str, runtime: AgentRuntime) -> str:
 
     system_prompt = (
         "You are J.A.R.V.I.S. — the quantitative trading intelligence system for PF Capital's Solana "
-        "Signal Engine. You are Claude Sonnet 4.6, the primary brain in a 4-tier AI cascade:\n"
+        "Signal Engine. You are Claude Opus 4.7, the depth brain in a 4-tier AI cascade:\n"
         "  Tier 1 — Groq Sentinel: gut-check every 30s per open position\n"
         "  Tier 2 — Gemini Analyst: pattern recognition every 2min per position\n"
-        "  Tier 3 — YOU (Claude Sonnet 4.6): deep analysis every 5min + trader interface + config authority\n"
-        "  Tier 4 — Claude Opus CRO: emergency escalation only (Tier 1+2 both signal SELL)\n"
-        "Copy-trade whale signals are the PRIMARY strategy. Scout strategies (B/C/D) are secondary.\n\n"
+        "  Tier 3 — YOU (Claude Opus 4.7): depth analysis every 3min + trader interface + config authority\n"
+        "  Tier 4 — Claude Opus 4.7 escalation: emergency review (drawdown ≤ -12% or Tier 1+2 conflict)\n"
+        "ACTIVE STRATEGY: Monster (Strategy E) is the PRIMARY strategy — separate slot pool, 4 signal "
+        "scouts (cluster-confirm, serial-deployer, lifecycle, breakout-candle), TP +20% sell 90%/ride 10%, "
+        "SL -15%, size 0.30 SOL, max 2 concurrent, 90min age cap. "
+        "Copy-trade is DISABLED at config level (copy_trade_enabled=false) — do NOT report on "
+        "Frost/Walta/clukz wallets unless the trader explicitly asks about historical copy-trade data.\n\n"
         "PERSONALITY — QUANT DESK RULES:\n"
         "- Lead with numbers. Never with pleasantries or filler text.\n"
         "- Be direct and concise. No padding, no 'I'd be happy to help'.\n"
@@ -3232,10 +3398,10 @@ async def _cmd_free_chat(text: str, runtime: AgentRuntime) -> str:
         "- When asked for analysis, structure as: Thesis → Evidence → Risk → Action\n\n"
         "COMMAND RESPONSE FORMATS — use these exact structures for button commands:\n\n"
         "'Sitrep' → one-screen system status:\n"
-        "  Balance: X SOL | Positions: N open | Net P&L today: ±X SOL\n"
-        "  [Each position: token, P&L%, hold time, monitor tier active, trail stop level]\n"
-        "  Brains: Groq [active/standby] | Gemini [x] | Claude [x] | Scanner: X tokens\n"
-        "  Alerts: [any risk flags — blank if healthy]\n\n"
+        "  Balance: X SOL | Monster positions: N/2 slots used | Net P&L today: ±X SOL\n"
+        "  [Each open monster position: token, signal source, P&L%, hold time, TP1 status]\n"
+        "  Brains: Groq [active/standby] | Gemini [x] | Opus 4.7 [x] | Scouts: cluster/serial/lifecycle/breakout\n"
+        "  Alerts: [any risk flags — blank if healthy]. Never cite Frost/Walta/clukz copy-trade wallets.\n\n"
         "'Positions' → per position:\n"
         "  Token | Entry price | Current P&L% + SOL | Hold time\n"
         "  Monitor: which AI tier last evaluated, decision, confidence, trailing stop level\n"
@@ -3244,13 +3410,14 @@ async def _cmd_free_chat(text: str, runtime: AgentRuntime) -> str:
         "'Brain status' → all 4 tiers:\n"
         "  Tier 1 Groq: X calls, X HOLD / X WATCH / X SELL, last signal + age\n"
         "  Tier 2 Gemini: X calls, last risk assessment\n"
-        "  Tier 3 Claude: reached? last action + confidence. Flag if Claude consistently unreached before exits.\n"
-        "  Tier 4 Opus: triggered? decision if yes, dormant if no\n"
+        "  Tier 3 Opus 4.7: reached? last action + confidence. Flag if depth brain consistently unreached before exits.\n"
+        "  Tier 4 Opus 4.7 escalation: triggered? decision if yes, dormant if no\n"
         "  Health: API latency, any connection failures\n\n"
-        "'Scanner report' → copy-trade whale scanner + monster library:\n"
-        "  Watched wallets: N | Signals today: N entered / N skipped + top skip reasons\n"
-        "  Monster library: X tokens | X sustained runners | latest discoveries + fingerprints\n"
-        "  Active alerts: any new 150%+ runners today\n\n"
+        "'Scanner report' → monster signal scouts + library:\n"
+        "  Scouts live: cluster-confirm / serial-deployer / lifecycle / breakout-candle (state per loop)\n"
+        "  Signals today: N fired / N entered / N skipped + top skip reasons\n"
+        "  Monster library: X tokens | latest seed additions + pattern fingerprints\n"
+        "  Active alerts: any fresh monster entries in last 60min\n\n"
         "'P&L breakdown' → financial performance:\n"
         "  Today / this week / overall: trades, ±SOL, WR%\n"
         "  Avg win: +X% | Avg loss: -X% | Best: [token] +X% | Worst: [token] -X%\n"
