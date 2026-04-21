@@ -35,6 +35,11 @@ import aiohttp
 MONSTER_TP1_GAIN_PCT     = 20.0    # +20% → fire TP1 (was +100; retuned 2026-04-20 after -0.79 SOL day)
 MONSTER_TP1_SELL_FRACTION = 0.90   # sell 90% at TP1, 10% rides for moonshot upside
 MONSTER_PRE_TP1_FLOOR_PCT = -15.0  # hard SL before TP1 fires (tightened -25 → -15, unconditional)
+# Break-even trail: once peak pnl ≥ +10%, SL ratchets up to BE_TRAIL_TARGET_PCT.
+# SOLMONEY 2026-04-22 peaked +19.4% then collapsed to -14.8% in 30s — this trap
+# would have banked ≥ +5% instead of stopping at the -15% floor.
+MONSTER_BE_TRAIL_ACTIVATE_PCT = 10.0  # peak must reach +10% before trail arms
+MONSTER_BE_TRAIL_TARGET_PCT   = 5.0   # once armed, exit if current pnl falls below +5%
 MONSTER_FLAT_TIMEOUT_SECS = 60 * 60  # 60 min pre-TP1 with pnl in flat zone → exit
 MONSTER_FLAT_ZONE_PCT     = 5.0    # ±5% = "flat"
 MONSTER_MAX_CONCURRENT    = 2
@@ -270,6 +275,33 @@ async def open_monster_position(
     }
     _save_state()
     print(f"[monster] ✅ entered {token_name} sig={buy_sig[:16] if buy_sig else 'none'}... price={entry_price}")
+
+    # ── Telegram buy alert ──
+    try:
+        from elizaos.plugins.solana.telegram_alerts import send_alert as _tg_buy
+        mode_tag = "PAPER" if MONSTER_PAPER_ONLY else "LIVE"
+        meta_str = ""
+        if metadata:
+            mc = metadata.get("mcap_usd") or metadata.get("mc_usd")
+            liq = metadata.get("liq_usd")
+            age = metadata.get("age_min")
+            bits = []
+            if mc: bits.append(f"MC ${float(mc)/1000:.0f}k")
+            if liq: bits.append(f"Liq ${float(liq)/1000:.0f}k")
+            if age is not None: bits.append(f"age {int(age)}m")
+            if bits:
+                meta_str = " • " + "  ".join(bits)
+        sig_short = f"{buy_sig[:10]}..." if buy_sig and buy_sig != "paper" else buy_sig
+        await _tg_buy(
+            f"🟢 <b>MONSTER BUY ({mode_tag})</b>\n"
+            f"<b>{token_name}</b> via <b>{signal_source}</b>\n"
+            f"<code>{mint[:20]}...</code>\n\n"
+            f"Size: <b>{sol_size:.3f} SOL</b>  •  Entry: <code>{entry_price:.2e}</code>{meta_str}\n"
+            f"Sig: <code>{sig_short}</code>"
+        )
+    except Exception as _tg_err:
+        print(f"[monster] telegram buy alert failed: {_tg_err}")
+
     return True
 
 
@@ -291,6 +323,14 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
     # ── TP1: +100% → sell 50% ────────────────────────────────────────────
     if not tp1_fired and pnl_pct >= MONSTER_TP1_GAIN_PCT:
         return "tp1_100pct", MONSTER_TP1_SELL_FRACTION
+
+    # ── Pre-TP1 break-even trail: peak ≥ +10% → exit if pnl drops below +5% ─
+    # SOLMONEY 2026-04-22 trap: peaked +19.4% then collapsed to -14.8% in 30s.
+    # This trail would have banked +5% instead of waiting for the -15% floor.
+    if not tp1_fired:
+        peak = float(pos.get("peak_pnl_pct") or 0.0)
+        if peak >= MONSTER_BE_TRAIL_ACTIVATE_PCT and pnl_pct <= MONSTER_BE_TRAIL_TARGET_PCT:
+            return f"be_trail_peak{peak:.0f}_pnl{pnl_pct:.0f}", 1.0
 
     # ── Pre-TP1 hard floor: -40% → full exit ─────────────────────────────
     if not tp1_fired and pnl_pct <= MONSTER_PRE_TP1_FLOOR_PCT:
@@ -447,6 +487,35 @@ async def _apply_exit(mint: str, reason: str, sell_fraction: float, runtime: Any
     })
     print(f"[monster] 📤 {reason} sold {sell_fraction*100:.0f}% of {pos['token_name']} "
           f"pnl={pnl_pct:+.1f}% sol_out={sol_out:.4f} sig={str(sig)[:16] if sig else 'paper'}")
+
+    # ── Telegram sell alert (partial or full) ──
+    try:
+        from elizaos.plugins.solana.telegram_alerts import send_alert as _tg_sell
+        mode_tag = "PAPER" if MONSTER_PAPER_ONLY else "LIVE"
+        will_close = is_full or pos["remaining_fraction"] <= 0.001
+        if will_close:
+            icon = "💰" if pnl_pct > 0 else ("🔴" if pnl_pct <= -10 else "⚪")
+            final_pnl_sol = (pos.get("locked_sol") or 0.0) - (pos.get("sol_spent") or 0.0)
+            hold_s = max(0.0, now - float(pos.get("entry_ts") or now))
+            hold_str = f"{int(hold_s//60)}m{int(hold_s%60):02d}s"
+            peak = pos.get("peak_pnl_pct") or 0.0
+            body = (
+                f"{icon} <b>MONSTER CLOSE ({mode_tag})</b>\n"
+                f"<b>{pos['token_name']}</b>  •  reason: <code>{reason}</code>\n"
+                f"<code>{mint[:20]}...</code>\n\n"
+                f"Final P&L: <b>{pnl_pct:+.1f}%</b>  ({final_pnl_sol:+.4f} SOL)\n"
+                f"Hold: {hold_str}  •  Peak: {peak:+.1f}%"
+            )
+        else:
+            body = (
+                f"🎯 <b>MONSTER PARTIAL ({mode_tag})</b>\n"
+                f"<b>{pos['token_name']}</b>  •  reason: <code>{reason}</code>\n"
+                f"Sold <b>{sell_fraction*100:.0f}%</b> at <b>{pnl_pct:+.1f}%</b>\n"
+                f"Out: <b>{sol_out:.4f} SOL</b>  •  remaining: {pos['remaining_fraction']*100:.0f}%"
+            )
+        await _tg_sell(body)
+    except Exception as _tg_err:
+        print(f"[monster] telegram sell alert failed: {_tg_err}")
 
     if is_full or pos["remaining_fraction"] <= 0.001:
         final_pnl_sol = pos["locked_sol"] - pos["sol_spent"]

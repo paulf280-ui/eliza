@@ -667,6 +667,7 @@ BREAKOUT_MAX_LIQ_USD         = 500_000
 BREAKOUT_MIN_MC_USD          = 100_000
 BREAKOUT_MAX_MC_USD          = 5_000_000
 BREAKOUT_M5_MIN_PCT          = 20.0
+BREAKOUT_H1_MIN_PCT          = 0.0    # reject dead-cat bounces (SOLMONEY 2026-04-22: h1=-15% → dumped 28pp in 30s)
 BREAKOUT_H1_MAX_PCT          = 150.0
 BREAKOUT_MIN_M5_VOL_USD      = 3_000
 BREAKOUT_MIN_H1_TXNS         = 30
@@ -711,6 +712,8 @@ async def breakout_candle_scout_loop(runtime: Any,
                     if m5 < BREAKOUT_M5_MIN_PCT:
                         continue
                     if h1 > BREAKOUT_H1_MAX_PCT:
+                        continue
+                    if h1 < BREAKOUT_H1_MIN_PCT:
                         continue
                     vol_m5 = float((p.get("volume") or {}).get("m5") or 0)
                     if vol_m5 < BREAKOUT_MIN_M5_VOL_USD:
