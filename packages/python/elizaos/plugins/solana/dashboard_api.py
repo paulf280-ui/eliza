@@ -141,6 +141,53 @@ async def _get_current_prices(runtime: AgentRuntime, mints: list[str]) -> dict[s
     return prices
 
 
+def _serialize_monster_position(mint: str, mp: dict[str, Any]) -> dict[str, Any]:
+    """Serialize a strategy_e_monster position into the dashboard schema.
+
+    The dashboard OPEN POSITIONS table consumes the same fields pos_mgr emits,
+    so we project monster state onto that schema. Monster-only fields are added
+    as extra keys (source, tp1_fired, locked_sol) — frontend ignores unknown keys.
+    """
+    entry = float(mp.get("entry_price") or 0.0)
+    cur   = float(mp.get("current_price") or entry)
+    sol_spent = float(mp.get("sol_spent") or 0.0)
+    remaining = float(mp.get("remaining_fraction", 1.0))
+    pnl_pct = ((cur / entry) - 1.0) * 100 if entry > 0 else 0.0
+    age_secs = time.time() - float(mp.get("entry_ts") or time.time())
+    return {
+        "mint": mint,
+        "dex": "pump-amm" if (mp.get("pool") or "").startswith("pump") else (mp.get("pool") or "pumpswap"),
+        "entry_price_sol": entry,
+        "entry_sol_spent": sol_spent,
+        "token_amount": 0,
+        "token_decimals": 6,
+        "stop_loss_price": entry * 0.6 if entry > 0 else 0,  # -40% hard floor pre-TP1
+        "tp1_price": entry * 2.0 if entry > 0 else 0,        # +100% = TP1
+        "tp2_price": 0,
+        "tp3_price": 0,
+        "peak_price": float(mp.get("peak_price") or entry),
+        "trailing_stop_price": 0,
+        "tp1_hit": bool(mp.get("tp1_fired", False)),
+        "tp2_hit": False,
+        "tp3_hit": False,
+        "entry_time": float(mp.get("entry_ts") or time.time()),
+        "age_seconds": age_secs,
+        "current_price_sol": cur,
+        "pnl_pct": round(pnl_pct, 2),
+        "unrealized_pnl_sol": round((pnl_pct / 100) * sol_spent * remaining, 6),
+        "creator_wallet": (mp.get("metadata") or {}).get("creator_wallet"),
+        "score": None,
+        "fill_pct": 100.0,
+        # Monster-specific extras
+        "strategy": "monster",
+        "signal_source": mp.get("signal_source"),
+        "token_name": mp.get("token_name"),
+        "locked_sol": float(mp.get("locked_sol") or 0.0),
+        "peak_pnl_pct": float(mp.get("peak_pnl_pct") or 0.0),
+        "remaining_fraction": remaining,
+    }
+
+
 def _generate_report(pos_mgr, wallet_data: dict, session_start: float) -> dict[str, Any]:
     """Generate a comprehensive session / paper-trading performance report."""
     if pos_mgr is None:
@@ -250,11 +297,24 @@ def register_dashboard_routes(app: web.Application, runtime: AgentRuntime) -> No
             except Exception:
                 pass
 
+        positions = pos_mgr.serialize_positions(prices) if pos_mgr else {}
+        # Merge monster-strategy positions so the dashboard's initial snapshot
+        # (and the 10s status poll) surfaces them — /api/positions already does
+        # this, but the frontend reads /api/status for first paint.
+        try:
+            from elizaos.plugins.solana import strategy_e_monster as _mon
+            for mint, mp in _mon.open_positions().items():
+                positions[mint] = _serialize_monster_position(mint, mp)
+        except Exception:
+            pass
+
+        copy_trade_enabled = os.getenv("COPY_TRADE_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
         data: dict[str, Any] = {
             "timestamp": time.time(),
             "paper_trading": PAPER_TRADING,
+            "copy_trade_enabled": copy_trade_enabled,
             "wallet": wallet_data,
-            "positions": pos_mgr.serialize_positions(prices) if pos_mgr else {},
+            "positions": positions,
             "risk": pos_mgr.get_risk_summary() if pos_mgr else {},
             "trade_history": pos_mgr.get_trade_history(50) if pos_mgr else [],
             "equity_history": pos_mgr.get_equity_snapshots() if pos_mgr else [],
@@ -272,13 +332,24 @@ def register_dashboard_routes(app: web.Application, runtime: AgentRuntime) -> No
     async def handle_positions(request: web.Request) -> web.Response:
         pos_mgr = _get_pos_mgr(runtime)
         if not pos_mgr:
-            return web.json_response({"positions": {}, "risk": {}})
-        mints = list(pos_mgr.positions.keys())
-        prices = await _get_current_prices(runtime, mints) if mints else {}
-        return web.json_response({
-            "positions": pos_mgr.serialize_positions(prices),
-            "risk": pos_mgr.get_risk_summary(),
-        })
+            positions = {}
+            risk: dict[str, Any] = {}
+        else:
+            mints = list(pos_mgr.positions.keys())
+            prices = await _get_current_prices(runtime, mints) if mints else {}
+            positions = pos_mgr.serialize_positions(prices)
+            risk = pos_mgr.get_risk_summary()
+
+        # Merge monster-strategy positions so the dashboard OPEN POSITIONS
+        # panel surfaces them alongside the legacy pos_mgr positions.
+        try:
+            from elizaos.plugins.solana import strategy_e_monster as _mon
+            for mint, mp in _mon.open_positions().items():
+                positions[mint] = _serialize_monster_position(mint, mp)
+        except Exception:
+            pass
+
+        return web.json_response({"positions": positions, "risk": risk})
 
     # ── GET /api/history ─────────────────────────────────────────────────────
 
@@ -367,16 +438,27 @@ def register_dashboard_routes(app: web.Application, runtime: AgentRuntime) -> No
         mint = request.match_info.get("mint", "")
         pos_mgr = _get_pos_mgr(runtime)
 
-        if not pos_mgr:
-            return web.json_response({"error": "position manager not available"}, status=503)
-        if mint not in pos_mgr.positions:
-            return web.json_response({"error": f"no open position for {mint}"}, status=404)
+        # Copy-trade / strategy positions live in pos_mgr.positions
+        if pos_mgr and mint in pos_mgr.positions:
+            try:
+                await pos_mgr._execute_auto_close(mint, "manual_close")
+                return web.json_response({"ok": True, "mint": mint, "pool": "strategy"})
+            except Exception as exc:
+                return web.json_response({"error": str(exc)}, status=500)
 
+        # Monster positions live in their own pool (strategy_e_monster)
         try:
-            await pos_mgr._execute_auto_close(mint, "manual_close")
-            return web.json_response({"ok": True, "mint": mint})
+            from elizaos.plugins.solana import strategy_e_monster as _mon
+            mon_positions = _mon.open_positions()
+            if mint in mon_positions:
+                mp = mon_positions[mint]
+                cur = float(mp.get("current_price") or mp.get("entry_price") or 0.0)
+                await _mon._apply_exit(mint, "manual_close", 1.0, runtime, cur)
+                return web.json_response({"ok": True, "mint": mint, "pool": "monster"})
         except Exception as exc:
-            return web.json_response({"error": str(exc)}, status=500)
+            return web.json_response({"error": f"monster close failed: {exc}"}, status=500)
+
+        return web.json_response({"error": f"no open position for {mint}"}, status=404)
 
     # ── Jarvis helper: analyze trade history ─────────────────────────────────
 
@@ -1657,10 +1739,49 @@ When adjusting a filter, always explain your reasoning based on the data above."
             from elizaos.plugins.solana.axiom_copy_trader import (
                 get_paper_stats, WATCHED_WALLETS, _paper_trades, _signal_log
             )
+            copy_trade_enabled = os.getenv("COPY_TRADE_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
             stats = get_paper_stats()
-            stats["watched_wallets"] = list(WATCHED_WALLETS.keys())
-            # Include last 50 closed trades for history table
-            stats["recent_trades"] = list(reversed(_paper_trades[-50:]))
+            stats["copy_trade_enabled"] = copy_trade_enabled
+            stats["watched_wallets"] = list(WATCHED_WALLETS.keys()) if copy_trade_enabled else []
+            # Build the recent trades feed: merge copy-trade paper trades
+            # and monster-strategy closed trades into a single chronological
+            # list so the dashboard trade cards surface BOTH strategies.
+            merged: list[dict] = list(_paper_trades[-50:]) if copy_trade_enabled else []
+            try:
+                from elizaos.plugins.solana import strategy_e_monster as _mon
+                for mc in _mon._monster_closed[-50:]:
+                    entry_p = float(mc.get("entry_price") or 0)
+                    close_p = float(mc.get("close_price") or entry_p)
+                    entry_ts = float(mc.get("entry_ts") or 0)
+                    close_ts = float(mc.get("close_ts") or 0)
+                    hold_mins = ((close_ts - entry_ts) / 60.0) if (close_ts and entry_ts) else 0.0
+                    merged.append({
+                        "ts":            close_ts or mc.get("ts") or 0,
+                        "dt":            None,
+                        "mint":          mc.get("mint", ""),
+                        "token_name":    mc.get("token_name", ""),
+                        "wallet":        f"monster/{mc.get('signal_source','?')}",
+                        "reason":        mc.get("close_reason", "monster_close"),
+                        "sol_spent":     float(mc.get("sol_spent") or 0),
+                        "entry_price":   entry_p,
+                        "exit_price":    close_p,
+                        "pnl_sol":       round(float(mc.get("final_pnl_sol") or 0), 4),
+                        "pnl_pct":       round(float(mc.get("final_pnl_pct") or 0), 2),
+                        "hold_mins":     round(hold_mins, 1),
+                        "peak_pnl_pct":  round(float(mc.get("peak_pnl_pct") or 0), 2),
+                        "peak_price":    mc.get("peak_price"),
+                        "locked_sol":    round(float(mc.get("locked_sol") or 0), 4),
+                        "partial_exits": mc.get("partial_exits") or [],
+                        "narrative":     mc.get("signal_source", "monster"),
+                        "tp1_hit":       bool(mc.get("tp1_fired", False)),
+                        "tp2_hit":       False,
+                        "strategy":      "monster",
+                        "buy_sig":       mc.get("buy_sig"),
+                    })
+            except Exception:
+                pass
+            merged.sort(key=lambda r: float(r.get("ts") or 0))
+            stats["recent_trades"] = list(reversed(merged[-50:]))
             # Signals fired today
             import time as _t
             day_ago = _t.time() - 86400
