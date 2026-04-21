@@ -60,6 +60,7 @@ def _env_on(key: str, default: str = "false") -> bool:
 CLUSTER_CONFIRM_ENABLED  = _env_on("MONSTER_CLUSTER_CONFIRM_ENABLED", "true")
 SERIAL_DEPLOYER_ENABLED  = _env_on("MONSTER_SERIAL_DEPLOYER_ENABLED", "true")
 LIFECYCLE_SCOUT_ENABLED  = _env_on("MONSTER_LIFECYCLE_ENABLED", "true")
+BREAKOUT_SCOUT_ENABLED   = _env_on("MONSTER_BREAKOUT_ENABLED", "true")
 
 # ─── Cadences ───────────────────────────────────────────────────────────
 CLUSTER_POLL_SECS         = 45     # poll cluster wallets every 45s
@@ -641,3 +642,129 @@ async def lifecycle_scout_loop(runtime: Any,
         except Exception as e:
             print(f"[monster-lifecycle] loop error: {e}")
         await asyncio.sleep(LIFECYCLE_POLL_SECS)
+
+
+# ─── 4) Breakout-candle scout ────────────────────────────────────────────
+# Covers the gap the lifecycle scout leaves at age 90min-12h. Fires when a
+# PumpSwap token shows a +20% m5 breakout on real volume — the same pattern
+# we see in MIM/hijabunc/TERMINAL/ALTSZN at t+30-45min, and the only way to
+# catch slow-cookers like Nintondo that spike 12h post-graduation.
+#
+# Gates (loose on age, strict on breakout quality):
+#   * age 30min-12h                      (lifecycle covers 20-90min; overlap at 30-90min is fine)
+#   * m5 >= +20%                         (breakout candle)
+#   * h1 <= +150%                        (not already blown past — chase risk)
+#   * liq $30k-$500k, mcap $100k-$5M
+#   * vol_m5 >= $3k                      (real volume, not thin-book push)
+#   * h1 txns >= 30
+#   * socials present, top1 < 12%
+
+BREAKOUT_POLL_SECS           = 90
+BREAKOUT_MIN_AGE_SECS        = 30 * 60
+BREAKOUT_MAX_AGE_SECS        = 12 * 3600
+BREAKOUT_MIN_LIQ_USD         = 30_000
+BREAKOUT_MAX_LIQ_USD         = 500_000
+BREAKOUT_MIN_MC_USD          = 100_000
+BREAKOUT_MAX_MC_USD          = 5_000_000
+BREAKOUT_M5_MIN_PCT          = 20.0
+BREAKOUT_H1_MAX_PCT          = 150.0
+BREAKOUT_MIN_M5_VOL_USD      = 3_000
+BREAKOUT_MIN_H1_TXNS         = 30
+BREAKOUT_TOP1_MAX_PCT        = 12.0
+
+
+async def breakout_candle_scout_loop(runtime: Any,
+                                      session: aiohttp.ClientSession) -> None:
+    if not BREAKOUT_SCOUT_ENABLED:
+        print("[monster-breakout] disabled (MONSTER_BREAKOUT_ENABLED=false)")
+        return
+    print("[monster-breakout] loop started — watching for +20% m5 breakouts on 30min-12h pumpswap pairs")
+
+    while True:
+        try:
+            pairs = await _recent_pumpswap_profiles(session)
+            now_ms = time.time() * 1000
+            for p in pairs:
+                try:
+                    if (p.get("dexId") or "").lower() not in ("pumpswap", "pump-amm"):
+                        continue
+                    mint = (p.get("baseToken") or {}).get("address")
+                    if not mint or mint in _MONSTER_SKIP_MINTS:
+                        continue
+                    if _recently_signalled(mint):
+                        continue
+                    pca = p.get("pairCreatedAt")
+                    if not pca:
+                        continue
+                    age_secs = (now_ms - float(pca)) / 1000
+                    if not (BREAKOUT_MIN_AGE_SECS <= age_secs <= BREAKOUT_MAX_AGE_SECS):
+                        continue
+                    liq_usd = float((p.get("liquidity") or {}).get("usd") or 0)
+                    if not (BREAKOUT_MIN_LIQ_USD <= liq_usd <= BREAKOUT_MAX_LIQ_USD):
+                        continue
+                    mc_usd = float(p.get("marketCap") or p.get("fdv") or 0)
+                    if not (BREAKOUT_MIN_MC_USD <= mc_usd <= BREAKOUT_MAX_MC_USD):
+                        continue
+                    pc = p.get("priceChange") or {}
+                    m5 = float(pc.get("m5") or 0)
+                    h1 = float(pc.get("h1") or 0)
+                    if m5 < BREAKOUT_M5_MIN_PCT:
+                        continue
+                    if h1 > BREAKOUT_H1_MAX_PCT:
+                        continue
+                    vol_m5 = float((p.get("volume") or {}).get("m5") or 0)
+                    if vol_m5 < BREAKOUT_MIN_M5_VOL_USD:
+                        continue
+                    txns_h1 = (p.get("txns") or {}).get("h1") or {}
+                    buys = txns_h1.get("buys") or 0
+                    sells = txns_h1.get("sells") or 0
+                    total = buys + sells
+                    if total < BREAKOUT_MIN_H1_TXNS:
+                        continue
+                    br = (buys / total) * 100 if total > 0 else 0
+                    base_info = p.get("info") or {}
+                    if not (base_info.get("socials") or base_info.get("websites")):
+                        continue
+
+                    t1 = await top1_wallet_pct(session, mint)
+                    if t1 is None or t1 >= BREAKOUT_TOP1_MAX_PCT:
+                        continue
+
+                    _mark_signalled(mint)
+                    print(f"[monster-breakout] 🎯 {mint[:8]} BREAKOUT age={age_secs/60:.0f}min "
+                          f"m5={m5:+.0f}% h1={h1:+.0f}% liq=${liq_usd:,.0f} vol_m5=${vol_m5:,.0f} top1={t1}%")
+                    _log_signal({
+                        "source": "breakout_candle",
+                        "mint": mint,
+                        "age_min": round(age_secs / 60, 1),
+                        "liq_usd": liq_usd,
+                        "mc_usd": mc_usd,
+                        "m5_change_pct": m5,
+                        "h1_change_pct": h1,
+                        "vol_m5_usd": vol_m5,
+                        "buy_ratio_pct": br,
+                        "top1_pct": t1,
+                    })
+                    if not monster.can_open_new_position():
+                        continue
+                    sym = (p.get("baseToken") or {}).get("symbol") or mint[:8]
+                    await monster.open_monster_position(
+                        mint=mint,
+                        token_name=sym,
+                        signal_source="breakout_candle",
+                        sol_size=monster.MONSTER_DEFAULT_SIZE_SOL,
+                        session=session,
+                        runtime=runtime,
+                        metadata={
+                            "age_min": round(age_secs / 60, 1),
+                            "liq_usd": liq_usd, "mc_usd": mc_usd,
+                            "m5_change": m5, "h1_change": h1,
+                            "vol_m5_usd": vol_m5, "buy_ratio": br,
+                            "top1_pct": t1,
+                        },
+                    )
+                except Exception:
+                    continue
+        except Exception as e:
+            print(f"[monster-breakout] loop error: {e}")
+        await asyncio.sleep(BREAKOUT_POLL_SECS)
