@@ -27,24 +27,19 @@ export default function CopyTradeSummaryBar({
         <div className="w-2.5 h-2.5 rounded-full bg-orange-400 animate-pulse"
           style={{ boxShadow: '0 0 8px rgba(249,115,22,0.8)' }} />
         <span className="text-sm font-bold text-zinc-200 uppercase tracking-widest">
-          Copy Trade Command Centre
+          Monster Command Centre
         </span>
-        {liveMode ? (
+        {liveMode && (
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
             style={{ background: 'rgba(239,68,68,0.2)', color: '#f87171' }}>
             LIVE
-          </span>
-        ) : (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse"
-            style={{ background: 'rgba(249,115,22,0.2)', color: '#f97316' }}>
-            PAPER · 24H TEST
           </span>
         )}
       </div>
 
       {/* Stats */}
       <div className="flex flex-wrap items-center gap-6">
-        <Stat label={liveMode ? 'Balance' : 'Virtual Balance'} value={`${balance.toFixed(3)} SOL`} valueClass="text-amber-400" />
+        <Stat label="Balance" value={`${balance.toFixed(3)} SOL`} valueClass="text-amber-400" />
         <Stat
           label="Net P&L"
           value={`${pnlPos ? '+' : ''}${netPnl.toFixed(4)} SOL`}

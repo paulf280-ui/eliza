@@ -59,7 +59,11 @@ WATCHED_WALLETS: dict[str, str] = {
     #   whale_already_sold — rambo is a sub-2s scalper we can't catch in time.
     #   Negative expectancy + low fill rate = remove.
     "Frost":   "4nwfXw7n98jEQn93VWY7Cuf1jnn1scHXuXCPGVYS9k6T",  # Kolscan #12 weekly | +0.408 SOL net (62% WR, 8 trades) | median hold 7 min
-    "Walta":   "39q2g5tTQn9n7KnuapzwS2smSx3NGYqBoea11tBjsGEt",  # Kolscan #9 weekly | +0.076 SOL (14% WR, 7 trades) — KEEP for ASTEROID-class 89x signals
+    # ── REMOVED 2026-04-20: Walta. n=8, net -0.1010 SOL, 1/8 WR. Worst trade -50.5%
+    #   on "Don't Go To Standfor" (flash-rug at 01:06 UTC Apr 20 — SL fired at -10%
+    #   but execution slipped to -50% when PumpPortal routing failed during rug).
+    #   Flash-rug exposure pattern: the 1 big win (+89x on ASTEROID) is not enough
+    #   to compensate for the single-trade drawdown risk.
     # ── RE-PROMOTED 2026-04-18: clukz — 20 trades, 45% WR, +0.397 SOL net. 73%
     #   zero-peak losses (bundler-adjacent) BUT 2 monster wins (+141.6%, +149.9%).
     #   Original removal reason (sub-1s scalper) may have been premature — 20 fills
@@ -83,6 +87,7 @@ _BLACKLISTED_WALLETS: set[str] = {
     "gangJEP5geDHjPVRhDS5dTF5e6GtRvtNogMEEVs91RV",   # Gang_0SOL   — 25%WR loser
     "CyaE1VxvBrahnPWkqm5VsdCvyS2QmNht2UFrKJHga54o",  # Cented — 175 trades/day, uncopyable speed
     "5hAgYC8TJCcEZV7LTXAzkTrm7YL29YXyQQJPCNrG84zM",  # Schoen — pump-and-dump, -0.33 SOL (-0.12/day), 87% stale signals, cut 2026-04-16
+    "39q2g5tTQn9n7KnuapzwS2smSx3NGYqBoea11tBjsGEt",  # Walta — flash-rug exposure, -0.1010 SOL (1/8 WR), cut 2026-04-20
     # ── Retired 2026-04-13 (all confirmed micro-scalpers, 0% hold >5 min) ──
     "DsqRyTUh1R37asYcVf1KdX4CNnz5DKEFmnXvgT4NfTPE",  # Axiom_W1 — sub-1s scalper
     # clukz RE-PROMOTED 2026-04-18 — see WATCHED_WALLETS above
@@ -306,7 +311,14 @@ def get_paper_stats() -> dict:
     try:
         from elizaos.plugins.solana import live_config as _lc_s
         _base       = float(_lc_s.get("copy_trade_paper_buy_sol", 0.35))
-        _live_mode  = bool(_lc_s.get("copy_trade_enabled", False))
+        _copy_live  = bool(_lc_s.get("copy_trade_enabled", False))
+        # Dashboard banner reflects whether ANY strategy is trading real SOL.
+        # In the monster-only era copy-trade is off but monster runs LIVE.
+        import os as _os
+        _monster_enabled = _os.getenv("MONSTER_STRATEGY_ENABLED", "false").strip().lower() in ("1","true","yes","on")
+        _monster_paper   = _os.getenv("MONSTER_PAPER_ONLY", "true").strip().lower() in ("1","true","yes","on")
+        _monster_live    = _monster_enabled and not _monster_paper
+        _live_mode  = _copy_live or _monster_live
         _paused     = bool(_lc_s.get("copy_trade_paused", False))
     except Exception:
         _base      = 0.35
@@ -1736,6 +1748,21 @@ async def _open_position(mint: str, token_name: str, sol_spent: float,
                     )
                     sol_spent = round(liq_cap_sol, 3)
 
+            # ── Zombie token age cap (added 2026-04-20) ───────────────────────
+            # Whales should be flipping fresh memecoins, not 7-month-old revival
+            # pumps with $20K liq. Block anything older than 48h. Losing trade
+            # UBI (234 days old, -8.5%) was the trigger.
+            COPY_TRADE_MAX_AGE_SECS = 48 * 3600
+            if _pair_age_secs is not None and _pair_age_secs > COPY_TRADE_MAX_AGE_SECS:
+                age_hrs = _pair_age_secs / 3600
+                print(
+                    f"[copy-trade] 🚫 ZOMBIE TOKEN: {token_name} ({mint[:8]}) "
+                    f"pair age={age_hrs:.1f}h > 48h cap — likely revival pump, blocking"
+                )
+                _log_signal(mint, token_name, wallet_name, sol_spent, "skipped",
+                            f"zombie_age_{age_hrs:.0f}h")
+                return
+
             # ── Post-grad 30-min liquidity test ───────────────────────────────
             # Brand-new PumpSwap graduates often have shallow liquidity and thin
             # holder bases — skip them until the pool has had 30 minutes to season.
@@ -2033,6 +2060,7 @@ async def _close_paper_position(mint: str, reason: str,
             reason.startswith("take_profit")
             or reason.startswith("tp_")
             or reason.startswith("peak_protection")
+            or reason.startswith("moonbag_protection")
         )
         _sell_priority_fee = 0.005 if _is_tp_exit else 0.002
         if _is_tp_exit:
@@ -2223,7 +2251,8 @@ async def _close_paper_position(mint: str, reason: str,
         _low = (reason or "").lower()
         if _low.startswith("stop_loss") or _low.startswith("sl_") or "rug" in _low:
             _outcome_tag = "SL_HIT"
-        elif _low.startswith("take_profit") or _low.startswith("tp_") or _low.startswith("peak_protection"):
+        elif (_low.startswith("take_profit") or _low.startswith("tp_")
+              or _low.startswith("peak_protection") or _low.startswith("moonbag_protection")):
             _outcome_tag = "TP_HIT"
         elif "wallet_exit" in _low:
             _outcome_tag = "WALLET_EXIT"
@@ -2616,6 +2645,32 @@ async def run_copy_trade_monitor(runtime: Any = None) -> None:
                                     f"(dropped {_pp_drawdown:.1f}% from peak, threshold {PP_DRAWDOWN_ABS:.1f}%) — exit"
                                 )
                                 to_stop.append((mint, f"peak_protection_{_peak_now:.0f}pct"))
+                                continue
+
+                        # ── Moonbag Peak-Protection (MPP) ───────────────────────────
+                        # Post-TP1 the original PPTS was gated off, letting the moonbag
+                        # run until wallet_exit. Result: My First Ankle peaked +95%
+                        # and closed -9.6% on wallet_exit:clukz — unacceptable for a
+                        # quant setup. MPP fires AFTER tp1_hit with drawdown tiers
+                        # scaled to peak size: big peaks get wider leash, small peaks
+                        # are cut tighter.
+                        if tp1_hit:
+                            if _peak_now >= 100.0:
+                                _mpp_threshold = 40.0
+                            elif _peak_now >= 50.0:
+                                _mpp_threshold = 25.0
+                            elif _peak_now >= 25.0:
+                                _mpp_threshold = 15.0
+                            else:
+                                _mpp_threshold = 10.0
+                            _mpp_drawdown = _peak_now - pnl_now
+                            if _mpp_drawdown >= _mpp_threshold:
+                                print(
+                                    f"[copy-trade] 🌙🔒 MOONBAG PROTECTION: {pos['token_name']} ({mint[:8]}) "
+                                    f"peak={_peak_now:+.1f}% → now={pnl_now:+.1f}% "
+                                    f"(dropped {_mpp_drawdown:.1f}%, tier threshold {_mpp_threshold:.0f}%) — exit moonbag"
+                                )
+                                to_stop.append((mint, f"moonbag_protection_peak{_peak_now:.0f}pct"))
                                 continue
 
                         # ── Copy-trade partial TP ladder ─────────────────────────────────

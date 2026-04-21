@@ -1743,6 +1743,40 @@ When adjusting a filter, always explain your reasoning based on the data above."
             stats = get_paper_stats()
             stats["copy_trade_enabled"] = copy_trade_enabled
             stats["watched_wallets"] = list(WATCHED_WALLETS.keys()) if copy_trade_enabled else []
+
+            # Merge monster open positions so LIVE CHARTS + open-positions panel
+            # surface them in the monster-only era (copy-trade off).
+            try:
+                from elizaos.plugins.solana import strategy_e_monster as _mon
+                import time as _t
+                for mint, mp in _mon.open_positions().items():
+                    entry_p = float(mp.get("entry_price") or 0)
+                    cur_p = float(mp.get("current_price") or 0) or entry_p
+                    pnl_pct = ((cur_p / entry_p) - 1.0) * 100 if entry_p > 0 and cur_p > 0 else 0.0
+                    stats.setdefault("open_positions", []).append({
+                        "mint":               mint,
+                        "token_name":         mp.get("token_name", mint[:8]),
+                        "wallet":             f"monster/{mp.get('signal_source','?')}",
+                        "entry_ts":           mp.get("entry_ts"),
+                        "sol_spent":          mp.get("sol_spent"),
+                        "entry_price":        entry_p,
+                        "current_price":      cur_p,
+                        "pnl_pct":            round(pnl_pct, 2),
+                        "mc_usd":             (mp.get("metadata") or {}).get("mcap_usd")
+                                              or (mp.get("metadata") or {}).get("mc_usd"),
+                        "tp1_hit":            bool(mp.get("tp1_fired", False)),
+                        "tp2_hit":            False,
+                        "locked_sol":         round(mp.get("locked_sol") or 0.0, 4),
+                        "remaining_fraction": round(mp.get("remaining_fraction") or 1.0, 3),
+                        "narrative":          mp.get("signal_source", "monster"),
+                        "peak_pnl_pct":       round(mp.get("peak_pnl_pct") or 0.0, 1),
+                        "partial_exits":      (mp.get("partial_exits") or [])[-5:],
+                        "strategy":           "monster",
+                    })
+                # Track slot count for the summary bar
+                stats["open_count"] = int(stats.get("open_count") or 0) + len(_mon.open_positions())
+            except Exception:
+                pass
             # Build the recent trades feed: merge copy-trade paper trades
             # and monster-strategy closed trades into a single chronological
             # list so the dashboard trade cards surface BOTH strategies.

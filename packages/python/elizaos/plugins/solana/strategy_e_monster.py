@@ -568,6 +568,23 @@ async def _apply_exit(mint: str, reason: str, sell_fraction: float, runtime: Any
         except Exception as _le_err:
             print(f"[monster] learning_engine record failed: {_le_err}")
 
+        # Resolve all PENDING brain decisions for this mint so each brain
+        # builds real learned_patterns from its own track record. Without
+        # this, brains stay in cold-start and show only 2 seed patterns.
+        try:
+            from elizaos.plugins.solana import brain_memory as _bm
+            r = reason.lower()
+            outcome_tag = (
+                "TP_HIT"      if "tp" in r else
+                "SL_HIT"      if "floor" in r or "sl" in r or "stop" in r or "pre_tp1" in r else
+                "WALLET_EXIT" if "wallet" in r or "be_trail" in r else
+                "TIMEOUT"     if "flat_gate" in r else
+                "MANUAL"
+            )
+            _bm.resolve_outcome_all_brains(mint, outcome_tag, pnl_pct)
+        except Exception as _bm_err:
+            print(f"[monster] brain_memory resolve failed: {_bm_err}")
+
         del _monster_positions[mint]
         # Drop any AI cascade / price feed we built for this mint.
         _monster_cascades.pop(mint, None)
