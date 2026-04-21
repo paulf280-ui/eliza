@@ -662,15 +662,20 @@ async def lifecycle_scout_loop(runtime: Any,
 BREAKOUT_POLL_SECS           = 90
 BREAKOUT_MIN_AGE_SECS        = 30 * 60
 BREAKOUT_MAX_AGE_SECS        = 12 * 3600
-BREAKOUT_MIN_LIQ_USD         = 30_000
+# MOONDOGE 2026-04-21: liq=$34k, m5=+89%, buys-only wash → LP pulled 88% in 5min,
+# we lost 98.7%. Raise min liq, cap m5, require buyer dominance, cap vol/liq.
+BREAKOUT_MIN_LIQ_USD         = 60_000   # was 30k — MOONDOGE passed at $34k, LP pulled
 BREAKOUT_MAX_LIQ_USD         = 500_000
 BREAKOUT_MIN_MC_USD          = 100_000
 BREAKOUT_MAX_MC_USD          = 5_000_000
 BREAKOUT_M5_MIN_PCT          = 20.0
+BREAKOUT_M5_MAX_PCT          = 60.0   # NEW: reject pump traps (MOONDOGE m5=+89% = manipulation)
 BREAKOUT_H1_MIN_PCT          = 0.0    # reject dead-cat bounces (SOLMONEY 2026-04-22: h1=-15% → dumped 28pp in 30s)
 BREAKOUT_H1_MAX_PCT          = 150.0
 BREAKOUT_MIN_M5_VOL_USD      = 3_000
 BREAKOUT_MIN_H1_TXNS         = 30
+BREAKOUT_MIN_BUY_RATIO_PCT   = 55.0   # NEW: buyer dominance floor
+BREAKOUT_MAX_M5_VOL_LIQ      = 3.0    # NEW: wash-trading cap (vol_m5/liq). MOONDOGE was 1.07x + +89% m5
 BREAKOUT_TOP1_MAX_PCT        = 12.0
 
 
@@ -711,12 +716,17 @@ async def breakout_candle_scout_loop(runtime: Any,
                     h1 = float(pc.get("h1") or 0)
                     if m5 < BREAKOUT_M5_MIN_PCT:
                         continue
+                    if m5 > BREAKOUT_M5_MAX_PCT:
+                        continue  # pump trap — MOONDOGE m5=+89% rugged us -98.7%
                     if h1 > BREAKOUT_H1_MAX_PCT:
                         continue
                     if h1 < BREAKOUT_H1_MIN_PCT:
                         continue
                     vol_m5 = float((p.get("volume") or {}).get("m5") or 0)
                     if vol_m5 < BREAKOUT_MIN_M5_VOL_USD:
+                        continue
+                    # Wash-trading cap: reject if 5-min volume churns more than Nx liquidity
+                    if liq_usd > 0 and (vol_m5 / liq_usd) > BREAKOUT_MAX_M5_VOL_LIQ:
                         continue
                     txns_h1 = (p.get("txns") or {}).get("h1") or {}
                     buys = txns_h1.get("buys") or 0
@@ -725,6 +735,8 @@ async def breakout_candle_scout_loop(runtime: Any,
                     if total < BREAKOUT_MIN_H1_TXNS:
                         continue
                     br = (buys / total) * 100 if total > 0 else 0
+                    if br < BREAKOUT_MIN_BUY_RATIO_PCT:
+                        continue  # wash/distribution — need buyer dominance
                     base_info = p.get("info") or {}
                     if not (base_info.get("socials") or base_info.get("websites")):
                         continue
@@ -732,6 +744,16 @@ async def breakout_candle_scout_loop(runtime: Any,
                     t1 = await top1_wallet_pct(session, mint)
                     if t1 is None or t1 >= BREAKOUT_TOP1_MAX_PCT:
                         continue
+
+                    # Rugcheck: block unlocked-LP danger tokens (LP pull = what killed MOONDOGE)
+                    try:
+                        from elizaos.plugins.solana.axiom_copy_trader import _quick_safety_check
+                        safe, rc_reason = await _quick_safety_check(mint, session)
+                        if not safe:
+                            print(f"[monster-breakout] 🛡 rugcheck block {mint[:8]}: {rc_reason}")
+                            continue
+                    except Exception as _rc_err:
+                        print(f"[monster-breakout] rugcheck import error: {_rc_err} — allowing")
 
                     _mark_signalled(mint)
                     print(f"[monster-breakout] 🎯 {mint[:8]} BREAKOUT age={age_secs/60:.0f}min "
