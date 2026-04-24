@@ -667,6 +667,18 @@ async def cluster_confirm_scout_loop(runtime: Any,
                     _log_reject("cluster_confirm", mint, "creator_burned", _snap,
                                 filter_name="creator", filter_value=_cl_creator)
                     continue
+
+                # Rugcheck safety gate — unlocked LP, bundled ownership, etc.
+                try:
+                    from elizaos.plugins.solana.axiom_copy_trader import _quick_safety_check
+                    _cl_rc_safe, _cl_rc_reason = await _quick_safety_check(mint, session)
+                    if not _cl_rc_safe:
+                        print(f"[monster-cluster] 🛡 rugcheck block {mint[:8]}: {_cl_rc_reason}")
+                        _log_reject("cluster_confirm", mint, "rugcheck", _snap,
+                                    filter_name="rugcheck", filter_value=_cl_rc_reason)
+                        continue
+                except Exception as _cl_rc_err:
+                    print(f"[monster-cluster] rugcheck import error: {_cl_rc_err} — allowing")
                 print(f"[monster-cluster] 🎯 {len(ws)} cluster wallets on {mint[:8]} — firing (liq=${_liq_usd:.0f} mc=${_mc_usd:.0f} h1=+{_h1:.0f}% top1={_top1}% top10={_top10}%)")
                 _log_signal({
                     "source": "cluster_confirm",
@@ -1035,6 +1047,18 @@ async def lifecycle_scout_loop(runtime: Any,
                     if _burned:
                         print(f"[monster-lifecycle] 🚫 {mint[:8]} creator={_creator[:8]} recently burned us — skip")
                         continue
+
+                    # Rugcheck safety gate — catches unlocked LP, bundled/concentrated
+                    # ownership that made it past our top-10 check, and other
+                    # structural red flags. Same gate breakout scout uses.
+                    try:
+                        from elizaos.plugins.solana.axiom_copy_trader import _quick_safety_check
+                        _rc_safe, _rc_reason = await _quick_safety_check(mint, session)
+                        if not _rc_safe:
+                            print(f"[monster-lifecycle] 🛡 rugcheck block {mint[:8]}: {_rc_reason}")
+                            continue
+                    except Exception as _rc_err:
+                        print(f"[monster-lifecycle] rugcheck import error: {_rc_err} — allowing")
 
                     _mark_signalled(mint)
                     print(f"[monster-lifecycle] 🎯 {mint[:8]} lifecycle match "

@@ -25,6 +25,59 @@ _BURN_ADDRESSES = {
 }
 
 
+async def fetch_rugcheck(
+    session: aiohttp.ClientSession,
+    mint: str,
+) -> dict | None:
+    """Fetch rugcheck.xyz report summary. Free, no API key.
+
+    Returns a dict with:
+      score           — raw numeric (0 = clean, higher = more red flags)
+      danger_count    — number of risks categorized as "danger"
+      warn_count      — number of risks categorized as "warn"
+      risk_names      — list of human-readable risk names (for logging)
+      lp_locked       — True if rugcheck sees LP locked / burned
+      audit_8         — normalized 0-8 score for holder_guard compatibility
+    Returns None on network error or 404 (brand-new token).
+    """
+    try:
+        async with session.get(
+            f"https://api.rugcheck.xyz/v1/tokens/{mint}/report/summary",
+            timeout=aiohttp.ClientTimeout(total=5),
+        ) as r:
+            if r.status == 404:
+                return None  # brand-new token, rugcheck hasn't indexed
+            if r.status != 200:
+                return None
+            data = await r.json()
+    except Exception:
+        return None
+
+    risks = data.get("risks") or []
+    danger_names = [r.get("name", "") for r in risks if r.get("level") == "danger"]
+    warn_names   = [r.get("name", "") for r in risks if r.get("level") == "warn"]
+    all_names    = [r.get("name", "") for r in risks]
+
+    # LP-locked hint: presence of unlocked-LP risk means LP is NOT locked.
+    has_lp_unlocked_risk = any(
+        ("liquidity" in n.lower() or "lp" in n.lower()) and "unlocked" in n.lower()
+        for n in danger_names
+    )
+
+    # Normalize to 0-8 "audit score" for holder_guard rule compatibility.
+    # Each danger-level risk drops 2 points; each warn drops 1. Floor at 0.
+    audit_8 = max(0, 8 - 2 * len(danger_names) - len(warn_names))
+
+    return {
+        "score":         int(data.get("score") or 0),
+        "danger_count":  len(danger_names),
+        "warn_count":    len(warn_names),
+        "risk_names":    all_names[:12],   # cap for log readability
+        "lp_locked":     not has_lp_unlocked_risk,
+        "audit_8":       audit_8,
+    }
+
+
 def _helius_rpc_url() -> str:
     key = os.getenv("HELIUS_API_KEY", "")
     if key:
@@ -168,8 +221,9 @@ async def build_snapshot(
     auth_task = fetch_mint_authority(session, mint)
     dev_task = fetch_dev_wallet(session, mint)
     lp_task = fetch_lp_burned_pct(session, mint)
-    dist, auth, dev_wallet, lp_burn = await asyncio.gather(
-        dist_task, auth_task, dev_task, lp_task, return_exceptions=True
+    rug_task = fetch_rugcheck(session, mint)
+    dist, auth, dev_wallet, lp_burn, rug = await asyncio.gather(
+        dist_task, auth_task, dev_task, lp_task, rug_task, return_exceptions=True
     )
 
     if isinstance(dist, dict):
@@ -185,6 +239,14 @@ async def build_snapshot(
 
     if isinstance(lp_burn, (int, float)):
         snap.lp_burned_pct = float(lp_burn)
+
+    # Rugcheck integration — populates audit_score (the PDF §2 field). Also
+    # overrides lp_burned_pct when rugcheck sees an unlocked-LP risk, since
+    # rugcheck's view is more reliable than our pump-amm heuristic.
+    if isinstance(rug, dict):
+        snap.audit_score = rug.get("audit_8")
+        if rug.get("lp_locked") is False:
+            snap.lp_burned_pct = 0.0  # rugcheck saw unlocked LP — override heuristic
 
     # Total supply — needed for dev % calculation
     sup_resp = await _rpc(session, "getTokenSupply", [mint])
