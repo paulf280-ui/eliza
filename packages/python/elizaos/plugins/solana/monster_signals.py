@@ -323,6 +323,20 @@ async def is_creator_burned(session: aiohttp.ClientSession, mint: str) -> tuple[
     return (creator in _load_burned_creators()), creator
 
 
+async def _try_smart_money_overlap(session: aiohttp.ClientSession, mint: str) -> int | None:
+    """Best-effort smart-money overlap count for scout metadata.
+
+    Returns None on any failure (roster empty, pool missing, Helius down) —
+    callers treat None as missing data, not "bad signal". Kept defensive so
+    a smart-money lookup failure can never kill a scout signal.
+    """
+    try:
+        from elizaos.plugins.solana.holder_guard.smart_money import count_for_mint
+        return await count_for_mint(session, mint)
+    except Exception:
+        return None
+
+
 async def top_wallet_distribution(session: aiohttp.ClientSession, mint: str) -> dict | None:
     """Return distribution stats for the top non-pool holders.
 
@@ -715,6 +729,7 @@ async def cluster_confirm_scout_loop(runtime: Any,
                         "top10_pct": _top10,
                         "creator": _cl_creator,
                         "buy_velocity_ratio": _cl_velocity,
+                        "smart_money_overlap": await _try_smart_money_overlap(session, mint),
                     },
                 )
         except Exception as e:
@@ -1092,7 +1107,8 @@ async def lifecycle_scout_loop(runtime: Any,
                                   "h1_change": h1_change, "m5_change": m5_change,
                                   "holders_at_entry": _lc_holders,
                                   "buy_velocity_ratio": _lc_velocity,
-                                  "creator": _creator},
+                                  "creator": _creator,
+                                  "smart_money_overlap": await _try_smart_money_overlap(session, mint)},
                     )
                 except Exception:
                     # Isolate per-pair errors
@@ -1314,6 +1330,7 @@ async def breakout_candle_scout_loop(runtime: Any,
                             "holders_at_entry": _br_holders,
                             "buy_velocity_ratio": _br_velocity,
                             "creator": _br_creator,
+                            "smart_money_overlap": await _try_smart_money_overlap(session, mint),
                         },
                     )
                 except Exception:
