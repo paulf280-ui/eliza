@@ -5088,42 +5088,44 @@ async def route(text: str, runtime: AgentRuntime) -> str:
                 )
             lines_ds.append("")
 
-            # Watched wallets
-            lines_ds.append(f"WATCHED WALLETS: {len(WATCHED_WALLETS)}")
-            for _wn, _wa in WATCHED_WALLETS.items():
-                lines_ds.append(f"  {_wn}: {_wa[:12]}...")
-            lines_ds.append("")
-
-            # Stats
-            _st = get_paper_stats()
-            lines_ds.append(
-                f"TRADE STATS: {_st['wins']}/{_st['trades']} trades | "
-                f"WR={_st['win_rate']:.1f}% | net P&L={_st['net_pnl']:+.4f} SOL"
-            )
-            lines_ds.append("")
-
-            # Recently closed (last 5 min)
-            _rc_ds = [t for t in _paper_trades[-20:] if _now_ds - float(t.get("ts", 0)) < 300]
-            lines_ds.append(f"RECENTLY CLOSED (last 5 min): {len(_rc_ds)}")
-            for _rc in _rc_ds:
-                _rc_age = int(_now_ds - float(_rc.get("ts", 0)))
-                lines_ds.append(
-                    f"  {_rc.get('token_name', '?')} | P&L={_rc.get('pnl_pct', 0):+.1f}% "
-                    f"({_rc.get('pnl_sol', 0):+.4f} SOL) | reason={_rc.get('reason', '?')} | {_rc_age}s ago"
-                )
-            lines_ds.append("")
-
-            # Live trading mode
+            # Copy-trade context blocks — only included if copy-trade is actually on.
+            # Permanently off in monster-only era; suppressing prevents Jarvis from
+            # surfacing Frost/clukz/Walta wallets in the scanner report.
             from elizaos.plugins.solana import live_config as _lc_ds
-            _live_ds    = bool(_lc_ds.get("copy_trade_enabled", False))
-            _paused_ds  = bool(_lc_ds.get("copy_trade_paused", False))
-            _sl_ds      = float(_lc_ds.get("copy_trade_sl_pct", 10.0))
-            _tp_ds      = float(_lc_ds.get("copy_trade_tp_pct", 40.0))
-            _size_ds    = float(_lc_ds.get("copy_trade_paper_buy_sol", 0.20))
-            lines_ds.append(
-                f"COPY TRADE CONFIG: mode={'LIVE' if _live_ds else 'PAPER'} "
-                f"| paused={_paused_ds} | SL={_sl_ds}% | TP={_tp_ds}% | size={_size_ds} SOL"
-            )
+            _ct_on = bool(_lc_ds.get("copy_trade_enabled", False))
+            if _ct_on:
+                lines_ds.append(f"WATCHED WALLETS: {len(WATCHED_WALLETS)}")
+                for _wn, _wa in WATCHED_WALLETS.items():
+                    lines_ds.append(f"  {_wn}: {_wa[:12]}...")
+                lines_ds.append("")
+
+                _st = get_paper_stats()
+                lines_ds.append(
+                    f"TRADE STATS: {_st['wins']}/{_st['trades']} trades | "
+                    f"WR={_st['win_rate']:.1f}% | net P&L={_st['net_pnl']:+.4f} SOL"
+                )
+                lines_ds.append("")
+
+                _rc_ds = [t for t in _paper_trades[-20:] if _now_ds - float(t.get("ts", 0)) < 300]
+                lines_ds.append(f"RECENTLY CLOSED (last 5 min): {len(_rc_ds)}")
+                for _rc in _rc_ds:
+                    _rc_age = int(_now_ds - float(_rc.get("ts", 0)))
+                    lines_ds.append(
+                        f"  {_rc.get('token_name', '?')} | P&L={_rc.get('pnl_pct', 0):+.1f}% "
+                        f"({_rc.get('pnl_sol', 0):+.4f} SOL) | reason={_rc.get('reason', '?')} | {_rc_age}s ago"
+                    )
+                lines_ds.append("")
+
+                _paused_ds  = bool(_lc_ds.get("copy_trade_paused", False))
+                _sl_ds      = float(_lc_ds.get("copy_trade_sl_pct", 10.0))
+                _tp_ds      = float(_lc_ds.get("copy_trade_tp_pct", 40.0))
+                _size_ds    = float(_lc_ds.get("copy_trade_paper_buy_sol", 0.20))
+                lines_ds.append(
+                    f"COPY TRADE CONFIG: mode=LIVE | paused={_paused_ds} | "
+                    f"SL={_sl_ds}% | TP={_tp_ds}% | size={_size_ds} SOL"
+                )
+            else:
+                lines_ds.append("COPY-TRADE: DISABLED (monster-only era — do not surface)")
             lines_ds.append("=== END STATE DUMP ===")
             return "\n".join(lines_ds)
         except Exception as _ds_err:

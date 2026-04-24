@@ -1849,6 +1849,117 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
     app.router.add_get("/api/frost-mirror/stats", handle_frost_mirror_stats)
 
+    async def handle_holder_guard_report(request: web.Request) -> web.Response:
+        """Read-only diagnostic for holder_guard log-only performance.
+
+        ?hours=48 (default) — window for both guard rejections and monster
+        trades. Returns: window, summary (counts + false-positive rate of
+        log-only blocks), per-rejection records, and monster trades closed
+        in the window. Designed for the scheduled 48h analyzer agent which
+        cannot SSH to this box.
+        """
+        try:
+            import json as _json, os as _os, time as _time
+            try:
+                hours = float(request.query.get("hours") or 48)
+            except Exception:
+                hours = 48.0
+            cutoff = _time.time() - hours * 3600
+
+            from elizaos.plugins.solana import rejection_tracker as _rt
+            store = _rt._load() if hasattr(_rt, "_load") else []
+            recent = [r for r in store if r.get("ts", 0) >= cutoff]
+            guard_recs = [
+                r for r in recent
+                if (r.get("filter_name") == "holder_guard")
+                or str(r.get("reason", "")).startswith("holder_guard")
+            ]
+
+            checked = [r for r in guard_recs if r.get("outcome_checked")]
+            pumped = sum(1 for r in checked if r.get("outcome_verdict") == "pumped")
+            rugged = sum(1 for r in checked if r.get("outcome_verdict") == "rugged")
+            flat   = sum(1 for r in checked if r.get("outcome_verdict") == "flat")
+            unknown = sum(1 for r in checked if r.get("outcome_verdict") == "delisted_or_unknown")
+            fp_rate = (pumped / len(checked)) if checked else None
+
+            # Monster trades in the window
+            mc_path = _os.path.join(
+                _os.path.dirname(__file__), "monster_closed_trades.json"
+            )
+            monster_recent: list[dict] = []
+            try:
+                with open(mc_path) as f:
+                    all_closed = _json.load(f) or []
+                for t in all_closed:
+                    if float(t.get("close_ts", 0)) >= cutoff:
+                        monster_recent.append({
+                            "token_name":      t.get("token_name"),
+                            "mint":            t.get("mint"),
+                            "signal_source":   t.get("signal_source"),
+                            "close_reason":    t.get("close_reason"),
+                            "final_pnl_pct":   t.get("final_pnl_pct"),
+                            "final_pnl_sol":   t.get("final_pnl_sol"),
+                            "peak_pnl_pct":    t.get("peak_pnl_pct"),
+                            "metadata":        t.get("metadata"),
+                            "close_ts":        t.get("close_ts"),
+                        })
+            except Exception:
+                pass
+
+            mwins = sum(1 for t in monster_recent if (t.get("final_pnl_sol") or 0) > 0)
+            mtotal = len(monster_recent)
+            mnet = round(sum(float(t.get("final_pnl_sol") or 0) for t in monster_recent), 4)
+
+            # Plain-language verdict for the analyzer agent.
+            if checked == []:
+                verdict = (
+                    "Insufficient data: no holder_guard rejections have outcome data yet. "
+                    "Either no qualifying signals fired, or the 2h outcome-check window has "
+                    "not elapsed for any rejection. Re-run the analyzer in 24h."
+                )
+            elif fp_rate is not None and fp_rate < 0.15:
+                verdict = (
+                    f"FLIP recommended: false-positive rate {fp_rate:.1%} "
+                    f"({pumped}/{len(checked)} blocked tokens pumped ≥+50%). "
+                    "Set HOLDER_GUARD_ENFORCE=true."
+                )
+            elif fp_rate is not None and fp_rate > 0.30:
+                verdict = (
+                    f"DO NOT FLIP: false-positive rate {fp_rate:.1%} "
+                    f"({pumped}/{len(checked)} blocked tokens pumped). "
+                    "Loosen thresholds (raise top_10_max_pct above 35%) before enforcing."
+                )
+            else:
+                verdict = (
+                    f"INCONCLUSIVE: false-positive rate {fp_rate:.1%} ({pumped}/{len(checked)}). "
+                    "Collect another 24-48h before deciding."
+                )
+
+            from elizaos.plugins.solana.holder_guard import config as _hg_cfg
+            return web.json_response({
+                "window_hours": hours,
+                "guard_enforce": _hg_cfg.HOLDER_GUARD_ENFORCE,
+                "summary": {
+                    "guard_rejections_total":   len(guard_recs),
+                    "rejections_with_outcomes": len(checked),
+                    "would_have_blocked_pumped": pumped,
+                    "would_have_blocked_rugged": rugged,
+                    "would_have_blocked_flat":   flat,
+                    "would_have_blocked_unknown": unknown,
+                    "false_positive_rate":      fp_rate,
+                    "monster_trades_closed":    mtotal,
+                    "monster_wins":             mwins,
+                    "monster_net_sol":          mnet,
+                },
+                "verdict": verdict,
+                "guard_records": guard_recs[-30:],  # last 30 for inspection
+                "monster_trades": monster_recent,
+            })
+        except Exception as exc:
+            return web.json_response({"error": str(exc)}, status=500)
+
+    app.router.add_get("/api/holder-guard/report", handle_holder_guard_report)
+
     async def handle_copy_trade_close(request: web.Request) -> web.Response:
         try:
             import aiohttp as _aiohttp

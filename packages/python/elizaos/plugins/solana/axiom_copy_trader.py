@@ -994,6 +994,15 @@ async def _get_market_data(mint: str, session: aiohttp.ClientSession) -> dict | 
             vol_h1   = float(vol.get("h1") or 0)
             buys_h1  = int((txns.get("h1") or {}).get("buys") or 0)
             sells_h1 = int((txns.get("h1") or {}).get("sells") or 0)
+            # Price-change windows — for brain context to detect dying momentum
+            # (post-peak rollback looks like "h1 > 0 but h6 >> h1").
+            pc = best.get("priceChange") or {}
+            try:
+                chg_h1  = float(pc.get("h1")  or 0)
+                chg_h6  = float(pc.get("h6")  or 0)
+                chg_h24 = float(pc.get("h24") or 0)
+            except (ValueError, TypeError):
+                chg_h1 = chg_h6 = chg_h24 = 0.0
             vol_mc_ratio   = (vol_h1 / mc)        if mc > 0      else None
             buy_sell_ratio = (buys_h1 / sells_h1) if sells_h1 > 0 else None
             # SOL price in USD (for position sizing vs liquidity)
@@ -1028,6 +1037,9 @@ async def _get_market_data(mint: str, session: aiohttp.ClientSession) -> dict | 
                 "sol_price_usd":  sol_price_usd,
                 "pair_age_secs":  pair_age_secs,
                 "holders":        holders,
+                "chg_h1":         chg_h1,
+                "chg_h6":         chg_h6,
+                "chg_h24":        chg_h24,
             }
     except Exception:
         return None
@@ -2400,7 +2412,10 @@ async def run_copy_trade_monitor(runtime: Any = None) -> None:
 
     - Detects BUY txs → opens paper position
     - Detects SELL txs → closes paper position and records P&L
-    - Always runs regardless of copy_trade_enabled (paper mode is separate)
+    - Honors copy_trade_enabled — returns immediately when False so the bot
+      does not subscribe to wallet activity, write paper trades, or feed
+      Jarvis context with copy-trade signals. Frost Mirror also short-circuits
+      because it gates on the same flag internally.
     """
     _load_all()
 
@@ -2408,6 +2423,18 @@ async def run_copy_trade_monitor(runtime: Any = None) -> None:
         from elizaos.plugins.solana import live_config as lc
     except Exception:
         lc = None  # type: ignore
+
+    # Master kill — copy-trade strategy is permanently off in monster-only era.
+    # This stops the WebSocket subscription, paper-trade tracking, signal logging,
+    # and Frost Mirror execution. Flip copy_trade_enabled=True in live_config to
+    # revive (or delete this guard).
+    if lc is not None:
+        try:
+            if not bool(lc.get("copy_trade_enabled", False)):
+                print("[copy-trade] Monitor NOT started — copy_trade_enabled=false (monster-only era)")
+                return
+        except Exception:
+            pass
 
     def _cfg(key: str, default: Any) -> Any:
         try:
