@@ -1,10 +1,10 @@
 {
   "_note": "Mint addresses of all confirmed monster tokens. Add every new monster here immediately when spotted. Used to backtest filters, validate DNA pattern, and tune Jarvis toward 50%+ WR.",
-  "_how_to_add": "Drop Solscan URL here — Claude extracts address, fetches live data, adds to file and updates pattern analysis.",
-  "_total_monsters": 43,
-  "_addresses_confirmed": 38,
+  "_how_to_add": "Drop Solscan URL here \u2014 Claude extracts address, fetches live data, adds to file and updates pattern analysis.",
+  "_total_monsters": 49,
+  "_addresses_confirmed": 44,
   "_addresses_missing": 5,
-  "_last_updated": "2026-04-21",
+  "_last_updated": "2026-04-24",
   "monsters": [
     {
       "symbol": "ASTEROID",
@@ -44,8 +44,8 @@
         "meteora_dlmm_2": "C5wJn8aaWmiQsnUK322ZWAukKtYMztvigEivcmhRifEv"
       },
       "missed_by_bot": true,
-      "miss_reason": "copy_trade_not_triggered — likely max_concurrent_positions=2 slots full at 05:45 UTC, OR entry score filter blocked. Walta bought at +114min post-launch.",
-      "notes": "TIER-1 MONSTER. Dual-DEX launch: Meteora DLMM opened 5.6 mins after PumpSwap = institutional-speed market-making = highest conviction signal. Walta 89x in 5 mins at 114min post-launch. Token STILL running +30% h1 at 5.7h old. Vol/liq=107x shows crushing buy pressure. Three separate DEX pools = sustained multi-wave rally (not single-spike pump). Buy ratio 51.4% (healthy — not overbought like rugs). This is the ARCHETYPE multi-DEX monster: pumpswap launch → rapid Meteora pool open → 1-2h survivorship → exponential phase.",
+      "miss_reason": "copy_trade_not_triggered \u2014 likely max_concurrent_positions=2 slots full at 05:45 UTC, OR entry score filter blocked. Walta bought at +114min post-launch.",
+      "notes": "TIER-1 MONSTER. Dual-DEX launch: Meteora DLMM opened 5.6 mins after PumpSwap = institutional-speed market-making = highest conviction signal. Walta 89x in 5 mins at 114min post-launch. Token STILL running +30% h1 at 5.7h old. Vol/liq=107x shows crushing buy pressure. Three separate DEX pools = sustained multi-wave rally (not single-spike pump). Buy ratio 51.4% (healthy \u2014 not overbought like rugs). This is the ARCHETYPE multi-DEX monster: pumpswap launch \u2192 rapid Meteora pool open \u2192 1-2h survivorship \u2192 exponential phase.",
       "creator_wallet": "DbFS3c9wpKtJiqFYu83QmpqHDBJtjKY8hqTL9AGZfRir"
     },
     {
@@ -63,7 +63,7 @@
       "age_hours_at_check": 72.1,
       "m5_at_check": -9.7,
       "solscan": "https://solscan.io/token/3tXvLBVojpviB13khqqsV4f7uh51Gy8m5q39eXJCpump",
-      "notes": "BEST EVER 143x — address now confirmed. 72h old at check, buy ratio 58.3%, still active vol/liq 2.8x",
+      "notes": "BEST EVER 143x \u2014 address now confirmed. 72h old at check, buy ratio 58.3%, still active vol/liq 2.8x",
       "creator_wallet": "6JTzSXk13Mh36S6Ni59U5BH6gXozoNYCiK9PD42LjGZN"
     },
     {
@@ -81,7 +81,7 @@
       "age_hours_at_check": 52.4,
       "m5_at_check": -0.7,
       "solscan": "https://solscan.io/token/4YiLHDR4B4pE4R5GUMA8HG8YunyeLwcobtEtvwMupump",
-      "notes": "OUTLIER — buy ratio only 37.8% (sellers dominant). +107% h24 but h6=-6%. Declining phase, not monster entry. DATA POINT: below 50% buy ratio = avoid",
+      "notes": "OUTLIER \u2014 buy ratio only 37.8% (sellers dominant). +107% h24 but h6=-6%. Declining phase, not monster entry. DATA POINT: below 50% buy ratio = avoid",
       "creator_wallet": "CJsqxwjadyWbM9YmHsxwagZ83ed2gsEyJ9AFAPzDMQw"
     },
     {
@@ -99,7 +99,7 @@
       "age_hours_at_check": 418.5,
       "m5_at_check": 0.8,
       "solscan": "https://solscan.io/token/3BHhMXMyyGGzLcTk6u5iJwTcV7eEGG9bWJrTKUttpump",
-      "notes": "OUTLIER — 418h (17 days!) old, buy ratio 69.9% (too high, euphoric), vol/liq only 0.2x (dead volume). Not a monster entry. DATA POINT: >65% buy ratio and vol/liq <0.5 = avoid",
+      "notes": "OUTLIER \u2014 418h (17 days!) old, buy ratio 69.9% (too high, euphoric), vol/liq only 0.2x (dead volume). Not a monster entry. DATA POINT: >65% buy ratio and vol/liq <0.5 = avoid",
       "creator_wallet": "3GH1KTLMjVu7mmdWemUbsRMHWNQAecNuzhVokhnqpQn6"
     },
     {
@@ -120,7 +120,7 @@
       "m5_at_check": 3.56,
       "mc_usd": 29139,
       "solscan": "https://solscan.io/token/SLq18aK1AgDNvLE7Abf1bMRsN2G24uXTzbFJaMCnoun",
-      "notes": "ANOMALY / DO NOT COPY — 241 days old (Meteora), liq $12k (micro), buy ratio 67.2% (above 65% euphoric zone). Shows +1092% h24 but this is a dormant token revival driven by external hype/influencer, NOT organic monster DNA. h6=-13% shows it already dumped. Do NOT use this as a template — it violates every entry filter. Entry at $12k liq and 241 days old is a rug trap. The gains happened before any rational entry was possible.",
+      "notes": "ANOMALY / DO NOT COPY \u2014 241 days old (Meteora), liq $12k (micro), buy ratio 67.2% (above 65% euphoric zone). Shows +1092% h24 but this is a dormant token revival driven by external hype/influencer, NOT organic monster DNA. h6=-13% shows it already dumped. Do NOT use this as a template \u2014 it violates every entry filter. Entry at $12k liq and 241 days old is a rug trap. The gains happened before any rational entry was possible.",
       "creator_wallet": "7UjNo7Ute3UMpzhp9mJa5UiEob8TgD1GuZfjgY2XwmtY"
     },
     {
@@ -138,7 +138,7 @@
       "age_hours_at_check": 266.5,
       "m5_at_check": 0.7,
       "solscan": "https://solscan.io/token/3TYgKwkE2Y3rxdw9osLRSpxpXmSC1C1oo19W9KHspump",
-      "notes": "MIXED — buy ratio 50.6% is perfect monster range, liq $120k is good, BUT h24=+1% means it already ran and is consolidating. 266h old. Entry window has passed. DATA POINT: correct buy ratio but dead momentum = missed it",
+      "notes": "MIXED \u2014 buy ratio 50.6% is perfect monster range, liq $120k is good, BUT h24=+1% means it already ran and is consolidating. 266h old. Entry window has passed. DATA POINT: correct buy ratio but dead momentum = missed it",
       "creator_wallet": "EKMyLLujPDEQLLc7Xvx7ojc5rr5nFQPkvpoYK7bENH2"
     },
     {
@@ -156,7 +156,7 @@
       "age_hours_at_check": 2.8,
       "m5_at_check": -27.5,
       "solscan": "https://solscan.io/token/sgeo6xzhQN9AroqzpAaVSw85jkbDN41suiuAGWopump",
-      "notes": "OUTLIER — vol/liq 34.9x (extreme wash/dump), buy ratio 44.7% (sellers dominating), m5=-27.5% (already dumping). Classic pump-and-dump exit. DATA POINT: vol/liq >5x + buy ratio <50% + m5 crashing = rug exit, avoid",
+      "notes": "OUTLIER \u2014 vol/liq 34.9x (extreme wash/dump), buy ratio 44.7% (sellers dominating), m5=-27.5% (already dumping). Classic pump-and-dump exit. DATA POINT: vol/liq >5x + buy ratio <50% + m5 crashing = rug exit, avoid",
       "creator_wallet": "583jfBFz3NzzfRU14tCUhoQnHnMRpyGSxdvxWR8V1SnU"
     },
     {
@@ -174,7 +174,7 @@
       "age_hours_at_check": 14.1,
       "m5_at_check": 7.3,
       "solscan": "https://solscan.io/token/CGEDT9QZDvvH5GmVkWJH2BXiMJqMJySC9ihWyr7Spump",
-      "notes": "MISSED MONSTER — +2214% h24, quiet entry, buy ratio 52.4%, vol/liq 2.1x",
+      "notes": "MISSED MONSTER \u2014 +2214% h24, quiet entry, buy ratio 52.4%, vol/liq 2.1x",
       "creator_wallet": "Eqoc4DrRBnhx3oC2yq4X9vrSCj939B6Sw8Jp25iJkZ2W"
     },
     {
@@ -192,7 +192,7 @@
       "age_hours_at_check": 20.1,
       "m5_at_check": -5.5,
       "solscan": "https://solscan.io/token/nNcqotFpBF7hsAqbNs1v2cYWeMnaKjFc3D2gHoQpump",
-      "notes": "MISSED MONSTER — +1380% h24, dip entry -5% m5, buy ratio 57.9%",
+      "notes": "MISSED MONSTER \u2014 +1380% h24, dip entry -5% m5, buy ratio 57.9%",
       "creator_wallet": "FireuLYd4yjJBhXQyBs3Mq6ZpNEjyHPNPG2eqhTP9RHV"
     },
     {
@@ -210,7 +210,7 @@
       "age_hours_at_check": 82.9,
       "m5_at_check": -3.1,
       "solscan": "https://solscan.io/token/2AMYvN5zvXMC9ueA6vznaiaEqWrjpxHCisa2Nuc5pump",
-      "notes": "MISSED — +207% h24, older 83h, slower mover",
+      "notes": "MISSED \u2014 +207% h24, older 83h, slower mover",
       "creator_wallet": "3KvsoNxgn64nsuHKPBHQJsguef3DgEkP2izE49k6CSAZ"
     },
     {
@@ -231,7 +231,7 @@
       "m5_at_check": 13.76,
       "mc_usd_at_check": 404719,
       "solscan": "https://solscan.io/token/6HXCCASZxmv5jnExJDoe7TTQJMu6kfctRotVmtHGpump",
-      "notes": "MONSTER — +1152% h24 at 11.8h old. Elon Musk political meme. Buy ratio 57.7% (perfect zone). Liq $54k. IMPORTANT: vol/liq at check = 35.8x (post-pump measurement) — at entry (2-4h old) was ~2-4x. Our paper bot entered at 2.3h with ELUN and scored +24% then Jarvis exited early — the token went on to do +1152%. Classic Haiku-too-early exit.",
+      "notes": "MONSTER \u2014 +1152% h24 at 11.8h old. Elon Musk political meme. Buy ratio 57.7% (perfect zone). Liq $54k. IMPORTANT: vol/liq at check = 35.8x (post-pump measurement) \u2014 at entry (2-4h old) was ~2-4x. Our paper bot entered at 2.3h with ELUN and scored +24% then Jarvis exited early \u2014 the token went on to do +1152%. Classic Haiku-too-early exit.",
       "creator_wallet": "CoPyPPWdm8SirumaAEe8S68nSJpHYhguN2L5i2YGxLB"
     },
     {
@@ -251,9 +251,9 @@
       "age_hours_created_utc": "2026-04-03T21:08:20Z",
       "m5_at_check": -2.71,
       "mc_usd_at_check": 527366,
-      "driving_force": "Political meme — Trump/Dump name. Multiple buying waves. A second +100% wave occurred ~24h after launch as European and Asian markets opened and picked up the political narrative. Sustained buy ratio 57% shows organic multi-wave buying, not a single pump.",
+      "driving_force": "Political meme \u2014 Trump/Dump name. Multiple buying waves. A second +100% wave occurred ~24h after launch as European and Asian markets opened and picked up the political narrative. Sustained buy ratio 57% shows organic multi-wave buying, not a single pump.",
       "solscan": "https://solscan.io/token/RfjEE8S9TBW7pUXcxwE34ksEgZxtZKezbH8LLeKpump",
-      "notes": "MONSTER — +1498% h24 at 13.7h old. Political Trump/Dump meme. Buy ratio 57% (perfect zone), liq $61k. Driving the 100% secondary move: political meme multi-wave structure — initial pump on US-hours traders, then secondary +100% as European/Asian markets opened. Still alive at h6=+3%, h1=+9.8%.",
+      "notes": "MONSTER \u2014 +1498% h24 at 13.7h old. Political Trump/Dump meme. Buy ratio 57% (perfect zone), liq $61k. Driving the 100% secondary move: political meme multi-wave structure \u2014 initial pump on US-hours traders, then secondary +100% as European/Asian markets opened. Still alive at h6=+3%, h1=+9.8%.",
       "creator_wallet": "4jFGPSqrdWSLySfH7kRg775gWoiiWc52ZuGzsQaEjyCS"
     },
     {
@@ -274,7 +274,7 @@
       "m5_at_check": 2.13,
       "mc_usd_at_check": 2331503,
       "solscan": "https://solscan.io/token/6pEC3xpugTTSmTKNRfoSuh6R6qCpaBQMvAWGE7dvw37C",
-      "notes": "MONSTER (RAYDIUM NATIVE) — +11683% h24 in just 4.4 hours. This is the fastest monster in our dataset. Raydium native launch. Buy ratio 53.1% (perfect zone). Liq grew to $194k (from ~$20-40k at entry) as the pump added LP. MC went from ~$20k at launch to $2.3M = ~117x. SpaceX/Elon Musk political meme theme. CRITICAL: the Raydium scout should have caught this at 1-2h old when liq was ~$30-50k, MC ~$50-200k, vol/liq ~2-4x, buy ratio ~53%. This is exactly the NoHat/PISS/LOLA pattern on Raydium.",
+      "notes": "MONSTER (RAYDIUM NATIVE) \u2014 +11683% h24 in just 4.4 hours. This is the fastest monster in our dataset. Raydium native launch. Buy ratio 53.1% (perfect zone). Liq grew to $194k (from ~$20-40k at entry) as the pump added LP. MC went from ~$20k at launch to $2.3M = ~117x. SpaceX/Elon Musk political meme theme. CRITICAL: the Raydium scout should have caught this at 1-2h old when liq was ~$30-50k, MC ~$50-200k, vol/liq ~2-4x, buy ratio ~53%. This is exactly the NoHat/PISS/LOLA pattern on Raydium.",
       "creator_wallet": "EkeDge5HaM7cV2gom28a2q4AReAt9tt565gm4Kg4LE7J"
     },
     {
@@ -288,7 +288,7 @@
       "buy_ratio_pct": 55.0,
       "liq_usd_at_check": 45000,
       "solscan": null,
-      "notes": "Address unknown — share Solscan link to complete record"
+      "notes": "Address unknown \u2014 share Solscan link to complete record"
     },
     {
       "symbol": "PISS",
@@ -301,7 +301,7 @@
       "buy_ratio_pct": 55.0,
       "liq_usd_at_check": 38000,
       "solscan": null,
-      "notes": "Address unknown — share Solscan link to complete record"
+      "notes": "Address unknown \u2014 share Solscan link to complete record"
     },
     {
       "symbol": "LOLA",
@@ -314,7 +314,7 @@
       "buy_ratio_pct": 54.0,
       "liq_usd_at_check": 52000,
       "solscan": null,
-      "notes": "Address unknown — share Solscan link to complete record"
+      "notes": "Address unknown \u2014 share Solscan link to complete record"
     },
     {
       "symbol": "TARO",
@@ -327,7 +327,7 @@
       "buy_ratio_pct": 50.5,
       "liq_usd_at_check": 29000,
       "solscan": null,
-      "notes": "7.9 day hold, 101 traders — address unknown"
+      "notes": "7.9 day hold, 101 traders \u2014 address unknown"
     },
     {
       "symbol": "PISS_original",
@@ -340,7 +340,7 @@
       "buy_ratio_pct": 55.0,
       "liq_usd_at_check": 38000,
       "solscan": null,
-      "notes": "Address unknown — share Solscan link to complete record"
+      "notes": "Address unknown \u2014 share Solscan link to complete record"
     },
     {
       "symbol": "fluide",
@@ -358,7 +358,7 @@
       "rugcheck_score": 1,
       "has_socials": true,
       "solscan": "https://solscan.io/token/DFsBC5HQoFHSLtE6LmWRff8GGWgiZ9Y52nPqsFCYpump",
-      "notes": "MONSTER — +6845% h24 at only 5h old. Buy ratio 51.5% h1 (perfect monster zone). Liq $128k (already ran up from entry ~$30-50k). Rugcheck=1 (clean). Has socials — BREAKS old 'ZERO socials' assumption. At 5h old this was likely catchable at 1-2h with liq ~$30k, buy ratio in zone. Classic fast mover.",
+      "notes": "MONSTER \u2014 +6845% h24 at only 5h old. Buy ratio 51.5% h1 (perfect monster zone). Liq $128k (already ran up from entry ~$30-50k). Rugcheck=1 (clean). Has socials \u2014 BREAKS old 'ZERO socials' assumption. At 5h old this was likely catchable at 1-2h with liq ~$30k, buy ratio in zone. Classic fast mover.",
       "creator_wallet": "8pY1AukbuPgUE3EetyLa59rFLMimJGT94ZzbMEZcQF4w"
     },
     {
@@ -377,7 +377,7 @@
       "rugcheck_score": 101,
       "has_socials": true,
       "solscan": "https://solscan.io/token/NnGKfhYFMkPjU8cRuSv5nhaKJpAzMeqoRYdHU9pBig1",
-      "notes": "FIRST CONFIRMED METEORA MONSTER — +160% h24 at 70.6h old. Buy ratio 59.2% h1 (perfect zone). Liq $45k. Rugcheck=101. Has socials — breaks 'ZERO socials' assumption. CRITICAL DEX INSIGHT: Meteora now confirmed as monster-capable DEX alongside PumpSwap and Raydium. Strategy D should be catching these. Age 70.6h with h24=+160% is consistent with our 'age > 48h requires h24 > 100%' rule — actually slightly below 100% but still active. Entry window was probably 20-40h old.",
+      "notes": "FIRST CONFIRMED METEORA MONSTER \u2014 +160% h24 at 70.6h old. Buy ratio 59.2% h1 (perfect zone). Liq $45k. Rugcheck=101. Has socials \u2014 breaks 'ZERO socials' assumption. CRITICAL DEX INSIGHT: Meteora now confirmed as monster-capable DEX alongside PumpSwap and Raydium. Strategy D should be catching these. Age 70.6h with h24=+160% is consistent with our 'age > 48h requires h24 > 100%' rule \u2014 actually slightly below 100% but still active. Entry window was probably 20-40h old.",
       "creator_wallet": "9WWt4F2W3DgXrday9DvrFSe7mCstwPAe9Bhc99wxVxnM"
     },
     {
@@ -397,7 +397,7 @@
       "rugcheck_score": 1,
       "has_socials": true,
       "solscan": "https://solscan.io/token/8i6MEfc8eFNcvns7WgW3JRxFWaXumzXFeDWff4ewVdY2",
-      "notes": "REVIVAL PATTERN — 63 days old (1515h!), yet h24=+121% and buy ratio 52.5% h24 (in monster zone). Rugcheck=1. Has socials. BREAKS AGE ASSUMPTION: tokens can have monster-like setup at any age if buy ratio and momentum are right. This is a 'dormant awakening' — old token suddenly getting fresh buying interest (political meme? narrative resurgence?). At 63 days the team has proven they didn't rug. Liq $42k is healthy. The buy ratio 52.5% over 24h is the signal — sustained buying pressure not a one-hour spike.",
+      "notes": "REVIVAL PATTERN \u2014 63 days old (1515h!), yet h24=+121% and buy ratio 52.5% h24 (in monster zone). Rugcheck=1. Has socials. BREAKS AGE ASSUMPTION: tokens can have monster-like setup at any age if buy ratio and momentum are right. This is a 'dormant awakening' \u2014 old token suddenly getting fresh buying interest (political meme? narrative resurgence?). At 63 days the team has proven they didn't rug. Liq $42k is healthy. The buy ratio 52.5% over 24h is the signal \u2014 sustained buying pressure not a one-hour spike.",
       "creator_wallet": "7iVCXQn4u6tiTEfNVqbWSEsRdEi69E9oYsSMiepuECwi"
     },
     {
@@ -417,7 +417,7 @@
       "rugcheck_score": 1038,
       "has_socials": true,
       "solscan": "https://solscan.io/token/2SN5omCCJPzseBpm7t38Qt2muy8gd4oknbF34tzLpump",
-      "notes": "REVIVAL PATTERN (MODEST) — 25 days old (613h), h24=+45% (below the 100% threshold for old tokens but above 40%), buy ratio 51.4% h24 (barely in zone). Rugcheck=1038. Has socials. Liq $59k. This is borderline — the +45% h24 for a 25-day old token is meaningful (not dead) but not explosive. Entry here is a lower-conviction monster play. BUY RATIO is still the key signal. Old + h24<100% + buy_ratio just above 50% = WEAK MONSTER CANDIDATE, lower allocation.",
+      "notes": "REVIVAL PATTERN (MODEST) \u2014 25 days old (613h), h24=+45% (below the 100% threshold for old tokens but above 40%), buy ratio 51.4% h24 (barely in zone). Rugcheck=1038. Has socials. Liq $59k. This is borderline \u2014 the +45% h24 for a 25-day old token is meaningful (not dead) but not explosive. Entry here is a lower-conviction monster play. BUY RATIO is still the key signal. Old + h24<100% + buy_ratio just above 50% = WEAK MONSTER CANDIDATE, lower allocation.",
       "creator_wallet": "AXmnRBrNtYYyyo82cLBBhnWJ7o1iqNLZbuEVpDB3V666"
     },
     {
@@ -447,7 +447,7 @@
       "narrative_category": "gambling_finance",
       "spike_cause": "Casino/gambling cultural narrative revival during Liberation Day tariff week. Gambling as metaphor for Trump tariff risk. 201-day-old token with real brand (blackjack.one, Twitter). Top1 holder 6.73% = very clean distribution. Spike h6=+195% happening live April 4 2026 during political/macro meme season.",
       "solscan": "https://solscan.io/token/5PwsE1yXAvANamqbYwM6zoWrYkNw8RZ74TZSsxnGu4vq",
-      "notes": "REVIVAL MONSTER — 201 days old, h6=+195% h24=+204% spike happening RIGHT NOW (April 4 2026). Buy ratio 58.8% (perfect zone). Liq $88k. Top1=6.73% (excellent distribution). Real brand: blackjack.one website. Classic Liberation Day macro meme revival. Spike cause: gambling/casino cultural metaphor resonates during tariff uncertainty ('it's all a gamble'). Market did not rug this team in 7 months — proven survival.",
+      "notes": "REVIVAL MONSTER \u2014 201 days old, h6=+195% h24=+204% spike happening RIGHT NOW (April 4 2026). Buy ratio 58.8% (perfect zone). Liq $88k. Top1=6.73% (excellent distribution). Real brand: blackjack.one website. Classic Liberation Day macro meme revival. Spike cause: gambling/casino cultural metaphor resonates during tariff uncertainty ('it's all a gamble'). Market did not rug this team in 7 months \u2014 proven survival.",
       "creator_wallet": "6cKvoKyqoSFVHeoQyf1AZSgqVsyZi79cyih4DJt6aEFX"
     },
     {
@@ -476,9 +476,9 @@
       "narrative_category": "productivity_workethic",
       "bundler_used": "j7tracker.com",
       "x_community_url": "https://x.com/i/communities/2012289562848956790",
-      "spike_cause": "Productivity/work-ethic narrative aligned with Trump DOGE efficiency era. Real open-source software project (GitHub: glittercowboy/get-shit-done). Organized launch via j7tracker.com bundler. X community hub for organized buyers. 78-day survivor — team did not rug. Meteora DLMM DEX.",
+      "spike_cause": "Productivity/work-ethic narrative aligned with Trump DOGE efficiency era. Real open-source software project (GitHub: glittercowboy/get-shit-done). Organized launch via j7tracker.com bundler. X community hub for organized buyers. 78-day survivor \u2014 team did not rug. Meteora DLMM DEX.",
       "solscan": "https://solscan.io/token/8116V1BW9zaXUM6pVhWVaAduKrLcEBi3RGXedKTrBAGS",
-      "notes": "METEORA MONSTER — 78 days old, buy ratio 57.7% (perfect zone), liq $75k. CRITICAL: deployed using j7tracker.com bundler (same as ELUN). Description says 'Deployed using https://j7tracker.com' — this signals organized coordinated launch. Has X community link (x.com/i/communities/) = organized buying group. Real GitHub project (glittercowboy/get-shit-done). Top1=17% is LP pool likely. DOGE-era work-ethic narrative has sustained community appeal. Second confirmed Meteora monster after BIGLY.",
+      "notes": "METEORA MONSTER \u2014 78 days old, buy ratio 57.7% (perfect zone), liq $75k. CRITICAL: deployed using j7tracker.com bundler (same as ELUN). Description says 'Deployed using https://j7tracker.com' \u2014 this signals organized coordinated launch. Has X community link (x.com/i/communities/) = organized buying group. Real GitHub project (glittercowboy/get-shit-done). Top1=17% is LP pool likely. DOGE-era work-ethic narrative has sustained community appeal. Second confirmed Meteora monster after BIGLY.",
       "creator_wallet": "GxDC9e7SP9mzhDo4re5HbpLa2RW7gB9DtmThx4i4pXSq"
     },
     {
@@ -506,9 +506,9 @@
       "telegram_url": "https://t.me/jeo_boden",
       "website_url": "https://www.boden4pres.com",
       "narrative_category": "political_meme",
-      "spike_cause": "Biden political meme from March 2024 election era. OLDEST token in dataset — 762 days (2+ years) with $310k liquidity and active community surviving through 2 election cycles. Spikes on Biden news (cognitive decline, SOTU, Biden policy decisions) and when political meme season hits (Liberation Day tariff wave revived all political memes). Multi-year survivor = the opposite of a rug.",
+      "spike_cause": "Biden political meme from March 2024 election era. OLDEST token in dataset \u2014 762 days (2+ years) with $310k liquidity and active community surviving through 2 election cycles. Spikes on Biden news (cognitive decline, SOTU, Biden policy decisions) and when political meme season hits (Liberation Day tariff wave revived all political memes). Multi-year survivor = the opposite of a rug.",
       "solscan": "https://solscan.io/token/3psH1Mj1f7yUfaD5gh6Zj7epE8hhrMkMETgv5TshQA4o",
-      "notes": "REVIVAL MONSTER (OUTLIER — buy ratio 49.2% BELOW 50%) — OLDEST in dataset at 762 days (March 2024 Biden/election era). Buy ratio 49.2% is the main outlier — BELOW our 50% floor. HOWEVER: $310k liquidity and established 2-year-old community change the calculus. Rule exception: tokens with liq > $200k + age > 6 months + h24 > 80% may work below 50% buy ratio. Spike cause: Liberation Day tariff crisis revived all political memes — 'boden' is the original Biden parody, still alive 2 years later. Raydium native (pre-dates pump.fun). NOT a filter template — treat as exceptional survivor/revival case.",
+      "notes": "REVIVAL MONSTER (OUTLIER \u2014 buy ratio 49.2% BELOW 50%) \u2014 OLDEST in dataset at 762 days (March 2024 Biden/election era). Buy ratio 49.2% is the main outlier \u2014 BELOW our 50% floor. HOWEVER: $310k liquidity and established 2-year-old community change the calculus. Rule exception: tokens with liq > $200k + age > 6 months + h24 > 80% may work below 50% buy ratio. Spike cause: Liberation Day tariff crisis revived all political memes \u2014 'boden' is the original Biden parody, still alive 2 years later. Raydium native (pre-dates pump.fun). NOT a filter template \u2014 treat as exceptional survivor/revival case.",
       "creator_wallet": "QDKe6HKextwnjsM85s5VQXBvYzaoEP1wyz8SUPDjV7K"
     },
     {
@@ -537,7 +537,7 @@
       "narrative_category": "emotional_loyalty_cultural",
       "spike_cause": "Hachiko = the legendary loyal Japanese Akita dog who waited at Shibuya Station for his dead owner every day for 9 years. Universally known story of loyalty and devotion. POWERFUL emotional narrative. Japanese/Asian community driven. The token hit $4M MC from ~$50-200k entry = 20-80x. Spike happened weeks ago (past peak at time of adding). STILL has $93k liquidity showing real community depth.",
       "solscan": "https://solscan.io/token/x95HN3DWvbfCBtTjGm587z8suK3ec6cwQwgZNLbWKyp",
-      "notes": "PAST PEAK MONSTER — captured for pattern analysis. MC $4.1M, liq $93k — well established. Top1=3.88% is BEST HOLDER DISTRIBUTION after ROCKET (3.90%) — almost perfectly spread. Rugcheck=1 (cleanest possible). Meteora DEX. Buy ratio 53.5%. NARRATIVE INSIGHT: Hachiko = most powerful emotional loyalty story in crypto-adjacent culture. The loyalty/devotion narrative drives HODLers — they HOLD because the story is about holding forever. This is why buy ratio stays in zone for months. Spike cause: Japanese/Asian community engagement + universal loyalty story + clean token (score=1 rugcheck).",
+      "notes": "PAST PEAK MONSTER \u2014 captured for pattern analysis. MC $4.1M, liq $93k \u2014 well established. Top1=3.88% is BEST HOLDER DISTRIBUTION after ROCKET (3.90%) \u2014 almost perfectly spread. Rugcheck=1 (cleanest possible). Meteora DEX. Buy ratio 53.5%. NARRATIVE INSIGHT: Hachiko = most powerful emotional loyalty story in crypto-adjacent culture. The loyalty/devotion narrative drives HODLers \u2014 they HOLD because the story is about holding forever. This is why buy ratio stays in zone for months. Spike cause: Japanese/Asian community engagement + universal loyalty story + clean token (score=1 rugcheck).",
       "creator_wallet": "JApBGtbBtsNosE1Z5CiyUkTMhAxATqH1NAuJJenHUceR"
     },
     {
@@ -564,9 +564,9 @@
       "telegram_url": "https://t.me/lolonsol_lol",
       "website_url": "https://lolonsol.lol",
       "narrative_category": "humor_universal",
-      "spike_cause": "LOL = Laughing Out Loud. The most universally recognised internet abbreviation in history. Simple, timeless, cross-cultural. Real domain lolonsol.lol shows brand investment. Active Telegram + Twitter community. MC went from ~$100k at graduation to $8.4M = ~84x. Top1 holder = 2.12% is the BEST distribution in the entire dataset — perfectly spread, no whale concentration. This is what organic community accumulation looks like.",
+      "spike_cause": "LOL = Laughing Out Loud. The most universally recognised internet abbreviation in history. Simple, timeless, cross-cultural. Real domain lolonsol.lol shows brand investment. Active Telegram + Twitter community. MC went from ~$100k at graduation to $8.4M = ~84x. Top1 holder = 2.12% is the BEST distribution in the entire dataset \u2014 perfectly spread, no whale concentration. This is what organic community accumulation looks like.",
       "solscan": "https://solscan.io/token/34q2KmCvapecJgR6ZrtbCTrzZVtkt3a5mHEA3TuEsWYb",
-      "notes": "MASSIVE MONSTER (past peak) — $8.4M MC, $355k liq, $1.88M daily volume even in decline. Top1=2.12% is BEST DISTRIBUTION of all 29 monsters. Rugcheck=1 (perfect). Buy ratio 59% in monster zone even at 17 days old. The LOL brand is immortal internet culture — 'Laughing Out Loud' needs no explanation. Real .lol domain. Active telegram at peak. SPIKE CAUSE: Pure viral humor meme with universal zero-barrier-to-entry understanding. No-one needs to explain what LOL means. This makes it globally viral by default. Bot should have been in this in the first 2-3 days.",
+      "notes": "MASSIVE MONSTER (past peak) \u2014 $8.4M MC, $355k liq, $1.88M daily volume even in decline. Top1=2.12% is BEST DISTRIBUTION of all 29 monsters. Rugcheck=1 (perfect). Buy ratio 59% in monster zone even at 17 days old. The LOL brand is immortal internet culture \u2014 'Laughing Out Loud' needs no explanation. Real .lol domain. Active telegram at peak. SPIKE CAUSE: Pure viral humor meme with universal zero-barrier-to-entry understanding. No-one needs to explain what LOL means. This makes it globally viral by default. Bot should have been in this in the first 2-3 days.",
       "creator_wallet": "CoPyPPWdm8SirumaAEe8S68nSJpHYhguN2L5i2YGxLB"
     },
     {
@@ -592,9 +592,9 @@
       "telegram_url": "https://t.me/+d6_YHbQMeLA1ODE8",
       "website_url": null,
       "narrative_category": "gaming_retro_visual",
-      "spike_cause": "Pixel/gaming/retro computing narrative. 'OG Pixel' branding signals first-mover positioning for the pixel aesthetic on Solana. Gaming culture, pixel art NFTs, Minecraft-generation nostalgia. Private invite-only Telegram (t.me/+invite_link). MC $11.9M from ~$100k entry = 100x+. h6=+42% showing ACTIVE movement still at 8.75 days — unusual for pumpswap tokens. The gaming/pixel narrative drives SUSTAINED buying from a specific demographic.",
+      "spike_cause": "Pixel/gaming/retro computing narrative. 'OG Pixel' branding signals first-mover positioning for the pixel aesthetic on Solana. Gaming culture, pixel art NFTs, Minecraft-generation nostalgia. Private invite-only Telegram (t.me/+invite_link). MC $11.9M from ~$100k entry = 100x+. h6=+42% showing ACTIVE movement still at 8.75 days \u2014 unusual for pumpswap tokens. The gaming/pixel narrative drives SUSTAINED buying from a specific demographic.",
       "solscan": "https://solscan.io/token/EkDGB5fbPXiRmDDjxKcC7dFjzvFZj2KT9t7oeyyPx4SX",
-      "notes": "MASSIVE MONSTER (still active) — $11.9M MC, $379k liq, $2.8M volume. 8.75 days old and still showing h6=+42% — very unusual longevity for PumpSwap. Buy ratio 53.3%. Top1=20.69% is graduation bonding curve pool level (normal). Private invite Telegram link shows tight-knit community. @ogpixelcoin handle ('OG' = original) signals community positioning as THE Pixel token. SPIKE CAUSE: gaming/retro visual culture is massive with Gen Z. Pixel art = Minecraft, retro games, nostalgia. Community stayed in it. Notable: this token has $379k liq at only 8.75 days old — exceptional community depth build-up.",
+      "notes": "MASSIVE MONSTER (still active) \u2014 $11.9M MC, $379k liq, $2.8M volume. 8.75 days old and still showing h6=+42% \u2014 very unusual longevity for PumpSwap. Buy ratio 53.3%. Top1=20.69% is graduation bonding curve pool level (normal). Private invite Telegram link shows tight-knit community. @ogpixelcoin handle ('OG' = original) signals community positioning as THE Pixel token. SPIKE CAUSE: gaming/retro visual culture is massive with Gen Z. Pixel art = Minecraft, retro games, nostalgia. Community stayed in it. Notable: this token has $379k liq at only 8.75 days old \u2014 exceptional community depth build-up.",
       "creator_wallet": "Cr6v6hzmEGhxEHUiVtQRuVTj65cGRzhmKZ6mru8ARY1r"
     },
     {
@@ -623,11 +623,11 @@
       "website_url": "https://pippin.love",
       "narrative_category": "ai_agent_tech",
       "kol_creator": "yoheinakajima",
-      "kol_creator_role": "Creator of BabyAGI — the original autonomous AI agent framework (2023). 1.8M+ Twitter followers.",
+      "kol_creator_role": "Creator of BabyAGI \u2014 the original autonomous AI agent framework (2023). 1.8M+ Twitter followers.",
       "kol_creator_tweet": "https://x.com/yoheinakajima/status/1855337887568638431",
-      "spike_cause": "AI narrative token created by yoheinakajima, creator of BabyAGI (2023) — the original autonomous AI agent framework. Real KOL token — when yoheinakajima tweets, PIPPIN moves. Any AI news (Claude/GPT/Grok releases, agent launches, AI regulation) triggers waves. $5M liquidity and $42M MC shows this has survived 511 days and 4+ major AI news cycles. NOT a pump.fun meme — this is an AI-ecosystem bet that happens to be a meme token.",
+      "spike_cause": "AI narrative token created by yoheinakajima, creator of BabyAGI (2023) \u2014 the original autonomous AI agent framework. Real KOL token \u2014 when yoheinakajima tweets, PIPPIN moves. Any AI news (Claude/GPT/Grok releases, agent launches, AI regulation) triggers waves. $5M liquidity and $42M MC shows this has survived 511 days and 4+ major AI news cycles. NOT a pump.fun meme \u2014 this is an AI-ecosystem bet that happens to be a meme token.",
       "solscan": "https://solscan.io/token/Dfh5DzRgSvvCFDoYc2ciTkMrbDfRKybA4SoFbPmApump",
-      "notes": "ESTABLISHED LARGE-CAP MONSTER (OUTLIER — buy ratio 48.7% BELOW 50%) — 511 days old, $42M MC, $5M liquidity. Buy ratio 48.7% is BELOW our floor — second exception case alongside boden (49.2%). Rule: established tokens with liq > $200k and age > 180 days may operate with buy ratio 46-50%. CRITICAL KOL FACTOR: Pippin was created by yoheinakajima (BabyAGI creator, 1.8M Twitter followers). This is a REAL KOL-created token — the creator has ongoing influence to drive waves. h24=+39% on $42M MC = $12M absolute move in 24h. Vol_h24=$16.2M = 38% of MC traded daily. SPIKE CAUSE: AI agent narrative is permanent in 2024-2026. Every major AI release triggers a wave. This is THE AI agent token on Solana.",
+      "notes": "ESTABLISHED LARGE-CAP MONSTER (OUTLIER \u2014 buy ratio 48.7% BELOW 50%) \u2014 511 days old, $42M MC, $5M liquidity. Buy ratio 48.7% is BELOW our floor \u2014 second exception case alongside boden (49.2%). Rule: established tokens with liq > $200k and age > 180 days may operate with buy ratio 46-50%. CRITICAL KOL FACTOR: Pippin was created by yoheinakajima (BabyAGI creator, 1.8M Twitter followers). This is a REAL KOL-created token \u2014 the creator has ongoing influence to drive waves. h24=+39% on $42M MC = $12M absolute move in 24h. Vol_h24=$16.2M = 38% of MC traded daily. SPIKE CAUSE: AI agent narrative is permanent in 2024-2026. Every major AI release triggers a wave. This is THE AI agent token on Solana.",
       "creator_wallet": "7rhxnLV8C77o6d8oz26AgK8x8m5ePsdeRawjqvojbjnQ"
     },
     {
@@ -650,10 +650,10 @@
       "h1_at_check": -14.4,
       "h6_at_check": 4.9,
       "narrative": "humor_universal_math",
-      "narrative_notes": "7x7=49 — universally understood math joke. Extremely simple, memorable, no political risk. Same pattern as LOL.",
+      "narrative_notes": "7x7=49 \u2014 universally understood math joke. Extremely simple, memorable, no political risk. Same pattern as LOL.",
       "why_it_pumped": "Ultra-fast graduation (29 min = top 5% fastest), simple universal meme, strong buying pressure from BC through graduation. Liberation Day market volatility window.",
       "why_bot_missed": "strategy_b_min_liq_usd raised to $13,500 by Jarvis. Token had $11,575 liq at graduation = BLOCKED. If limit was $10k we would have entered.",
-      "bot_fix_required": "strategy_b_min_liq_usd must be locked at $10,000 — now added to paper+live PROTECTED_KEYS",
+      "bot_fix_required": "strategy_b_min_liq_usd must be locked at $10,000 \u2014 now added to paper+live PROTECTED_KEYS",
       "solscan": "https://solscan.io/token/97PGWGgGJorRwwYgNqF5Z68SqwoyiuT2UjumzSjDpump",
       "entry_signal_notes": "Caught at graduation: m5=+0% (slight dip, Strategy B dip-wait). Pool not indexed at confirmation time. Liq grew quickly post-graduation.",
       "mc_usd_at_check": 519905,
@@ -682,8 +682,8 @@
       "h6_at_check": -24.6,
       "narrative": "political_meme_pop_culture_fusion",
       "narrative_notes": "Obi Wan Kenobi (Star Wars) + Peanut the Squirrel (viral NY govt euthanasia victim, Oct 2024). Resistance/freedom fighter narrative fusion. Very old token revival pattern.",
-      "why_it_pumped": "519-day revival. Peanut/PNut narrative resurged — political meme revival catalyst. Old Raydium token with large established liq ($64k).",
-      "why_bot_missed": "Token not in scanner window at right time — scanner cycles 15-30 tokens, OPK likely not in top list during spike window. Buy_ratio h1 now 44% (post-peak declining) would fail our 50% floor filter even if scanned.",
+      "why_it_pumped": "519-day revival. Peanut/PNut narrative resurged \u2014 political meme revival catalyst. Old Raydium token with large established liq ($64k).",
+      "why_bot_missed": "Token not in scanner window at right time \u2014 scanner cycles 15-30 tokens, OPK likely not in top list during spike window. Buy_ratio h1 now 44% (post-peak declining) would fail our 50% floor filter even if scanned.",
       "revival_pattern": true,
       "exception_rule": "buy_ratio_h24=70% is above 65% ceiling BUT this is h24 average across full pump day. At early entry moment, buy_ratio was likely 50-60%. Same exception logic as boden/pippin for old established tokens.",
       "solscan": "https://solscan.io/token/5WGkdemJNEoAVKveDQdzQmDqTyxCraXGw9ACyrwCEUMS",
@@ -713,8 +713,8 @@
       "h6_at_check": 9.3,
       "narrative": "ai_agent_tech",
       "narrative_notes": "Nuero = neural/neuro AI agent narrative. AI tech/neural network theme. 5.7-day-old PumpSwap graduated token.",
-      "why_it_pumped": "AI agent narrative wave. Graduated pump.fun, 5.7 days old at peak. PumpSwap with solid liq. Classic delayed monster pattern — not early buy rush but sustained building.",
-      "why_bot_missed": "Not in scanner window at entry time. At check time h1 buy_ratio=66% (just above 65% ceiling). h24 buy_ratio=57% would pass. Timing issue — scanner saw it after peak.",
+      "why_it_pumped": "AI agent narrative wave. Graduated pump.fun, 5.7 days old at peak. PumpSwap with solid liq. Classic delayed monster pattern \u2014 not early buy rush but sustained building.",
+      "why_bot_missed": "Not in scanner window at entry time. At check time h1 buy_ratio=66% (just above 65% ceiling). h24 buy_ratio=57% would pass. Timing issue \u2014 scanner saw it after peak.",
       "solscan": "https://solscan.io/token/8BrKogqwr7Uad9Pwkxw91w31v2x5qf8yDL4x52Qhpump",
       "mc_usd_at_check": 404289,
       "liq_mc_ratio": 0.14,
@@ -743,17 +743,17 @@
       "mc_usd_at_check": 128019,
       "liq_mc_ratio": 0.22,
       "narrative": "humor_animal_character",
-      "narrative_notes": "Penguin character meme. Pluto = underdog/misfit (demoted from planet, or Disney character). Animal character tokens with a personality angle. 'Pluto is the winning vote' variant tokens were flooding A2 at creation time — coordinated launch campaign.",
+      "narrative_notes": "Penguin character meme. Pluto = underdog/misfit (demoted from planet, or Disney character). Animal character tokens with a personality angle. 'Pluto is the winning vote' variant tokens were flooding A2 at creation time \u2014 coordinated launch campaign.",
       "x_community_signal": true,
       "x_community_url": "https://x.com/i/communities/2037433093552832650",
-      "x_community_notes": "Website field on DexScreener = X community link. This is a confirmed MONSTER SIGNAL — means organized persistent buying group with a dedicated community. This signal alone should trigger higher score.",
+      "x_community_notes": "Website field on DexScreener = X community link. This is a confirmed MONSTER SIGNAL \u2014 means organized persistent buying group with a dedicated community. This signal alone should trigger higher score.",
       "why_it_pumped": "Fast graduation (11 min = very fast), animal character narrative, X community organized buyers, strong h6 momentum (+297%). Multiple copycat 'Pluto is winning' tokens launching simultaneously = coordinated campaign signal.",
-      "why_bot_missed_early": "Strategy B graduation snipe: vol/liq=0.4x < 1x min at graduation — but a brand-new pool has zero vol history. This check is invalid for new graduates. FIX: removed vol/liq MIN check from Strategy B.",
-      "why_bot_missed_scout": "Strategy C scout: liq ranged $10-24k for 2h while token pumped to h1=+396%. Our $25k liq floor blocked every scan. By the time liq hit $25k, h1 was +363% — blocked by h1 cap.",
+      "why_bot_missed_early": "Strategy B graduation snipe: vol/liq=0.4x < 1x min at graduation \u2014 but a brand-new pool has zero vol history. This check is invalid for new graduates. FIX: removed vol/liq MIN check from Strategy B.",
+      "why_bot_missed_scout": "Strategy C scout: liq ranged $10-24k for 2h while token pumped to h1=+396%. Our $25k liq floor blocked every scan. By the time liq hit $25k, h1 was +363% \u2014 blocked by h1 cap.",
       "actual_bot_entry": "Entered at h1=+77% (wave 2 rebound, already well past peak). Trailing stop hit 8min later at +13.3%. This was entry after the horse had bolted.",
       "bot_fix_required": "Remove vol/liq MIN from Strategy B graduation snipe. The graduation event IS the momentum signal.",
       "common_with_other_monsters": [
-        "buy_ratio 58% — iron-clad range",
+        "buy_ratio 58% \u2014 iron-clad range",
         "X community link = organized buyers (confirmed signal, first live proof)",
         "Fast graduation (<30min) = strong bonding curve buying",
         "Animal character narrative (same class as HACHI, LOL)",
@@ -783,13 +783,13 @@
       "solscan": "https://solscan.io/token/9LbueXn3HMWWSTZPbH8jJKEZNKnb6YvTVn8HvqeQpump",
       "confirmed": true,
       "key_signals": [
-        "KOL tweet link — @JakTheDegen direct tweet URL in DexScreener socials (NOT just a profile — a specific /status/ post)",
-        "Authority N/A at time of check — mint authority burned post-launch",
+        "KOL tweet link \u2014 @JakTheDegen direct tweet URL in DexScreener socials (NOT just a profile \u2014 a specific /status/ post)",
+        "Authority N/A at time of check \u2014 mint authority burned post-launch",
         "Same-day launch, +1513% within hours",
         "NOTE: 'Axiom' in Solscan Social Channels is universal navigation (not a token-specific signal)"
       ],
-      "playbook_lesson": "Direct tweet link (/status/) in socials = KOL actively promoting right now. Check follower count of the tweeter immediately (+2 if >10k, +3 if >100k). Authority N/A = bullish — no rug via new minting possible.",
-      "notes": "No website — pure social signal play. Fast violent pump same-day. The Axiom entry in Solscan is a standard nav dropdown that appears on ALL tokens — not a signal.",
+      "playbook_lesson": "Direct tweet link (/status/) in socials = KOL actively promoting right now. Check follower count of the tweeter immediately (+2 if >10k, +3 if >100k). Authority N/A = bullish \u2014 no rug via new minting possible.",
+      "notes": "No website \u2014 pure social signal play. Fast violent pump same-day. The Axiom entry in Solscan is a standard nav dropdown that appears on ALL tokens \u2014 not a signal.",
       "creator_wallet": "DsCJ5siuJTPQtQa3A9N69azGZaWtUPzi9VPp2G9Jfpx9"
     },
     {
@@ -813,7 +813,7 @@
         "Liberation Day cluster candidate (April 5, tariff-era political energy)",
         "Counter-establishment narrative: dark web freedom fighter = anti-govt resonance in ALL crypto holders"
       ],
-      "playbook_lesson": "Dual narrative tokens hit two separate audiences independently. The Silk Road narrative is unique — EVERY crypto holder knows the story regardless of country or culture. Website + dedicated Twitter = prepared launch with staying power.",
+      "playbook_lesson": "Dual narrative tokens hit two separate audiences independently. The Silk Road narrative is unique \u2014 EVERY crypto holder knows the story regardless of country or culture. Website + dedicated Twitter = prepared launch with staying power.",
       "notes": "Cthulhu adds chaos/elder-god energy to the political narrative. Both the crypto-political and internet-horror audiences overlap heavily in the Solana degen space.",
       "creator_wallet": "39KwYt6BVzB2Pm4RCERYDowPqhK8eXfAsg9B7D7V17Vd"
     },
@@ -846,7 +846,7 @@
       "solscan": "https://solscan.io/token/BiBMG42BrmvJE5gY5UCXLURroGR6tBC1gfcYbZuEpump",
       "missed_by_bot": true,
       "miss_reason": "No scout keyed on multi-DEX lifecycle (PumpSwap + fresh Meteora pool within 2h). None of Frost/Walta/clukz bought it, so copy-trade never fired.",
-      "notes": "ARCHETYPE MONSTER +10,804% h24. Top1 only 2.71% — best-class supply distribution. PumpSwap graduated, Meteora DLMM opened 102 mins later (institutional MM signal). Full social stack: X Community + Telegram + dedicated .com website. This is the screenshot monster the user flagged — we should have caught this within the 2-6h entry window."
+      "notes": "ARCHETYPE MONSTER +10,804% h24. Top1 only 2.71% \u2014 best-class supply distribution. PumpSwap graduated, Meteora DLMM opened 102 mins later (institutional MM signal). Full social stack: X Community + Telegram + dedicated .com website. This is the screenshot monster the user flagged \u2014 we should have caught this within the 2-6h entry window."
     },
     {
       "symbol": "ASSFACE",
@@ -875,7 +875,7 @@
       "solscan": "https://solscan.io/token/BnXWvsVZYgBxTUDyDqHZjvFbQGvEZeipY4ZdmqCbpump",
       "missed_by_bot": true,
       "miss_reason": "Copy-trade only; no lifecycle scout to catch this at 2-3h old when Meteora pool opened.",
-      "notes": "MONSTER +1009% h24. Top1 6.88%, socials are X Community ONLY (no telegram, no website) — proof that a single community link is enough. Still running at check time (h1 +33%). Creator wallet vanity ends in '666'."
+      "notes": "MONSTER +1009% h24. Top1 6.88%, socials are X Community ONLY (no telegram, no website) \u2014 proof that a single community link is enough. Still running at check time (h1 +33%). Creator wallet vanity ends in '666'."
     },
     {
       "symbol": "HPOP8",
@@ -906,7 +906,7 @@
       "solscan": "https://solscan.io/token/5YX8Bsgm4AENU8SbsjMEeZssDcvnT5sx96mxgf69pump",
       "missed_by_bot": true,
       "miss_reason": "Copy-trade only; no lifecycle scout to catch rapidlaunch-style bundled launches with fast multi-DEX presence.",
-      "notes": "MONSTER +1463% h24. Meteora opened only 40 mins after PumpSwap — fastest multi-DEX lag in set. rapidlaunch.io is a pump.fun-alternative bundler (same role as j7tracker)."
+      "notes": "MONSTER +1463% h24. Meteora opened only 40 mins after PumpSwap \u2014 fastest multi-DEX lag in set. rapidlaunch.io is a pump.fun-alternative bundler (same role as j7tracker)."
     },
     {
       "symbol": "GREKT",
@@ -934,8 +934,8 @@
       "narrative_category": "wsb_finance_humor",
       "solscan": "https://solscan.io/token/Sgei8pavjJLWVrYUp9PwNxK6hmP5TphQd2HR4Yxpump",
       "missed_by_bot": true,
-      "miss_reason": "No lifecycle scout. Twitter link is a direct /status/ post — KOL-style signal identical to Freg.",
-      "notes": "MONSTER +1700% h24. BEST supply distribution in this cohort — Top1 4.21%, Top5 6.45%. No Meteora pool yet but bolt.host website + specific tweet /status/ URL = active KOL promotion (Freg-type play). WSB 'generational REKT' narrative."
+      "miss_reason": "No lifecycle scout. Twitter link is a direct /status/ post \u2014 KOL-style signal identical to Freg.",
+      "notes": "MONSTER +1700% h24. BEST supply distribution in this cohort \u2014 Top1 4.21%, Top5 6.45%. No Meteora pool yet but bolt.host website + specific tweet /status/ URL = active KOL promotion (Freg-type play). WSB 'generational REKT' narrative."
     },
     {
       "symbol": "DUMBMONEY",
@@ -967,8 +967,8 @@
       "narrative_category": "wsb_gamestop_reference",
       "solscan": "https://solscan.io/token/CAjtTHvC878f8cZ4zEwdvgjkjFM7rbYN8Mb1go1cpump",
       "missed_by_bot": true,
-      "miss_reason": "5-day survivor. Three Meteora pools opened between day 3-4 — multi-MM conviction signal we don't scan for.",
-      "notes": "SURVIVOR — 5 days old at check. h24 down -34% (late-stage cooling) but MC still $3.5M at top1=2.8%, Top5=8.67%. THREE Meteora pools opened over 21 min on day 3 post-launch = multiple MMs stepping in simultaneously. Full social stack. GameStop 'Dumb Money' movie reference — strong retail resonance."
+      "miss_reason": "5-day survivor. Three Meteora pools opened between day 3-4 \u2014 multi-MM conviction signal we don't scan for.",
+      "notes": "SURVIVOR \u2014 5 days old at check. h24 down -34% (late-stage cooling) but MC still $3.5M at top1=2.8%, Top5=8.67%. THREE Meteora pools opened over 21 min on day 3 post-launch = multiple MMs stepping in simultaneously. Full social stack. GameStop 'Dumb Money' movie reference \u2014 strong retail resonance."
     },
     {
       "symbol": "Nintondo",
@@ -1010,7 +1010,7 @@
       },
       "missed_by_bot": true,
       "miss_reason": "SLOW-COOKER: spike started 725min (12h) after graduation, far outside our 60-90min lifecycle window. No cluster/serial scout fired because no whitelisted wallets bought it. Our DexScreener search-based lifecycle scout also missed it because the pair wasn't ranked high in /search?q=pumpswap results during the 60-90min window.",
-      "notes": "SLOW-COOKER archetype: long stealth phase (~12h) with median $854 vol / 5min, price range $0.028-$0.067 micro, then organic breakout. 30x+ final. Opposite of ASTEROID which ramped within 114min. Catching this needs a post-graduation watchlist scan that waits for the breakout candle (≥20% above prior-30min median), NOT an age-based filter."
+      "notes": "SLOW-COOKER archetype: long stealth phase (~12h) with median $854 vol / 5min, price range $0.028-$0.067 micro, then organic breakout. 30x+ final. Opposite of ASTEROID which ramped within 114min. Catching this needs a post-graduation watchlist scan that waits for the breakout candle (\u226520% above prior-30min median), NOT an age-based filter."
     },
     {
       "symbol": "TERMINAL",
@@ -1047,7 +1047,7 @@
         "pumpswap_primary": "9W3azeDENcXRBRRc6utrCgqDjAsMTVjRfk8uLEMT9Zh9"
       },
       "missed_by_bot": true,
-      "miss_reason": "AGE_FLOOR_TOO_HIGH: spike started at 33min post-graduation. Lifecycle scout requires age >= 60min (LIFECYCLE_MIN_AGE_SECS=3600). Cluster/serial scouts didn't fire — no whitelisted wallets. Also the lifecycle scout's DexScreener /search?q=pumpswap doesn't reliably surface fresh pairs in the 0-60min window.",
+      "miss_reason": "AGE_FLOOR_TOO_HIGH: spike started at 33min post-graduation. Lifecycle scout requires age >= 60min (LIFECYCLE_MIN_AGE_SECS=3600). Cluster/serial scouts didn't fire \u2014 no whitelisted wallets. Also the lifecycle scout's DexScreener /search?q=pumpswap doesn't reliably surface fresh pairs in the 0-60min window.",
       "notes": "FAST-RAMP archetype: Meteora DLMM opened only 12min after PumpSwap graduation (institutional-speed MM, like ASTEROID). Breakout candle at t+33min on $45K 5min-vol. By the time our 60min floor opens, token is already +4x. To catch this we need LIFECYCLE_MIN_AGE_SECS dropped to 20-30min, AND a direct pair-creation feed (not search)."
     },
     {
@@ -1086,7 +1086,121 @@
       },
       "missed_by_bot": true,
       "miss_reason": "AGE_FLOOR_TOO_HIGH + SLOW_RAMP_TO_PEAK: initial breakout at t+35min (below 60min floor), then slow grind for 4 days to peak. Even if we had caught the spike candle, our LIFECYCLE_MAX_AGE_SECS=90min would have forced a close well before the 80x peak. No cluster/serial fire.",
-      "notes": "HYBRID archetype: fast initial breakout (like TERMINAL, 35min) but then patient multi-day grind to 80x peak (like Nintondo's slow-cook). Demonstrates that capping max hold age at 90min forces us out of the biggest winners. Peak was 96h after entry candle — classic patient-grinder meme."
+      "notes": "HYBRID archetype: fast initial breakout (like TERMINAL, 35min) but then patient multi-day grind to 80x peak (like Nintondo's slow-cook). Demonstrates that capping max hold age at 90min forces us out of the biggest winners. Peak was 96h after entry candle \u2014 classic patient-grinder meme."
+    },
+    {
+      "symbol": "TROLL",
+      "name": "TROLL",
+      "mint": "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2",
+      "dex": "pumpswap",
+      "date_spotted": "2026-04-24",
+      "date_added": "2026-04-24",
+      "source": "manual_add",
+      "h1_gain_pct_at_check": -1.19,
+      "h6_gain_pct": 4.86,
+      "h24_gain_pct": 8.48,
+      "liq_usd_at_check": 1709336,
+      "vol_24h_usd": 631449,
+      "fdv_at_check": 23355194,
+      "age_hours_at_check": 8852.7,
+      "creator_wallet": null,
+      "pair_address": "4w2cysotX6czaUGmmWg13hDpY4QEMG2CzeKYEQyK9Ama",
+      "solscan": "https://solscan.io/token/5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2"
+    },
+    {
+      "symbol": "67",
+      "name": "The Official 67 Coin",
+      "mint": "9AvytnUKsLxPxFHFqS6VLxaxt5p6BhYNr53SD2Chpump",
+      "dex": "pumpswap",
+      "date_spotted": "2026-04-24",
+      "date_added": "2026-04-24",
+      "source": "manual_add",
+      "h1_gain_pct_at_check": -4.16,
+      "h6_gain_pct": -6.94,
+      "h24_gain_pct": 36.85,
+      "liq_usd_at_check": 303635,
+      "vol_24h_usd": 449997,
+      "fdv_at_check": 2440754,
+      "age_hours_at_check": 5213.7,
+      "creator_wallet": "CfkaAru9ArJ2tAStYHvbAyRBJL3EhDzsWYV2KYg9shxB",
+      "pair_address": "DMAFL613XTipuA3jFNYczavWT7XsiYf9cR3qmRMZQhB6",
+      "solscan": "https://solscan.io/token/9AvytnUKsLxPxFHFqS6VLxaxt5p6BhYNr53SD2Chpump"
+    },
+    {
+      "symbol": "Bonk",
+      "name": "Bonk",
+      "mint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+      "dex": "orca",
+      "date_spotted": "2026-04-24",
+      "date_added": "2026-04-24",
+      "source": "manual_add",
+      "h1_gain_pct_at_check": -0.52,
+      "h6_gain_pct": -1.05,
+      "h24_gain_pct": -0.93,
+      "liq_usd_at_check": 900579,
+      "vol_24h_usd": 3746,
+      "fdv_at_check": 564220222,
+      "age_hours_at_check": 29206.5,
+      "creator_wallet": null,
+      "pair_address": "3ne4mWqdYuNiYrYZC9TrA3FcfuFdErghH97vNPbjicr1",
+      "solscan": "https://solscan.io/token/DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+    },
+    {
+      "symbol": "HODL",
+      "name": "HODL",
+      "mint": "Hh3oTaqDCKKfdBgsQEvxp9sUwyNf8x9qmKqEMLBWpump",
+      "dex": "pumpswap",
+      "date_spotted": "2026-04-24",
+      "date_added": "2026-04-24",
+      "source": "manual_add",
+      "h1_gain_pct_at_check": -1.22,
+      "h6_gain_pct": 1.3,
+      "h24_gain_pct": 12.78,
+      "liq_usd_at_check": 265111,
+      "vol_24h_usd": 178758,
+      "fdv_at_check": 3881377,
+      "age_hours_at_check": 1699.4,
+      "creator_wallet": null,
+      "pair_address": "DTdtHUx79bmNMnesv3au7pzBKAkB3mUUi8GwUdZ6Suw",
+      "solscan": "https://solscan.io/token/Hh3oTaqDCKKfdBgsQEvxp9sUwyNf8x9qmKqEMLBWpump"
+    },
+    {
+      "symbol": "retire",
+      "name": "The Last Play",
+      "mint": "zGh48JtNHVBb5evgoZLXwgPD2Qu4MhkWdJLGDAupump",
+      "dex": "raydium",
+      "date_spotted": "2026-04-24",
+      "date_added": "2026-04-24",
+      "source": "manual_add",
+      "h1_gain_pct_at_check": -1.06,
+      "h6_gain_pct": -0.68,
+      "h24_gain_pct": 5.19,
+      "liq_usd_at_check": 621138,
+      "vol_24h_usd": 41064,
+      "fdv_at_check": 4608202,
+      "age_hours_at_check": 13383.1,
+      "creator_wallet": null,
+      "pair_address": "6HfaJiUuTXFZEfmdkQSNbvfe6i95Nh2wUVJ5dWMf7gtw",
+      "solscan": "https://solscan.io/token/zGh48JtNHVBb5evgoZLXwgPD2Qu4MhkWdJLGDAupump"
+    },
+    {
+      "symbol": "Punch",
+      "name": "\u30d1\u30f3\u30c1",
+      "mint": "NV2RYH954cTJ3ckFUpvfqaQXU4ARqqDH3562nFSpump",
+      "dex": "pumpswap",
+      "date_spotted": "2026-04-24",
+      "date_added": "2026-04-24",
+      "source": "manual_add",
+      "h1_gain_pct_at_check": -0.02,
+      "h6_gain_pct": 3.24,
+      "h24_gain_pct": 0.27,
+      "liq_usd_at_check": 362572,
+      "vol_24h_usd": 213261,
+      "fdv_at_check": 2964750,
+      "age_hours_at_check": 1878.2,
+      "creator_wallet": null,
+      "pair_address": "A6KHMiFzn9AM7VKBtVP4fZNY9bCo2jP63R9dphaW1vrq",
+      "solscan": "https://solscan.io/token/NV2RYH954cTJ3ckFUpvfqaQXU4ARqqDH3562nFSpump"
     }
   ],
   "last_updated": "2026-04-05",
@@ -1140,23 +1254,23 @@
   "confirmed_entry_filters": {
     "buy_ratio_pct_min": 50,
     "buy_ratio_pct_max": 65,
-    "buy_ratio_notes": "IRON-CLAD — 100% hit rate across all 13 true monsters + 2 revival patterns + 100% rejection of outliers. ROCKET=37.8%, FML=69.9%, apple=79.8%, Quality=44.7% all failed. ALL 4 new tokens (fluide=51.5%, BIGLY=59.2%, GAJAE=52.5%, Hamster=51.4%) are in the 50-65% zone. This is THE single most reliable filter in the entire dataset.",
+    "buy_ratio_notes": "IRON-CLAD \u2014 100% hit rate across all 13 true monsters + 2 revival patterns + 100% rejection of outliers. ROCKET=37.8%, FML=69.9%, apple=79.8%, Quality=44.7% all failed. ALL 4 new tokens (fluide=51.5%, BIGLY=59.2%, GAJAE=52.5%, Hamster=51.4%) are in the 50-65% zone. This is THE single most reliable filter in the entire dataset.",
     "vol_liq_ratio_min": 1.0,
     "vol_liq_ratio_max": 3.0,
-    "vol_liq_notes": "True monsters at entry: ZEN=2.8x, BURNIE=2.1x, milkers=2.3x, raydium set 1-3x estimated. Moderate momentum — NOT yet exploding. Outliers: Quality=34.9x (dump in progress), FML=0.2x (dead), apple=0.1x (dead), BULL=0.3x (dead).",
+    "vol_liq_notes": "True monsters at entry: ZEN=2.8x, BURNIE=2.1x, milkers=2.3x, raydium set 1-3x estimated. Moderate momentum \u2014 NOT yet exploding. Outliers: Quality=34.9x (dump in progress), FML=0.2x (dead), apple=0.1x (dead), BULL=0.3x (dead).",
     "liq_usd_min": 25000,
     "liq_usd_max": 150000,
-    "liq_notes": "Monsters at entry: $25k–$128k. Grows as token moves. apple failed at $10k. Anything above $150k at entry has usually already run.",
+    "liq_notes": "Monsters at entry: $25k\u2013$128k. Grows as token moves. apple failed at $10k. Anything above $150k at entry has usually already run.",
     "m5_pct_max_entry": 15,
     "m5_pct_min_entry": -15,
-    "m5_notes": "Quiet entry is the SIGNATURE — monsters are NOT already pumping when you buy. milkers had m5=-5.5% (perfect dip entry). Quality had m5=-27.5% (already dumping, skip). If m5 > +15%, you missed the quiet entry.",
+    "m5_notes": "Quiet entry is the SIGNATURE \u2014 monsters are NOT already pumping when you buy. milkers had m5=-5.5% (perfect dip entry). Quality had m5=-27.5% (already dumping, skip). If m5 > +15%, you missed the quiet entry.",
     "age_hours_min_sweet_spot": 2,
     "age_hours_max_sweet_spot": 20,
     "age_hours_extended": 72,
-    "age_hours_revival": "unlimited — if buy_ratio 50-65% AND h24 > 40%, any age can be a revival",
+    "age_hours_revival": "unlimited \u2014 if buy_ratio 50-65% AND h24 > 40%, any age can be a revival",
     "age_notes": "Sweet spot 2-20h. ZEN still active at 72h. REVISED (2026-04-04): GAJAE (1515h, 63 days) and Hamster (613h, 25 days) show old tokens can re-awaken with monster buy ratios. Rule revised: after 48h require h24 > 40% + buy ratio in zone. After 168h require h24 > 80% + buy ratio in zone. FML=418h with h24=+47% was dead (vol/liq=0.2x), not a revival.",
-    "score_at_entry": "3-10 — DO NOT gate on score alone. PISS=3 (22x), NoHat=4 (18x), LOLA=4 (15x). Average monster score = 5.6. MIN_SCORE=8 would reject 4 of 5 Raydium monsters.",
-    "social_signal": "REVISED (2026-04-04) — Old assumption 'ZERO socials' is WRONG. All 4 new tokens (fluide, BIGLY, GAJAE, Hamster) have socials. Having Twitter/Telegram linked is NEUTRAL — it is normal token metadata. What matters is: NO ACTIVE INFLUENCER CALLS AT ENTRY. Socials exist = normal. Active Twitter promotion = token already priced in. The real signal is buy ratio, not social presence.",
+    "score_at_entry": "3-10 \u2014 DO NOT gate on score alone. PISS=3 (22x), NoHat=4 (18x), LOLA=4 (15x). Average monster score = 5.6. MIN_SCORE=8 would reject 4 of 5 Raydium monsters.",
+    "social_signal": "REVISED (2026-04-04) \u2014 Old assumption 'ZERO socials' is WRONG. All 4 new tokens (fluide, BIGLY, GAJAE, Hamster) have socials. Having Twitter/Telegram linked is NEUTRAL \u2014 it is normal token metadata. What matters is: NO ACTIVE INFLUENCER CALLS AT ENTRY. Socials exist = normal. Active Twitter promotion = token already priced in. The real signal is buy ratio, not social presence.",
     "dex": [
       "pumpswap",
       "raydium",
@@ -1168,15 +1282,15 @@
     "raydium_native": {
       "typical_hours": "6-10",
       "examples": "PISS peaked at 6h (22x), NoHat at 8h (18x), LOLA at 10h (15x)",
-      "implication": "Raydium monsters move fast — need to be in early, trail tight within day 1"
+      "implication": "Raydium monsters move fast \u2014 need to be in early, trail tight within day 1"
     },
     "pumpswap_graduate": {
       "typical_hours": "14-48",
       "examples": "BURNIE still running at 14h, milkers at 20h, ZEN secondary run at 72h, Chicky slow at 83h",
-      "implication": "PumpSwap monsters are slow burners. MAX_HOLD must be 48h minimum — old 6h limit would cut every single one before peak"
+      "implication": "PumpSwap monsters are slow burners. MAX_HOLD must be 48h minimum \u2014 old 6h limit would cut every single one before peak"
     },
     "outlier": {
-      "typical_hours": "189 (TARO — 7.9 days)",
+      "typical_hours": "189 (TARO \u2014 7.9 days)",
       "implication": "Patient trailing stop can catch exceptional cases but don't size for this"
     }
   },
@@ -1187,7 +1301,7 @@
   "exit_strategy": {
     "trailing_stop_pct": 0.12,
     "trailing_stop_verdict": "ONLY exit that captures monsters. Fixed TP at ANY level kills the trade.",
-    "fixed_tp_verdict": "KILLS THE TRADE — ZEN=143x, BURNIE=+2214%, milkers=+1380% would all exit at 30-60% TP missing 95-99% of the move",
+    "fixed_tp_verdict": "KILLS THE TRADE \u2014 ZEN=143x, BURNIE=+2214%, milkers=+1380% would all exit at 30-60% TP missing 95-99% of the move",
     "hold_hours_raydium": "6-10h typical peak",
     "hold_hours_pumpswap": "14-48h typical peak",
     "max_hold_pumpswap_required": 48,
@@ -1195,7 +1309,7 @@
   },
   "buy_ratio_exception_large_liq": {
     "rule": "For tokens with liq > $200k AND age > 180 days: buy ratio floor is 46% (not 50%). Standard 50% floor applies to all tokens with liq < $200k.",
-    "examples": "boden=49.2% ($310k liq, 762 days) — MONSTER. pippin=48.7% ($5M liq, 511 days) — MONSTER. Both below 50% but massive established communities.",
+    "examples": "boden=49.2% ($310k liq, 762 days) \u2014 MONSTER. pippin=48.7% ($5M liq, 511 days) \u2014 MONSTER. Both below 50% but massive established communities.",
     "why": "At very high liq+age, profit-taker sell volume naturally dilutes the buy ratio even during active accumulation. The absolute buy size is large even at 48-49%. Standard 50% floor is correct for all new/small tokens."
   },
   "narrative_taxonomy": {
@@ -1235,11 +1349,11 @@
       "BULL",
       "ROCKET"
     ],
-    "insight": "Political memes and AI narrative tokens have the LONGEST runway — they spike repeatedly on news events. Humor/universal memes spike fastest and hardest but are one-wave. Emotional/loyalty memes sustain buying for months. Gaming/retro attract specific demographics with sustained buying."
+    "insight": "Political memes and AI narrative tokens have the LONGEST runway \u2014 they spike repeatedly on news events. Humor/universal memes spike fastest and hardest but are one-wave. Emotional/loyalty memes sustain buying for months. Gaming/retro attract specific demographics with sustained buying."
   },
   "kol_creator_signal": {
-    "confirmed_case": "pippin — created by yoheinakajima (BabyAGI creator, 1.8M Twitter followers). Real KOL with ongoing influence. Each new AI release/tweet drives a fresh wave. $42M MC, $5M liq, $16M daily volume.",
-    "rule": "If pump.fun description or token socials link to a real KOL with >100k Twitter followers who is ACTIVE in the space — this is a STRONG positive signal. The KOL is the recurring wave catalyst.",
+    "confirmed_case": "pippin \u2014 created by yoheinakajima (BabyAGI creator, 1.8M Twitter followers). Real KOL with ongoing influence. Each new AI release/tweet drives a fresh wave. $42M MC, $5M liq, $16M daily volume.",
+    "rule": "If pump.fun description or token socials link to a real KOL with >100k Twitter followers who is ACTIVE in the space \u2014 this is a STRONG positive signal. The KOL is the recurring wave catalyst.",
     "detection": "Check pump.fun description text for X/Twitter profile links or known names. GSD description: 'Deployed using j7tracker.com' (bundler, not KOL). Pippin description: links directly to yoheinakajima tweet."
   },
   "j7tracker_bundler_signal": {
@@ -1247,13 +1361,13 @@
       "GSD (description: 'Deployed using https://j7tracker.com')",
       "ELUN (description mentioned j7tracker.io)"
     ],
-    "what_it_means": "j7tracker.com is a Solana token bundler tool used for coordinated launches — the team pre-loads wallets to hit graduation fast. Fast graduation + j7tracker description = organized team, not a random rug. Combined with X community link = organized long-term project.",
+    "what_it_means": "j7tracker.com is a Solana token bundler tool used for coordinated launches \u2014 the team pre-loads wallets to hit graduation fast. Fast graduation + j7tracker description = organized team, not a random rug. Combined with X community link = organized long-term project.",
     "rule": "j7tracker in description = POSITIVE signal (organized team, not a one-shot rug). NOT negative. Different from high top1-holder concentration which IS negative."
   },
   "x_community_signal": {
-    "confirmed_case": "GSD — website field is x.com/i/communities/2012289562848956790 (X community link)",
-    "what_it_means": "An X Community is a persistent organized buying group with ongoing coordination. Much stronger than a regular Twitter account — these are self-selected committed buyers. If token's website/socials links to X Community, expect organized repeated buying waves.",
-    "confirmed_live_proof": "Pluto the Penguin 2026-04-05 — X community link present, token went +297% h24"
+    "confirmed_case": "GSD \u2014 website field is x.com/i/communities/2012289562848956790 (X community link)",
+    "what_it_means": "An X Community is a persistent organized buying group with ongoing coordination. Much stronger than a regular Twitter account \u2014 these are self-selected committed buyers. If token's website/socials links to X Community, expect organized repeated buying waves.",
+    "confirmed_live_proof": "Pluto the Penguin 2026-04-05 \u2014 X community link present, token went +297% h24"
   },
   "top1_holder_analysis": {
     "best_distribution": {
@@ -1265,38 +1379,38 @@
     },
     "normal_range": "5-22% for graduated tokens (bonding curve pool shows as ~20-21%)",
     "danger_threshold": ">50% = instant rug risk (hardcoded block in check_token_safety)",
-    "insight": "LOL at 2.12% and HACHI at 3.88% are exceptionally distributed — no whale can exit and kill the price. This is why they sustain. When top1 < 10%, the token is structurally more resilient to dumps."
+    "insight": "LOL at 2.12% and HACHI at 3.88% are exceptionally distributed \u2014 no whale can exit and kill the price. This is why they sustain. When top1 < 10%, the token is structurally more resilient to dumps."
   },
   "killer_disqualifiers": [
-    "buy_ratio < 50% AND liq < $200k — sellers in control (ROCKET 37.8%, Quality 44.7%) — HARD BLOCK",
-    "buy_ratio < 46% even for large liq tokens — too seller-dominated — HARD BLOCK",
-    "buy_ratio > 65% — euphoric top buyers, late-stage pump (FML 69.9%, apple 79.8%) — HARD BLOCK",
-    "vol_liq > 5x — pump/dump or wash trading in progress (Quality 34.9x) — HARD BLOCK",
-    "vol_liq < 0.5x — dead volume, nobody cares (FML 0.2x, apple 0.1x, BULL 0.3x) — HARD BLOCK",
-    "liq < $20k — micro-cap rug zone — HARD BLOCK",
-    "age > 48h AND h24 < 40% AND liq < $100k — already ran and dead (BULL: 266h, +1% h24) — SKIP",
-    "age > 168h AND h24 < 80% AND liq < $150k — very old, no revival momentum — SKIP",
-    "m5 < -20% — already dumping hard at entry (Quality -27.5%) — HARD BLOCK",
-    "score < 3 — below any reasonable floor — HARD BLOCK (but score 3-4 is FINE for monsters)",
-    "top1_holder > 50% — whale concentration, instant rug (hardcoded block) — HARD BLOCK",
-    "ACTIVE influencer promotion at entry — token already priced in — CAUTION (having socials is NEUTRAL)"
+    "buy_ratio < 50% AND liq < $200k \u2014 sellers in control (ROCKET 37.8%, Quality 44.7%) \u2014 HARD BLOCK",
+    "buy_ratio < 46% even for large liq tokens \u2014 too seller-dominated \u2014 HARD BLOCK",
+    "buy_ratio > 65% \u2014 euphoric top buyers, late-stage pump (FML 69.9%, apple 79.8%) \u2014 HARD BLOCK",
+    "vol_liq > 5x \u2014 pump/dump or wash trading in progress (Quality 34.9x) \u2014 HARD BLOCK",
+    "vol_liq < 0.5x \u2014 dead volume, nobody cares (FML 0.2x, apple 0.1x, BULL 0.3x) \u2014 HARD BLOCK",
+    "liq < $20k \u2014 micro-cap rug zone \u2014 HARD BLOCK",
+    "age > 48h AND h24 < 40% AND liq < $100k \u2014 already ran and dead (BULL: 266h, +1% h24) \u2014 SKIP",
+    "age > 168h AND h24 < 80% AND liq < $150k \u2014 very old, no revival momentum \u2014 SKIP",
+    "m5 < -20% \u2014 already dumping hard at entry (Quality -27.5%) \u2014 HARD BLOCK",
+    "score < 3 \u2014 below any reasonable floor \u2014 HARD BLOCK (but score 3-4 is FINE for monsters)",
+    "top1_holder > 50% \u2014 whale concentration, instant rug (hardcoded block) \u2014 HARD BLOCK",
+    "ACTIVE influencer promotion at entry \u2014 token already priced in \u2014 CAUTION (having socials is NEUTRAL)"
   ],
-  "vol_liq_critical_note": "Vol/liq at CHECK TIME is always high (10-40x) because the monster has already pumped. The filter must be applied at ENTRY TIME when vol/liq is 1-3x. ELUN checked at 35.8x, Dunald at 40.2x, SpaceX at 25.4x — all were ~2-4x at their entry window (1-4h old).",
-  "political_meme_pattern": "ELUN, Dunald, SpaceX, boden — 4 of 17 true/revival monsters are political memes. These have multi-wave structure: US wave 1, European/Asian secondary wave 12-24h later. boden at 762 days proves political memes NEVER truly die — they revive on every news cycle. Liberation Day tariff announcement April 2 triggered ALL political memes simultaneously.",
-  "raydium_speed_note": "SpaceX did +11683% in 4.4 HOURS on Raydium — fastest in dataset. Raydium native launches can peak much faster than PumpSwap graduates. Raydium scanner MUST be catching tokens at 1-2h old.",
+  "vol_liq_critical_note": "Vol/liq at CHECK TIME is always high (10-40x) because the monster has already pumped. The filter must be applied at ENTRY TIME when vol/liq is 1-3x. ELUN checked at 35.8x, Dunald at 40.2x, SpaceX at 25.4x \u2014 all were ~2-4x at their entry window (1-4h old).",
+  "political_meme_pattern": "ELUN, Dunald, SpaceX, boden \u2014 4 of 17 true/revival monsters are political memes. These have multi-wave structure: US wave 1, European/Asian secondary wave 12-24h later. boden at 762 days proves political memes NEVER truly die \u2014 they revive on every news cycle. Liberation Day tariff announcement April 2 triggered ALL political memes simultaneously.",
+  "raydium_speed_note": "SpaceX did +11683% in 4.4 HOURS on Raydium \u2014 fastest in dataset. Raydium native launches can peak much faster than PumpSwap graduates. Raydium scanner MUST be catching tokens at 1-2h old.",
   "meteora_confirmed": "BIGLY and GSD confirm Meteora as monster-capable. Both 50-90 days old with sustained buy ratios 57-59%. Strategy D is validated.",
-  "revival_pattern": "GAJAE (63d), Hamster (25d), boden (762d), black (201d), HACHI (128d) — 5 confirmed revival cases. Common thread: buy ratio RETURNS to 50-65% zone after dormancy. The re-entry of buy pressure into the monster zone is the signal, not the age.",
+  "revival_pattern": "GAJAE (63d), Hamster (25d), boden (762d), black (201d), HACHI (128d) \u2014 5 confirmed revival cases. Common thread: buy ratio RETURNS to 50-65% zone after dormancy. The re-entry of buy pressure into the monster zone is the signal, not the age.",
   "our_bot_missed_elun": "Paper bot entered ELUN at 2.3h old and Haiku exited at 4 minutes with +24%. Token went on to +1152%. This is the exact Haiku-too-early mistake that prompted the 30-min minimum hold fix.",
   "liberation_day_cluster": "8 of 15+ dated monsters graduated or spiked within 72h of April 2 2026 Trump tariff announcement. Political + macro uncertainty = meme season. When major political/economic news hits, ALL narrative tokens spike together. Flag: when >3 political memes spike same day, enter monster-detection overdrive.",
   "code_changes_applied_2026_04_03": {
-    "MIN_SCORE": "8 → 3 (run_traderbot.py) — monster data: PISS=3, NoHat=4 were 22x and 18x",
-    "MAX_HOLD_PUMPSWAP": "6h → 48h (position_manager.py) — BURNIE/milkers/ZEN all peaked after old 6h limit",
-    "max_buy_ratio_cap": "Added 65% hard block in raydium_scout_loop (run_traderbot.py) — FML/apple pattern",
+    "MIN_SCORE": "8 \u2192 3 (run_traderbot.py) \u2014 monster data: PISS=3, NoHat=4 were 22x and 18x",
+    "MAX_HOLD_PUMPSWAP": "6h \u2192 48h (position_manager.py) \u2014 BURNIE/milkers/ZEN all peaked after old 6h limit",
+    "max_buy_ratio_cap": "Added 65% hard block in raydium_scout_loop (run_traderbot.py) \u2014 FML/apple pattern",
     "top1_holder_check": "Added >50% top1 holder = instant block in check_token_safety (position_manager.py)"
   },
   "scanner_miss_analysis_2026_04_05": {
     "7x7=49": "Caught at graduation but strategy_b_min_liq_usd=13500 (Jarvis raised) blocked $11.5k liq. FIX: locked at $10k",
-    "OPK": "519-day revival. Not in scan window at right time. Buy_ratio h24=70% > 65% ceiling — but at entry moment was ~52-58%. Revival tokens need scan window coincidence.",
+    "OPK": "519-day revival. Not in scan window at right time. Buy_ratio h24=70% > 65% ceiling \u2014 but at entry moment was ~52-58%. Revival tokens need scan window coincidence.",
     "NUERO": "5.7-day PumpSwap. Not in scan window at entry time. h1 buy_ratio=66% at check (1pp over ceiling). h24=57% is in range.",
     "Pluto": "Graduation blocked by vol/liq=0.4x (new pool has zero vol). Scout blocked by $25k liq floor for 2h while it pumped to +297%. FIX: removed vol/liq MIN from Strategy B graduation snipe.",
     "Freg": "Axiom-terminal launch. KOL tweet (JakTheDegen). No website but +1513% h24. Bot would need to recognise Axiom-sourced tokens via social channel metadata.",
@@ -1342,7 +1456,7 @@
         "median": 55,
         "p25": 52,
         "p75": 58,
-        "note": "50-55% bucket produced median 46x — LOW buy ratio (accumulation) → biggest moves"
+        "note": "50-55% bucket produced median 46x \u2014 LOW buy ratio (accumulation) \u2192 biggest moves"
       },
       "m5_change_pct": {
         "median": 0.0,
@@ -1369,7 +1483,7 @@
       "missed_by_max": [
         "Nintondo (725min)"
       ],
-      "proposed_min": "20min — catches fast-ramp breakouts before the 4x move",
+      "proposed_min": "20min \u2014 catches fast-ramp breakouts before the 4x move",
       "proposed_max": "Remove age-ceiling entirely for positions with buy_ratio<55% and liq_mc<0.10 (signs of accumulation, not distribution)",
       "signal_source_gap": "search-based DexScreener feed misses fresh pairs; need pair-creation firehose (helius webhook or on-chain log subscribe)"
     }
