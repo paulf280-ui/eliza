@@ -140,6 +140,17 @@ async def open_monster_position(
     Does NOT consult traded_mints.json — monster strategy can re-enter any mint.
     Respects its OWN concurrent-position cap only.
     """
+    # Master pause check — respects dashboard pause button. Added 2026-04-24
+    # after monster traded (AINI, TRADE) while user had the bot paused; the
+    # old button only set copy_trade_paused which this path never read.
+    try:
+        from elizaos.plugins.solana import live_config as _lc_pause
+        if bool(_lc_pause.get("trading_paused", False)):
+            print(f"[monster] ⏸️  trading paused — skip {token_name} ({mint[:8]})")
+            return False
+    except Exception:
+        pass
+
     if mint in _monster_positions:
         print(f"[monster] already holding {mint[:8]} — skip")
         return False

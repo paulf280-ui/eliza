@@ -1871,9 +1871,13 @@ When adjusting a filter, always explain your reasoning based on the data above."
             from elizaos.plugins.solana import live_config as _lc_pause
             body = await request.json() if request.content_length else {}
             paused = bool(body.get("paused", True))
+            # Set BOTH flags so one button pauses every strategy, not just copy-trade.
+            # Monster/etc. entry paths read trading_paused; axiom_copy_trader still
+            # reads copy_trade_paused for backwards-compat.
             _lc_pause.set_value("copy_trade_paused", paused, changed_by="dashboard", reason="manual pause button")
+            _lc_pause.set_value("trading_paused",    paused, changed_by="dashboard", reason="manual pause button")
             state = "PAUSED" if paused else "RESUMED"
-            print(f"[copy-trade] ⏸️  Trading {state} via dashboard button")
+            print(f"[pause] ⏸️  All trading {state} via dashboard button (copy_trade_paused + trading_paused)")
             return web.json_response({"ok": True, "paused": paused})
         except Exception as exc:
             return web.json_response({"error": str(exc)}, status=500)

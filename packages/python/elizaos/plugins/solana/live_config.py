@@ -160,7 +160,8 @@ _config: dict = {
     "copy_trade_ladder_l3_frac":  0.20,   # sell 20% of original (10% runner left)
     "copy_trade_compound_pct":   0.20,    # position size = wallet_balance × 20% (quant-locked, REQUIRED_COMPOUND_PCT)
     "copy_trade_enabled":        False,   # live mode — set True to execute real trades
-    "copy_trade_paused":         False,   # dashboard pause button — blocks new entries only
+    "copy_trade_paused":         False,   # legacy copy-trade pause — kept for axiom_copy_trader
+    "trading_paused":            False,   # MASTER pause — every strategy entry path checks this. Set by dashboard pause button alongside copy_trade_paused so one click pauses everything. Added 2026-04-24 after monster traded (AINI, TRADE) while user had dashboard paused, because the old button only set copy_trade_paused which monster ignored.
 
     # ── Trenchman (fast-lane copy trader) — DISABLED 2026-04-18 ───────────────
     # 19 trades, 21% WR, -0.592 SOL net (single worst wallet in history). Re-enable
