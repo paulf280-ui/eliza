@@ -32,14 +32,15 @@ from typing import Any
 import aiohttp
 
 # ─── Config ───────────────────────────────────────────────────────────────
-MONSTER_TP1_GAIN_PCT     = 20.0    # +20% → fire TP1 (was +100; retuned 2026-04-20 after -0.79 SOL day)
-MONSTER_TP1_SELL_FRACTION = 0.90   # sell 90% at TP1, 10% rides for moonshot upside
+MONSTER_TP1_GAIN_PCT     = 30.0    # +30% → fire TP1 (2026-04-22: raised from +20, recovers 97.5% of stake at TP1)
+MONSTER_TP1_SELL_FRACTION = 0.75   # sell 75% at TP1, 25% rides for runner upside (was 0.90)
 MONSTER_PRE_TP1_FLOOR_PCT = -15.0  # hard SL before TP1 fires (tightened -25 → -15, unconditional)
 # Break-even trail: once peak pnl ≥ +10%, SL ratchets up to BE_TRAIL_TARGET_PCT.
 # SOLMONEY 2026-04-22 peaked +19.4% then collapsed to -14.8% in 30s — this trap
 # would have banked ≥ +5% instead of stopping at the -15% floor.
-MONSTER_BE_TRAIL_ACTIVATE_PCT = 10.0  # peak must reach +10% before trail arms
-MONSTER_BE_TRAIL_TARGET_PCT   = 5.0   # once armed, exit if current pnl falls below +5%
+MONSTER_BE_TRAIL_ACTIVATE_PCT = 20.0  # peak must reach +20% before trail arms (was 10 — SAM 2026-04-23 cut at +4% after peak +25%, then ran +106% past our exit)
+MONSTER_BE_TRAIL_TARGET_PCT   = 10.0  # once armed, exit if pnl falls below +10% (was 5 — tolerate deeper retrace for dip-and-rip shapes)
+MONSTER_BE_TRAIL_ENABLED      = False # disabled 2026-04-24: trail was ejecting monsters pre-TP1 on natural pulse-and-breath pullbacks. AINI peaked +25%, trail fired at +3%, token then ran to +80%+. Same pattern as SAM the day before. Pre-TP1 protection now = hard floor (-15%) + flat gate (60min). Flip to True only after classifier layer is in place and can confirm breakdowns.
 MONSTER_FLAT_TIMEOUT_SECS = 60 * 60  # 60 min pre-TP1 with pnl in flat zone → exit
 MONSTER_FLAT_ZONE_PCT     = 5.0    # ±5% = "flat"
 MONSTER_MAX_CONCURRENT    = 2
@@ -302,7 +303,43 @@ async def open_monster_position(
     except Exception as _tg_err:
         print(f"[monster] telegram buy alert failed: {_tg_err}")
 
+    # ── Catalyst lookup (Layer 4b) ──
+    # Fire non-blocking social-buzz check right after open. Result is written
+    # onto pos["catalyst"] within ~15s and shows up in the brain context on
+    # the next cascade tick. We never block the buy on this.
+    try:
+        import asyncio as _asyncio
+        _asyncio.get_event_loop().create_task(
+            _populate_catalyst(mint, token_name, runtime)
+        )
+    except Exception as _cat_err:
+        print(f"[monster] catalyst task spawn failed: {_cat_err}")
+
     return True
+
+
+async def _populate_catalyst(mint: str, token_name: str, runtime: Any) -> None:
+    """Query social_monitor for buzz/catalyst context and attach to the position."""
+    try:
+        svc = runtime.get_service("social_monitor") if runtime else None
+        if not svc:
+            return
+        # The check_token_buzz API: (mint, name, symbol) → (active, confidence, reason)
+        symbol = token_name if len(token_name) <= 12 else token_name[:12]
+        active, confidence, reason = await svc.check_token_buzz(mint, token_name, symbol)
+        pos = _monster_positions.get(mint)
+        if not pos:
+            return
+        pos["catalyst"] = {
+            "active":     bool(active),
+            "confidence": int(confidence),
+            "reason":     str(reason)[:200],
+            "fetched_ts": time.time(),
+        }
+        _save_state()
+        print(f"[monster] 🔎 catalyst {token_name}: active={active} conf={confidence} reason={reason[:80]}")
+    except Exception as exc:
+        print(f"[monster] catalyst fetch failed for {mint[:8]}: {exc}")
 
 
 # ─── Exit decision ────────────────────────────────────────────────────────
@@ -327,7 +364,8 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
     # ── Pre-TP1 break-even trail: peak ≥ +10% → exit if pnl drops below +5% ─
     # SOLMONEY 2026-04-22 trap: peaked +19.4% then collapsed to -14.8% in 30s.
     # This trail would have banked +5% instead of waiting for the -15% floor.
-    if not tp1_fired:
+    # Gated off 2026-04-24 (MONSTER_BE_TRAIL_ENABLED=False) — see flag comment.
+    if MONSTER_BE_TRAIL_ENABLED and not tp1_fired:
         peak = float(pos.get("peak_pnl_pct") or 0.0)
         if peak >= MONSTER_BE_TRAIL_ACTIVATE_PCT and pnl_pct <= MONSTER_BE_TRAIL_TARGET_PCT:
             return f"be_trail_peak{peak:.0f}_pnl{pnl_pct:.0f}", 1.0
@@ -348,8 +386,38 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
         else:
             pos["first_in_flat_zone_ts"] = None
 
-    # ── Post-TP1 event-driven exits ──────────────────────────────────────
+    # ── Post-TP1 moonbag state machine ────────────────────────────────────
+    # The 25% bag rides out the cooldown. We track the post-TP1 running low
+    # and only "arm" the brain cascade once the price recovers +50% off that
+    # low (V-recovery confirming Leg 2). During DORMANT, discretionary exits
+    # are suppressed — we let the bag breathe. Only safety rails are active:
+    #   - liq < $3k = stuck bag emergency
+    #   - 8h dormant cap = don't hold forgotten bags across trading sessions
     if tp1_fired:
+        pos["post_tp1_low"] = min(
+            float(pos.get("post_tp1_low") or current_price),
+            current_price,
+        )
+        pos["tp1_fired_ts"] = pos.get("tp1_fired_ts") or now
+        _low = float(pos["post_tp1_low"])
+        moonbag_armed = current_price >= _low * 1.5 if _low > 0 else False
+        pos["moonbag_armed"] = moonbag_armed
+        if _low > 0:
+            _vr = current_price / _low
+            pos["v_recovery_max"] = max(float(pos.get("v_recovery_max") or 0.0), _vr)
+
+        # Safety rail 1 — liquidity collapse (always active)
+        if current_liq is not None and current_liq < 3_000:
+            return f"moonbag_liq_collapse_${current_liq:.0f}", 1.0
+
+        # Safety rail 2 — 8h dormant cap
+        if not moonbag_armed:
+            dormant_secs = now - float(pos["tp1_fired_ts"])
+            if dormant_secs >= 8 * 3600:
+                return f"moonbag_dormant_{int(dormant_secs/3600)}h", 1.0
+            return None, 0.0  # DORMANT — ignore all other exits
+
+        # ── ARMED — V-recovery confirmed, event-driven exits re-enable ──
         # Liquidity pull: >40% drop over 5 min
         checkpoints = pos.get("liq_checkpoints") or []
         if current_liq is not None:
@@ -518,7 +586,13 @@ async def _apply_exit(mint: str, reason: str, sell_fraction: float, runtime: Any
         print(f"[monster] telegram sell alert failed: {_tg_err}")
 
     if is_full or pos["remaining_fraction"] <= 0.001:
+        # Net P&L across ALL partial exits, not just the last one. Previously
+        # `final_pnl_pct` was set to the last exit's pnl_pct (exit-price vs
+        # entry-price) which misreported winning trades as losers — ETF 2026-04-22
+        # banked +0.056 SOL net but recorded -5.3% because its moonbag exited red.
         final_pnl_sol = pos["locked_sol"] - pos["sol_spent"]
+        _sol_spent = float(pos.get("sol_spent") or 0.0)
+        final_pnl_pct = (final_pnl_sol / _sol_spent * 100.0) if _sol_spent > 0 else pnl_pct
         close_rec = {
             **pos,
             "mint": mint,
@@ -526,7 +600,8 @@ async def _apply_exit(mint: str, reason: str, sell_fraction: float, runtime: Any
             "close_ts": now,
             "close_price": current_price,
             "final_pnl_sol": final_pnl_sol,
-            "final_pnl_pct": pnl_pct,
+            "final_pnl_pct": final_pnl_pct,
+            "last_exit_pnl_pct": pnl_pct,  # preserve last-exit detail for forensics
         }
         _monster_closed.append(close_rec)
 
@@ -539,6 +614,14 @@ async def _apply_exit(mint: str, reason: str, sell_fraction: float, runtime: Any
             hold_mins = max(0.0, (now - float(pos.get("entry_ts") or now)) / 60.0)
             tp1_hit = bool(pos.get("tp1_fired", False))
             age_min_meta = meta.get("age_min")
+            # Post-TP1 drawdown depth for moonbag learning
+            _post_tp1_low = pos.get("post_tp1_low")
+            _entry_px = pos.get("entry_price") or 0.0
+            _post_tp1_low_pnl = (
+                round((float(_post_tp1_low) / _entry_px - 1) * 100, 2)
+                if _post_tp1_low and _entry_px > 0 else None
+            )
+            _catalyst = pos.get("catalyst") or {}
             _le.record_trade_exit(mint, {
                 "token_name":    pos.get("token_name", mint[:8]),
                 "wallet":        "monster",
@@ -548,9 +631,9 @@ async def _apply_exit(mint: str, reason: str, sell_fraction: float, runtime: Any
                 "reason":        reason,
                 "ts":            now,
                 "hold_mins":     hold_mins,
-                "entry_price":   pos.get("entry_price") or 0.0,
+                "entry_price":   _entry_px,
                 "exit_price":    current_price,
-                "pnl_pct":       pnl_pct,
+                "pnl_pct":       final_pnl_pct,
                 "pnl_sol":       final_pnl_sol,
                 "peak_pnl_pct":  pos.get("peak_pnl_pct") or 0.0,
                 "tp1_hit":       tp1_hit,
@@ -558,12 +641,33 @@ async def _apply_exit(mint: str, reason: str, sell_fraction: float, runtime: Any
                 "locked_sol":    pos.get("locked_sol") or 0.0,
                 "_entry_mc":     meta.get("mcap_usd") or meta.get("mc_usd"),
                 "_entry_liq":    meta.get("liq_usd"),
+                "_entry_holders": meta.get("holders_at_entry"),
                 # ── Entry-timing fingerprint (for monster learning) ──
-                "h1_change_at_entry": meta.get("h1_change_pct") or meta.get("h1_change"),
-                "m5_change_at_entry": meta.get("m5_change_pct") or meta.get("m5_change"),
-                "age_hours_at_entry": (float(age_min_meta) / 60.0) if age_min_meta is not None else None,
-                "buy_ratio_at_entry": meta.get("buy_ratio") or meta.get("buy_ratio_pct"),
-                "top1_pct_at_entry":  meta.get("top1_pct"),
+                "h1_change_at_entry":     meta.get("h1") or meta.get("h1_change_pct") or meta.get("h1_change"),
+                "h6_change_at_entry":     meta.get("h6"),
+                "h24_change_at_entry":    meta.get("h24"),
+                "m5_change_at_entry":     meta.get("m5") or meta.get("m5_change_pct") or meta.get("m5_change"),
+                "age_hours_at_entry":     (float(age_min_meta) / 60.0) if age_min_meta is not None else None,
+                "buy_ratio_at_entry":     meta.get("buy_ratio") or meta.get("buy_ratio_pct"),
+                "top1_pct_at_entry":      meta.get("top1_pct"),
+                "top10_pct_at_entry":     meta.get("top10_pct"),
+                # ── Expanded entry signals (2026-04-22) ──
+                "momentum_ratio_at_entry": (
+                    float(meta.get("h6")) / float(meta.get("h1"))
+                    if (meta.get("h1") and float(meta.get("h1") or 0) > 0 and meta.get("h6")) else None
+                ),
+                "mcap_velocity_at_entry": (
+                    float(meta.get("mcap_usd") or meta.get("mc_usd") or 0) / float(age_min_meta)
+                    if age_min_meta and float(age_min_meta) > 0
+                       and (meta.get("mcap_usd") or meta.get("mc_usd")) else None
+                ),
+                "pct_off_peak_at_entry":  meta.get("pct_off_peak_at_entry"),
+                # ── Catalyst + Moonbag lifecycle ──
+                "catalyst_active":     _catalyst.get("active"),
+                "catalyst_confidence": _catalyst.get("confidence"),
+                "moonbag_armed":       pos.get("moonbag_armed"),
+                "post_tp1_low_pnl_pct": _post_tp1_low_pnl,
+                "v_recovery_max":      pos.get("v_recovery_max"),
             })
         except Exception as _le_err:
             print(f"[monster] learning_engine record failed: {_le_err}")
@@ -581,7 +685,7 @@ async def _apply_exit(mint: str, reason: str, sell_fraction: float, runtime: Any
                 "TIMEOUT"     if "flat_gate" in r else
                 "MANUAL"
             )
-            _bm.resolve_outcome_all_brains(mint, outcome_tag, pnl_pct)
+            _bm.resolve_outcome_all_brains(mint, outcome_tag, final_pnl_pct)
         except Exception as _bm_err:
             print(f"[monster] brain_memory resolve failed: {_bm_err}")
 
@@ -654,18 +758,34 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                         if pos["ghost_ticks"] >= GHOST_PURGE_TICKS:
                             print(f"[monster] ❌ GHOST PURGE {tn} ({mint[:8]}) — tokens "
                                   f"not on-chain for {pos['ghost_ticks']} ticks. Freeing slot.")
-                            # Record as a phantom loss so learning_engine sees it.
+                            # Account for any SOL already recovered via partial_exits.
+                            # CATEROID 2026-04-22 previously recorded -100% / -0.3 SOL
+                            # after TP1 had banked 0.325 SOL + position_manager sold
+                            # the moonbag externally — real net was ~+0.07 SOL.
                             try:
                                 now = time.time()
                                 entry_price = float(pos.get("entry_price") or 0.0)
+                                _spent  = float(pos.get("sol_spent") or 0.0)
+                                _locked = float(pos.get("locked_sol") or 0.0)
+                                # If tokens vanished but we've already locked ≥ spent,
+                                # it's an externally-closed (manual / stall / Jupiter)
+                                # sale, not a phantom rug. Use the net we know.
+                                _had_partials = bool(pos.get("partial_exits"))
+                                _final_sol = _locked - _spent if _had_partials else -_spent
+                                _final_pct = (
+                                    (_final_sol / _spent * 100.0) if _spent > 0 and _had_partials
+                                    else -100.0
+                                )
                                 close_rec = {
                                     **pos,
                                     "mint": mint,
-                                    "close_reason": "ghost_purge",
+                                    "close_reason": (
+                                        "externally_closed" if _had_partials else "ghost_purge"
+                                    ),
                                     "close_ts": now,
-                                    "close_price": entry_price,  # unknown — use entry
-                                    "final_pnl_sol": -float(pos.get("sol_spent") or 0.0),
-                                    "final_pnl_pct": -100.0,
+                                    "close_price": entry_price,  # last known
+                                    "final_pnl_sol": _final_sol,
+                                    "final_pnl_pct": _final_pct,
                                 }
                                 _monster_closed.append(close_rec)
                             except Exception:
@@ -787,26 +907,42 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                             tier = decision.tier
                             conf = decision.confidence
 
+                            # Dormant moonbag exemption — post-TP1, pre-V-recovery.
+                            # Brains still score for dashboard visibility but cannot
+                            # force an exit. evaluate_exit owns the safety rails
+                            # (liq collapse, 8h cap). This is the whole point of
+                            # letting the 25% bag ride through cooldown.
+                            _dormant_bag = tp1_fired and not pos.get("moonbag_armed", False)
+
                             ai_allowed = False
                             gate_reason = ""
-                            # Opus depth-brain: any SELL at ≥0.70 conf is actionable.
-                            if tier == "opus" and conf >= 0.70:
-                                ai_allowed = True
-                                gate_reason = "opus_emergency"
-                            # Real drawdown with any tier: conf ≥ 0.70 is enough.
-                            # Rationale: on 2026-04-20 we bled -56% on MIM because
-                            # the old 0.80/-20% gate + a broken executor combined
-                            # into hours of no exits while brains unanimously
-                            # screamed SELL. Trust the consensus earlier.
-                            elif cur_pnl <= -15.0 and conf >= 0.70:
-                                ai_allowed = True
-                                gate_reason = f"drawdown_{cur_pnl:.0f}pct"
-                            elif tp1_fired and drawdown_from_peak >= 40.0 and conf >= 0.70:
-                                ai_allowed = True
-                                gate_reason = f"post_tp1_peak_fade_{drawdown_from_peak:.0f}pct"
-                            elif peak_pnl >= 30.0 and drawdown_from_peak >= 35.0 and conf >= 0.70:
-                                ai_allowed = True
-                                gate_reason = f"runner_fade_{drawdown_from_peak:.0f}pct_from_{peak_pnl:.0f}pct_peak"
+                            if _dormant_bag:
+                                _low = float(pos.get("post_tp1_low") or 0)
+                                _vr = (current_price / _low) if _low > 0 else 0.0
+                                print(f"[monster] 💤 dormant-bag ignored AI SELL "
+                                      f"{pos.get('token_name', mint[:8])} tier={tier} conf={conf:.2f} "
+                                      f"pnl={cur_pnl:+.1f}% v_recovery={_vr:.2f}× (need 1.50×)")
+                            else:
+                                # Opus depth-brain: raised from 0.70 → 0.85 (2026-04-23).
+                                # LARP was cut at opus 0.72 conf with -13% pnl — token then ran
+                                # +77% past our exit. Opus's own pattern rule said raise floor.
+                                if tier == "opus" and conf >= 0.85:
+                                    ai_allowed = True
+                                    gate_reason = "opus_emergency"
+                                # Real drawdown with any tier: conf ≥ 0.70 is enough.
+                                # Rationale: on 2026-04-20 we bled -56% on MIM because
+                                # the old 0.80/-20% gate + a broken executor combined
+                                # into hours of no exits while brains unanimously
+                                # screamed SELL. Trust the consensus earlier.
+                                elif cur_pnl <= -15.0 and conf >= 0.70:
+                                    ai_allowed = True
+                                    gate_reason = f"drawdown_{cur_pnl:.0f}pct"
+                                elif tp1_fired and drawdown_from_peak >= 40.0 and conf >= 0.70:
+                                    ai_allowed = True
+                                    gate_reason = f"post_tp1_peak_fade_{drawdown_from_peak:.0f}pct"
+                                elif peak_pnl >= 30.0 and drawdown_from_peak >= 35.0 and conf >= 0.70:
+                                    ai_allowed = True
+                                    gate_reason = f"runner_fade_{drawdown_from_peak:.0f}pct_from_{peak_pnl:.0f}pct_peak"
 
                             if ai_allowed:
                                 ai_reason = f"ai_{tier}_{conf:.2f}_{gate_reason}"

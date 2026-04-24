@@ -30,8 +30,27 @@ from typing import Any
 import aiohttp
 
 from . import strategy_e_monster as monster
+from . import rejection_tracker as rt
 
 BASE = Path(__file__).parent
+
+
+def _log_reject(scout: str, mint: str, reason: str, snapshot: dict,
+                filter_name: str = "", filter_value: Any = None,
+                threshold: Any = None) -> None:
+    """Thin wrapper so a tracker failure can't kill a scout loop."""
+    try:
+        rt.record(
+            mint=mint,
+            reason=reason,
+            filter_name=filter_name or reason,
+            filter_value=filter_value,
+            threshold=threshold,
+            strategy=scout,
+            extra=snapshot,
+        )
+    except Exception:
+        pass
 SIGNAL_LOG_FILE = BASE / "monster_signal_log.json"
 WHITELIST_FILE  = BASE / "monster_creator_whitelist.json"
 
@@ -175,6 +194,68 @@ async def top1_wallet_pct(session: aiohttp.ClientSession, mint: str) -> float | 
     return None
 
 
+async def top_wallet_distribution(session: aiohttp.ClientSession, mint: str) -> dict | None:
+    """Return distribution stats for the top non-pool holders.
+
+    Returns {"top1_pct": X, "top10_pct": Y, "wallets_scanned": N} or None.
+    Uses the same RPC data as top1_wallet_pct but keeps all qualifying wallets
+    so we can compute the top-10 aggregate — a much richer signal than top-1
+    alone. Low top-10 (<25%) means holders are broadly distributed; high top-10
+    (>60%) means concentrated.
+    """
+    sup = await _rpc(session, "getTokenSupply", [mint])
+    total = float(((sup.get("result") or {}).get("value") or {}).get("uiAmount") or 0)
+    if total <= 0:
+        return None
+    large = await _rpc(session, "getTokenLargestAccounts", [mint])
+    vals = ((large.get("result") or {}).get("value") or [])
+    if not vals:
+        return None
+    addrs = [v["address"] for v in vals[:20]]
+    parsed = await _rpc(session, "getMultipleAccounts",
+                        [addrs, {"encoding": "jsonParsed"}])
+    accounts = ((parsed.get("result") or {}).get("value") or [])
+
+    tas: list[tuple[str, float]] = []
+    for v, acc in zip(vals[:20], accounts, strict=False):
+        if not acc:
+            continue
+        try:
+            wallet = acc["data"]["parsed"]["info"]["owner"]
+        except Exception:
+            continue
+        try:
+            bal = float(v.get("uiAmount") or 0)
+        except Exception:
+            continue
+        tas.append((wallet, bal))
+    if not tas:
+        return None
+
+    owners = [w for w, _ in tas]
+    info = await _rpc(session, "getMultipleAccounts",
+                      [owners, {"encoding": "base64"}])
+    infos = ((info.get("result") or {}).get("value") or [])
+
+    real_wallets: list[tuple[str, float]] = []
+    for (wallet, bal), w_info in zip(tas, infos, strict=False):
+        owner_prog = (w_info or {}).get("owner") if w_info else SYSTEM_PROGRAM
+        if owner_prog == SYSTEM_PROGRAM:
+            real_wallets.append((wallet, bal))
+
+    if not real_wallets or total <= 0:
+        return None
+
+    real_wallets.sort(key=lambda x: x[1], reverse=True)
+    top1_bal = real_wallets[0][1]
+    top10_bal = sum(b for _, b in real_wallets[:10])
+    return {
+        "top1_pct": round(top1_bal / total * 100, 3),
+        "top10_pct": round(top10_bal / total * 100, 2),
+        "wallets_scanned": len(real_wallets),
+    }
+
+
 async def _dex_pairs(session: aiohttp.ClientSession, mint: str) -> list[dict]:
     try:
         async with session.get(
@@ -197,6 +278,45 @@ def _best_pair(pairs: list[dict]) -> dict | None:
         key=lambda p: float((p.get("liquidity") or {}).get("usd") or 0),
         reverse=True,
     )[0]
+
+
+async def pct_off_recent_peak(
+    session: aiohttp.ClientSession,
+    pair_address: str,
+    lookback_minutes: int = 60,
+) -> float | None:
+    """Return (current / max(last_N_min)) as a 0..1 ratio. None on fetch failure.
+
+    Uses GeckoTerminal's free OHLCV endpoint (no API key). Aggregates 1-minute
+    candles across the last `lookback_minutes` and returns the ratio of the
+    latest close to the window peak. Scouts use this to reject entries
+    currently far off the recent high (post-peak rollback).
+    """
+    try:
+        limit = max(lookback_minutes, 10)
+        url = (
+            f"https://api.geckoterminal.com/api/v2/networks/solana/pools/"
+            f"{pair_address}/ohlcv/minute?aggregate=1&limit={limit}"
+        )
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as r:
+            if r.status != 200:
+                return None
+            d = await r.json()
+        # OHLCV rows: [ts, open, high, low, close, volume]
+        rows = (d.get("data") or {}).get("attributes", {}).get("ohlcv_list") or []
+        if not rows:
+            return None
+        highs = [float(row[2]) for row in rows if len(row) >= 5]
+        closes = [float(row[4]) for row in rows if len(row) >= 5]
+        if not highs or not closes:
+            return None
+        peak = max(highs)
+        current = closes[0]  # GeckoTerminal returns newest-first
+        if peak <= 0:
+            return None
+        return current / peak
+    except Exception:
+        return None
 
 
 # ─── 1) Cluster-confirm scout ───────────────────────────────────────────
@@ -309,19 +429,112 @@ async def cluster_confirm_scout_loop(runtime: Any,
                 if _recently_signalled(mint):
                     continue
                 _mark_signalled(mint)
-                print(f"[monster-cluster] 🎯 {len(ws)} cluster wallets on {mint[:8]} — firing")
+                # Market-state guard — cluster wallets can buy absurd tops.
+                # Without these checks we entered CATEROID-class tokens after
+                # 10,000%+ pumps (2026-04-22 root-cause investigation).
+                pairs = await _dex_pairs(session, mint)
+                best = _best_pair(pairs)
+                if not best:
+                    print(f"[monster-cluster] 🚫 {mint[:8]} — no DexScreener pair yet, defer")
+                    continue
+                _liq_usd = float((best.get("liquidity") or {}).get("usd") or 0)
+                _mc_usd  = float(best.get("marketCap") or best.get("fdv") or 0)
+                _pc      = best.get("priceChange") or {}
+                _h1      = float(_pc.get("h1")  or 0)
+                _h6      = float(_pc.get("h6")  or 0)
+                _h24     = float(_pc.get("h24") or 0)
+                _info    = best.get("info") or {}
+                try:
+                    _holders_at_entry = int(_info.get("holders")) if _info.get("holders") is not None else None
+                except (ValueError, TypeError):
+                    _holders_at_entry = None
+                _pca     = best.get("pairCreatedAt")
+                try:
+                    _age_secs = (time.time() - float(_pca) / 1000.0) if _pca else None
+                except (ValueError, TypeError):
+                    _age_secs = None
+                _snap = {
+                    "liq_usd": _liq_usd, "mc_usd": _mc_usd,
+                    "h1": _h1, "h6": _h6, "h24": _h24,
+                    "age_min": round(_age_secs / 60, 1) if _age_secs else None,
+                }
+                # Hard liquidity floor — a $5k pool rugs on our exit alone
+                if _liq_usd < 20_000:
+                    print(f"[monster-cluster] 🚫 {mint[:8]} liq=${_liq_usd:.0f} <$20k — skip")
+                    _log_reject("cluster_confirm", mint, "liq_floor", _snap,
+                                filter_name="liq_usd", filter_value=_liq_usd, threshold=20_000)
+                    continue
+                # Hard age cap — monster is the FRESH-pump lane. unc 2026-04-22
+                # fired at age 5.8 DAYS with h1=-4.8% h6=-8.8% (cluster wallets
+                # accumulating a mature $8M mcap token that pumped a week ago).
+                # Cap at 24h; other scouts cover the <12h sub-ranges.
+                if _age_secs and _age_secs > 24 * 3600:
+                    print(f"[monster-cluster] 🚫 {mint[:8]} age={_age_secs/3600:.0f}h >24h — mature token, skip")
+                    _log_reject("cluster_confirm", mint, "age_cap", _snap,
+                                filter_name="age_hours", filter_value=round(_age_secs/3600, 1), threshold=24)
+                    continue
+                # Don't buy into a falling candle. Cluster wallets accumulating
+                # weakness rarely mean-revert fast enough for our 30% TP1.
+                # Allow tiny dips (-2%) as entry-noise tolerance.
+                if _h1 < -2.0:
+                    print(f"[monster-cluster] 🚫 {mint[:8]} h1={_h1:+.1f}% — falling into entry, skip")
+                    _log_reject("cluster_confirm", mint, "falling_candle", _snap,
+                                filter_name="h1_change", filter_value=_h1, threshold=-2.0)
+                    continue
+                # Mcap velocity filter (same rationale as breakout_candle)
+                if _age_secs and _age_secs > 0 and _age_secs < 3 * 3600 and _mc_usd > 0:
+                    _velocity = _mc_usd / (_age_secs / 60)
+                    if _velocity > 5_000:
+                        print(f"[monster-cluster] 🚫 {mint[:8]} mc-velocity ${_velocity:.0f}/min >$5k — second-wave")
+                        _log_reject("cluster_confirm", mint, "mcap_velocity", _snap,
+                                    filter_name="mcap_velocity", filter_value=round(_velocity), threshold=5000)
+                        continue
+                # Already-pumped cap: skip if h1 > 200% (we'd be chasing the top)
+                if _h1 > 200.0:
+                    print(f"[monster-cluster] 🚫 {mint[:8]} h1=+{_h1:.0f}% — already blown past")
+                    _log_reject("cluster_confirm", mint, "h1_blown", _snap,
+                                filter_name="h1_change", filter_value=_h1, threshold=200)
+                    continue
+                # Dying-momentum: h6 >> h1 means peak was hours ago
+                if _h1 > 0 and _h6 > _h1 * 5:
+                    print(f"[monster-cluster] 🚫 {mint[:8]} h6/h1={_h6 / _h1:.1f} — post-peak rollback")
+                    _log_reject("cluster_confirm", mint, "h6_h1_dying", _snap,
+                                filter_name="h6_h1_ratio", filter_value=round(_h6/_h1, 1), threshold=5)
+                    continue
+                # Real peak-distance check via GeckoTerminal candles
+                _pair_addr = best.get("pairAddress")
+                _peak_ratio_cluster: float | None = None
+                if _pair_addr:
+                    _peak_ratio = await pct_off_recent_peak(session, _pair_addr, 60)
+                    if _peak_ratio is not None and _peak_ratio < 0.85:
+                        print(f"[monster-cluster] 🚫 {mint[:8]} at {_peak_ratio*100:.0f}% of 60m peak — rollback")
+                        _log_reject("cluster_confirm", mint, "peak_distance", _snap,
+                                    filter_name="peak_ratio_60m", filter_value=round(_peak_ratio, 2), threshold=0.85)
+                        continue
+                    _peak_ratio_cluster = _peak_ratio
+                # Compute top-1 + top-10 wallet distribution (free via Helius).
+                # Low top10% (<25%) = broadly distributed = runner shape;
+                # high top10% (>60%) = concentrated = rug risk.
+                _cluster_dist = await top_wallet_distribution(session, mint)
+                _top1 = (_cluster_dist or {}).get("top1_pct")
+                _top10 = (_cluster_dist or {}).get("top10_pct")
+                print(f"[monster-cluster] 🎯 {len(ws)} cluster wallets on {mint[:8]} — firing (liq=${_liq_usd:.0f} mc=${_mc_usd:.0f} h1=+{_h1:.0f}% top1={_top1}% top10={_top10}%)")
                 _log_signal({
                     "source": "cluster_confirm",
                     "mint": mint,
                     "cluster_wallets": list(ws.keys()),
                     "window_first_buy_ts": min(ws.values()),
+                    "liq_usd": _liq_usd,
+                    "mc_usd":  _mc_usd,
+                    "h1":      _h1,
+                    "h6":      _h6,
+                    "h24":     _h24,
+                    "age_min": round(_age_secs / 60, 1) if _age_secs else None,
                 })
                 if not monster.can_open_new_position():
                     print("[monster-cluster] slot pool full — logged only")
                     continue
-                # Token name: use symbol from DexScreener if available
-                pairs = await _dex_pairs(session, mint)
-                sym = (pairs[0].get("baseToken") or {}).get("symbol") if pairs else None
+                sym = (best.get("baseToken") or {}).get("symbol")
                 await monster.open_monster_position(
                     mint=mint,
                     token_name=sym or mint[:8],
@@ -329,7 +542,17 @@ async def cluster_confirm_scout_loop(runtime: Any,
                     sol_size=monster.MONSTER_DEFAULT_SIZE_SOL,
                     session=session,
                     runtime=runtime,
-                    metadata={"cluster_wallets": list(ws.keys())},
+                    metadata={
+                        "cluster_wallets": list(ws.keys()),
+                        "liq_usd": _liq_usd,
+                        "mc_usd":  _mc_usd,
+                        "h1": _h1, "h6": _h6, "h24": _h24,
+                        "age_min": round(_age_secs / 60, 1) if _age_secs else None,
+                        "pct_off_peak_at_entry": _peak_ratio_cluster,
+                        "holders_at_entry": _holders_at_entry,
+                        "top1_pct": _top1,
+                        "top10_pct": _top10,
+                    },
                 )
         except Exception as e:
             print(f"[monster-cluster] loop error: {e}")
@@ -518,8 +741,9 @@ LIFECYCLE_MAX_AGE_SECS      = 90 * 60         # 90min (tightened 6h → 90min 20
 LIFECYCLE_TOP1_MAX_PCT      = 10.0
 LIFECYCLE_BUY_RATIO_MIN     = 48.0
 LIFECYCLE_BUY_RATIO_MAX     = 65.0
-LIFECYCLE_H1_CHANGE_MAX_PCT = 40.0            # skip if h1 > +40% — run already happened
-LIFECYCLE_M5_CHANGE_MAX_PCT = 5.0             # skip if m5 > +5%  — buying the micro-spike
+LIFECYCLE_H1_CHANGE_MAX_PCT = 100.0           # raised 40→100 (2026-04-23): SAM +300% in 3h was rejected by the old cap
+LIFECYCLE_H1_CHANGE_MIN_PCT = -10.0           # added 2026-04-24: reject free-falling tokens. TRADE entered at h1=-38.7% and died -17%.
+LIFECYCLE_M5_CHANGE_MAX_PCT = 15.0            # raised 5→15 (2026-04-23): caught only pullbacks, missed first-leg breakouts. Safety held by mcap velocity + peak ratio + LP burn.
 
 
 async def _recent_pumpswap_profiles(session: aiohttp.ClientSession) -> list[dict]:
@@ -583,6 +807,8 @@ async def lifecycle_scout_loop(runtime: Any,
                     m5_change = float(pc.get("m5") or 0)
                     if h1_change > LIFECYCLE_H1_CHANGE_MAX_PCT:
                         continue  # ran too hard in the last hour — chase risk
+                    if h1_change < LIFECYCLE_H1_CHANGE_MIN_PCT:
+                        continue  # falling knife — token is mid-fade, don't catch
                     if m5_change > LIFECYCLE_M5_CHANGE_MAX_PCT:
                         continue  # micro-spike — wait for consolidation
                     txns_h1 = (p.get("txns") or {}).get("h1") or {}
@@ -674,7 +900,7 @@ BREAKOUT_H1_MIN_PCT          = 0.0    # reject dead-cat bounces (SOLMONEY 2026-0
 BREAKOUT_H1_MAX_PCT          = 150.0
 BREAKOUT_MIN_M5_VOL_USD      = 3_000
 BREAKOUT_MIN_H1_TXNS         = 30
-BREAKOUT_MIN_BUY_RATIO_PCT   = 55.0   # NEW: buyer dominance floor
+BREAKOUT_MIN_BUY_RATIO_PCT   = 65.0   # raised from 55 — ETF 2026-04-22 passed at 58.1% and exhausted
 BREAKOUT_MAX_M5_VOL_LIQ      = 3.0    # NEW: wash-trading cap (vol_m5/liq). MOONDOGE was 1.07x + +89% m5
 BREAKOUT_TOP1_MAX_PCT        = 12.0
 
@@ -722,6 +948,46 @@ async def breakout_candle_scout_loop(runtime: Any,
                         continue
                     if h1 < BREAKOUT_H1_MIN_PCT:
                         continue
+                    _bc_snap = {
+                        "age_min": round(age_secs / 60, 1),
+                        "liq_usd": liq_usd, "mc_usd": mc_usd,
+                        "m5": m5, "h1": h1,
+                    }
+                    # Second-wave rejection via mcap velocity. ETF 2026-04-22
+                    # passed every filter at age=101min mc=$750k and we bought
+                    # 7 min after its +20,805% ATH. Its lifetime mcap velocity
+                    # was $7,366/min — far above any healthy fresh breakout.
+                    # A normal 2h-old breakout sits around $1-3k/min. Above 5k/min
+                    # on a <3h-old token means the pump already happened.
+                    if age_secs > 0:
+                        mcap_velocity = mc_usd / (age_secs / 60)
+                        if age_secs < 3 * 3600 and mcap_velocity > 5_000:
+                            _log_reject("breakout_candle", mint, "mcap_velocity", _bc_snap,
+                                        filter_name="mcap_velocity", filter_value=round(mcap_velocity), threshold=5000)
+                            continue  # second-wave bounce, not fresh breakout
+                    # Dying-momentum filter: if h6 dwarfs h1, the peak was in the
+                    # older part of the 6h window and we're buying a rollback.
+                    # Fresh breakouts have h6/h1 ≈ 1-2; ETF-shaped exhaustion has
+                    # h6/h1 > 5 (most gain happened hours ago, tiny h1 bounce now).
+                    h6 = float(pc.get("h6") or 0)
+                    h24 = float(pc.get("h24") or 0)
+                    _bc_snap["h6"] = h6
+                    _bc_snap["h24"] = h24
+                    if h1 > 0 and h6 > h1 * 5:
+                        _log_reject("breakout_candle", mint, "h6_h1_dying", _bc_snap,
+                                    filter_name="h6_h1_ratio", filter_value=round(h6/h1, 1), threshold=5)
+                        continue  # momentum dying — post-peak rollback
+                    # Real peak-distance check via GeckoTerminal 1-min candles.
+                    # Reject if currently <85% of the 60-min peak (post-peak rollback).
+                    pair_addr = p.get("pairAddress")
+                    breakout_peak_ratio: float | None = None
+                    if pair_addr:
+                        peak_ratio = await pct_off_recent_peak(session, pair_addr, 60)
+                        if peak_ratio is not None and peak_ratio < 0.85:
+                            _log_reject("breakout_candle", mint, "peak_distance", _bc_snap,
+                                        filter_name="peak_ratio_60m", filter_value=round(peak_ratio, 2), threshold=0.85)
+                            continue  # >15% off recent peak → rollback, not breakout
+                        breakout_peak_ratio = peak_ratio
                     vol_m5 = float((p.get("volume") or {}).get("m5") or 0)
                     if vol_m5 < BREAKOUT_MIN_M5_VOL_USD:
                         continue
@@ -741,7 +1007,9 @@ async def breakout_candle_scout_loop(runtime: Any,
                     if not (base_info.get("socials") or base_info.get("websites")):
                         continue
 
-                    t1 = await top1_wallet_pct(session, mint)
+                    _dist = await top_wallet_distribution(session, mint)
+                    t1 = (_dist or {}).get("top1_pct")
+                    t10 = (_dist or {}).get("top10_pct")
                     if t1 is None or t1 >= BREAKOUT_TOP1_MAX_PCT:
                         continue
 
@@ -757,7 +1025,7 @@ async def breakout_candle_scout_loop(runtime: Any,
 
                     _mark_signalled(mint)
                     print(f"[monster-breakout] 🎯 {mint[:8]} BREAKOUT age={age_secs/60:.0f}min "
-                          f"m5={m5:+.0f}% h1={h1:+.0f}% liq=${liq_usd:,.0f} vol_m5=${vol_m5:,.0f} top1={t1}%")
+                          f"m5={m5:+.0f}% h1={h1:+.0f}% liq=${liq_usd:,.0f} vol_m5=${vol_m5:,.0f} top1={t1}% top10={t10}%")
                     _log_signal({
                         "source": "breakout_candle",
                         "mint": mint,
@@ -783,9 +1051,16 @@ async def breakout_candle_scout_loop(runtime: Any,
                         metadata={
                             "age_min": round(age_secs / 60, 1),
                             "liq_usd": liq_usd, "mc_usd": mc_usd,
+                            "m5": m5, "h1": h1, "h6": h6, "h24": h24,
                             "m5_change": m5, "h1_change": h1,
                             "vol_m5_usd": vol_m5, "buy_ratio": br,
                             "top1_pct": t1,
+                            "top10_pct": t10,
+                            "pct_off_peak_at_entry": breakout_peak_ratio,
+                            "holders_at_entry": (
+                                int((p.get("info") or {}).get("holders"))
+                                if (p.get("info") or {}).get("holders") is not None else None
+                            ),
                         },
                     )
                 except Exception:
