@@ -94,6 +94,13 @@ LIFECYCLE_POLL_SECS       = 120    # DexScreener lifecycle scan every 2min
 
 SIGNAL_DEDUP_WINDOW_SECS  = 60 * 60 * 12  # don't re-signal the same mint within 12h
 
+# ─── Shared concentration cap (all scouts) ──────────────────────────────
+# Top-10 aggregate pct-of-supply at entry. Per holder_guard PDF spec, >35%
+# means insiders hold enough exit liquidity that retail is the dump-counterparty.
+# TRADE 2026-04-24 died -17% with top-10 at 81.3% — would have been blocked.
+# Each scout also keeps its own top-1 cap (lifecycle=10, breakout=12, serial=15).
+MONSTER_TOP10_MAX_PCT     = 35.0
+
 # ─── Whitelist loader ───────────────────────────────────────────────────
 def load_whitelist() -> dict:
     if not WHITELIST_FILE.exists():
@@ -518,6 +525,11 @@ async def cluster_confirm_scout_loop(runtime: Any,
                 _cluster_dist = await top_wallet_distribution(session, mint)
                 _top1 = (_cluster_dist or {}).get("top1_pct")
                 _top10 = (_cluster_dist or {}).get("top10_pct")
+                if _top10 is not None and _top10 >= MONSTER_TOP10_MAX_PCT:
+                    print(f"[monster-cluster] 🚫 {mint[:8]} top10={_top10}% ≥ {MONSTER_TOP10_MAX_PCT}% — insiders hold exit liquidity, skip")
+                    _log_reject("cluster_confirm", mint, "top10_concentration", _snap,
+                                filter_name="top10_pct", filter_value=_top10, threshold=MONSTER_TOP10_MAX_PCT)
+                    continue
                 print(f"[monster-cluster] 🎯 {len(ws)} cluster wallets on {mint[:8]} — firing (liq=${_liq_usd:.0f} mc=${_mc_usd:.0f} h1=+{_h1:.0f}% top1={_top1}% top10={_top10}%)")
                 _log_signal({
                     "source": "cluster_confirm",
@@ -692,14 +704,22 @@ async def _serial_after_graduation(runtime: Any, session: aiohttp.ClientSession,
         return
 
     # Cheap safety pass: top1 < 15% (serial deployers get more slack than lifecycle)
+    # plus top10 < MONSTER_TOP10_MAX_PCT — one RPC call gets both.
     try:
-        t1 = await top1_wallet_pct(session, mint)
+        _dist = await top_wallet_distribution(session, mint)
     except Exception:
-        t1 = None
+        _dist = None
+    t1 = (_dist or {}).get("top1_pct")
+    t10 = (_dist or {}).get("top10_pct")
     if t1 is not None and t1 >= 15.0:
         print(f"[monster-serial] {mint[:8]} top1={t1}% ≥15 — skipping")
         _log_signal({"source": "serial_deployer", "mint": mint,
                      "creator": creator, "phase": "blocked_top1", "top1": t1})
+        return
+    if t10 is not None and t10 >= MONSTER_TOP10_MAX_PCT:
+        print(f"[monster-serial] {mint[:8]} top10={t10}% ≥ {MONSTER_TOP10_MAX_PCT}% — skipping")
+        _log_signal({"source": "serial_deployer", "mint": mint,
+                     "creator": creator, "phase": "blocked_top10", "top10": t10})
         return
 
     pairs = await _dex_pairs(session, mint)
@@ -826,10 +846,14 @@ async def lifecycle_scout_loop(runtime: Any,
                     if not socials and not websites:
                         continue
 
-                    # Expensive last: top-1 non-pool holder
-                    t1 = await top1_wallet_pct(session, mint)
+                    # Expensive last: top-1 + top-10 non-pool holders (one RPC call)
+                    _lc_dist = await top_wallet_distribution(session, mint)
+                    t1 = (_lc_dist or {}).get("top1_pct")
+                    t10 = (_lc_dist or {}).get("top10_pct")
                     if t1 is None or t1 >= LIFECYCLE_TOP1_MAX_PCT:
                         continue
+                    if t10 is not None and t10 >= MONSTER_TOP10_MAX_PCT:
+                        continue  # TRADE-class: insiders hold >35% → dump liquidity
 
                     _mark_signalled(mint)
                     print(f"[monster-lifecycle] 🎯 {mint[:8]} lifecycle match "
@@ -1012,6 +1036,8 @@ async def breakout_candle_scout_loop(runtime: Any,
                     t10 = (_dist or {}).get("top10_pct")
                     if t1 is None or t1 >= BREAKOUT_TOP1_MAX_PCT:
                         continue
+                    if t10 is not None and t10 >= MONSTER_TOP10_MAX_PCT:
+                        continue  # top-10 concentration = rug setup, skip breakout
 
                     # Rugcheck: block unlocked-LP danger tokens (LP pull = what killed MOONDOGE)
                     try:
