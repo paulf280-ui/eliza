@@ -158,6 +158,19 @@ async def open_monster_position(
         print(f"[monster] slot pool full ({len(_monster_positions)}/{MONSTER_MAX_CONCURRENT}) — skip {token_name}")
         return False
 
+    # Holder-guard entry check. Log-only by default (HOLDER_GUARD_ENFORCE=false);
+    # when enforcing, a hard-block decision returns False here and the scout's
+    # attempt to open is vetoed. TRADE-class failures land in block_reasons.
+    try:
+        from elizaos.plugins.solana.holder_guard import HolderGuard, config as _hg_cfg
+        _guard = HolderGuard()
+        _g_dec = await _guard.evaluate_entry(session, mint, scout=signal_source)
+        if _g_dec.hard_block and _hg_cfg.HOLDER_GUARD_ENFORCE:
+            print(f"[monster] 🛑 holder-guard veto on {token_name} ({mint[:8]}) — {'; '.join(_g_dec.block_reasons)}")
+            return False
+    except Exception as _hg_err:
+        print(f"[holder-guard] entry-check failure (non-fatal): {_hg_err}")
+
     # Loser cooldown: don't re-enter a mint that lost badly within the last 24h.
     last_loss = _recent_loss_on_mint(mint)
     if last_loss:
@@ -704,6 +717,12 @@ async def _apply_exit(mint: str, reason: str, sell_fraction: float, runtime: Any
         # Drop any AI cascade / price feed we built for this mint.
         _monster_cascades.pop(mint, None)
         _monster_feeds.pop(mint, None)
+        # Release holder-flow snapshots for this mint.
+        try:
+            from elizaos.plugins.solana.holder_guard import flow as _hg_flow
+            _hg_flow.purge(mint)
+        except Exception:
+            pass
     _save_state()
 
 
@@ -853,6 +872,27 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
 
                 # ── 1. Deterministic rules (TP1, floor, flat, post-TP1 events) ──
                 reason, frac = evaluate_exit(pos, current_price, current_liq, current_buy_ratio)
+
+                # ── 1b. Holder-flow guard — can force exit on top-10 jump /
+                # holder drop, or suppress short-term price noise exits when
+                # accumulation is still healthy (hold_override).
+                try:
+                    from elizaos.plugins.solana.holder_guard import HolderGuard, config as _hg_cfg
+                    _hg = HolderGuard()
+                    _flow_dec = await _hg.evaluate_exit(session, mint)
+                    if _flow_dec.should_exit and _hg_cfg.HOLDER_GUARD_ENFORCE:
+                        reason = _flow_dec.exit_reason or "holder_flow_exit"
+                        frac = 1.0
+                    elif (
+                        _flow_dec.hold_override
+                        and _hg_cfg.HOLDER_GUARD_ENFORCE
+                        and reason
+                        and reason.startswith(("flat_gate", "be_trail"))
+                    ):
+                        print(f"[holder-guard] 🟢 HOLD override on {mint[:8]} — {_flow_dec.hold_reason} — suppressing {reason}")
+                        reason, frac = None, 0.0
+                except Exception as _hg_err:
+                    print(f"[holder-guard] exit-check failure (non-fatal): {_hg_err}")
 
                 # ── 2. AI cascade — feeds a snapshot every tick & runs tiers ─────
                 ai_reason: str | None = None
