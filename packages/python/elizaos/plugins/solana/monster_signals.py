@@ -101,6 +101,27 @@ SIGNAL_DEDUP_WINDOW_SECS  = 60 * 60 * 12  # don't re-signal the same mint within
 # Each scout also keeps its own top-1 cap (lifecycle=10, breakout=12, serial=15).
 MONSTER_TOP10_MAX_PCT     = 35.0
 
+# ─── Holder organic-buyer-base floor ────────────────────────────────────
+# Tokens with too few unique holders look healthy by price/volume but have
+# no real buyer base — they're being moved by 5-10 wallets pretending to be
+# a market. PDF sweet-spot says 500; dialled to 200 for first run since
+# we have no data validation yet. Tighten if we see late-entry losses on
+# tokens with ~200-400 holders.
+MONSTER_MIN_UNIQUE_HOLDERS = 200
+
+# ─── Buy velocity ratio ─────────────────────────────────────────────────
+# Compares recent 1h buy rate to the prior-5h average. <1.0 means buy
+# pressure is decelerating — we'd be entering as momentum dies.
+# Computed from DexScreener h1 + h6 fields; no extra RPC.
+MONSTER_BUY_VELOCITY_MIN_RATIO = 1.0
+
+# ─── Creator-burn cooldown (skip new tokens from creators that just lost us) ──
+# Reads monster_closed_trades.json on demand. If the token's on-chain creator
+# has any prior monster trade closing ≤ -30% within the last 48h, skip.
+# Counters the "rug-then-redeploy" cycle some creators run.
+CREATOR_BURN_LOSS_THRESHOLD_PCT = -30.0
+CREATOR_BURN_WINDOW_SECS         = 48 * 3600
+
 # ─── Whitelist loader ───────────────────────────────────────────────────
 def load_whitelist() -> dict:
     if not WHITELIST_FILE.exists():
@@ -199,6 +220,107 @@ async def top1_wallet_pct(session: aiohttp.ClientSession, mint: str) -> float | 
         if owner_prog == SYSTEM_PROGRAM:
             return round(bal / total * 100, 3) if total else None
     return None
+
+
+def _buy_velocity_ratio(p: dict) -> float | None:
+    """Ratio of last-1h buy count to prior 5h average buy rate.
+
+    >=1.0 means recent buy pressure is keeping pace with or accelerating
+    past the established trend; <1.0 means it's decelerating (entering
+    into fading momentum). None when h6 data is missing or h1 == h6.
+    """
+    txns = p.get("txns") or {}
+    h1 = txns.get("h1") or {}
+    h6 = txns.get("h6") or {}
+    try:
+        b1 = float(h1.get("buys") or 0)
+        b6 = float(h6.get("buys") or 0)
+    except (ValueError, TypeError):
+        return None
+    if b6 <= b1 or b1 < 1:
+        return None
+    prior_per_hour = (b6 - b1) / 5.0
+    if prior_per_hour <= 0:
+        return None
+    return round(b1 / prior_per_hour, 3)
+
+
+_burned_creators_cache: dict[str, tuple[float, set[str]]] = {}
+_BURNED_CACHE_TTL_SECS = 300
+
+
+def _load_burned_creators() -> set[str]:
+    """Set of creator wallets with any monster close ≤ threshold inside window.
+
+    Cached for 5 min so we don't reread monster_closed_trades.json on every
+    scout tick. Scout signals fire on the order of seconds-to-minutes — 5min
+    cache is plenty fresh. Returns empty set if the file or 'creator' field
+    is missing on records (common when older trades pre-date this feature).
+    """
+    now = time.time()
+    cached = _burned_creators_cache.get("k")
+    if cached and (now - cached[0]) < _BURNED_CACHE_TTL_SECS:
+        return cached[1]
+
+    burned: set[str] = set()
+    cutoff = now - CREATOR_BURN_WINDOW_SECS
+    closed_path = BASE / "monster_closed_trades.json"
+    try:
+        if closed_path.exists():
+            for t in json.loads(closed_path.read_text()) or []:
+                if not isinstance(t, dict):
+                    continue
+                if float(t.get("close_ts") or 0) < cutoff:
+                    continue
+                if float(t.get("final_pnl_pct") or 0) > CREATOR_BURN_LOSS_THRESHOLD_PCT:
+                    continue
+                creator = (t.get("metadata") or {}).get("creator") or t.get("creator")
+                if creator:
+                    burned.add(creator)
+    except Exception:
+        pass
+
+    _burned_creators_cache["k"] = (now, burned)
+    return burned
+
+
+async def _fetch_creator(session: aiohttp.ClientSession, mint: str) -> str | None:
+    """Best-effort creator-wallet lookup via Helius DAS getAsset.
+
+    Returns None on RPC error or when the asset has no creator metadata.
+    Cheap (~one RPC call) but adds ~100-300ms per scout signal.
+    """
+    helius_key = os.getenv("HELIUS_API_KEY", "")
+    url = (
+        f"https://mainnet.helius-rpc.com/?api-key={helius_key}"
+        if helius_key else "https://api.mainnet-beta.solana.com"
+    )
+    try:
+        async with session.post(
+            url,
+            json={"jsonrpc": "2.0", "id": 1, "method": "getAsset", "params": [mint]},
+            timeout=aiohttp.ClientTimeout(total=5),
+        ) as r:
+            if r.status != 200:
+                return None
+            data = await r.json()
+            creators = ((data.get("result") or {}).get("creators")) or []
+            if not creators:
+                return None
+            for c in creators:
+                if c.get("verified"):
+                    return c.get("address")
+            return creators[0].get("address")
+    except Exception:
+        return None
+
+
+async def is_creator_burned(session: aiohttp.ClientSession, mint: str) -> tuple[bool, str | None]:
+    """Return (True, creator) if the mint's creator recently lost us money."""
+    creator = await _fetch_creator(session, mint)
+    if not creator:
+        return False, None
+    return (creator in _load_burned_creators()), creator
 
 
 async def top_wallet_distribution(session: aiohttp.ClientSession, mint: str) -> dict | None:
@@ -519,6 +641,13 @@ async def cluster_confirm_scout_loop(runtime: Any,
                                     filter_name="peak_ratio_60m", filter_value=round(_peak_ratio, 2), threshold=0.85)
                         continue
                     _peak_ratio_cluster = _peak_ratio
+                # Buy velocity check — recent 1h vs prior 5h average.
+                _cl_velocity = _buy_velocity_ratio(best)
+                if _cl_velocity is not None and _cl_velocity < MONSTER_BUY_VELOCITY_MIN_RATIO:
+                    print(f"[monster-cluster] 🚫 {mint[:8]} buy_velocity={_cl_velocity:.2f} < {MONSTER_BUY_VELOCITY_MIN_RATIO} — momentum decelerating")
+                    _log_reject("cluster_confirm", mint, "buy_velocity", _snap,
+                                filter_name="buy_velocity_ratio", filter_value=_cl_velocity, threshold=MONSTER_BUY_VELOCITY_MIN_RATIO)
+                    continue
                 # Compute top-1 + top-10 wallet distribution (free via Helius).
                 # Low top10% (<25%) = broadly distributed = runner shape;
                 # high top10% (>60%) = concentrated = rug risk.
@@ -529,6 +658,14 @@ async def cluster_confirm_scout_loop(runtime: Any,
                     print(f"[monster-cluster] 🚫 {mint[:8]} top10={_top10}% ≥ {MONSTER_TOP10_MAX_PCT}% — insiders hold exit liquidity, skip")
                     _log_reject("cluster_confirm", mint, "top10_concentration", _snap,
                                 filter_name="top10_pct", filter_value=_top10, threshold=MONSTER_TOP10_MAX_PCT)
+                    continue
+                # Creator burn check — skip if a recent monster trade by this
+                # creator lost us money.
+                _cl_burned, _cl_creator = await is_creator_burned(session, mint)
+                if _cl_burned:
+                    print(f"[monster-cluster] 🚫 {mint[:8]} creator={_cl_creator[:8]} recently burned us — skip")
+                    _log_reject("cluster_confirm", mint, "creator_burned", _snap,
+                                filter_name="creator", filter_value=_cl_creator)
                     continue
                 print(f"[monster-cluster] 🎯 {len(ws)} cluster wallets on {mint[:8]} — firing (liq=${_liq_usd:.0f} mc=${_mc_usd:.0f} h1=+{_h1:.0f}% top1={_top1}% top10={_top10}%)")
                 _log_signal({
@@ -564,6 +701,8 @@ async def cluster_confirm_scout_loop(runtime: Any,
                         "holders_at_entry": _holders_at_entry,
                         "top1_pct": _top1,
                         "top10_pct": _top10,
+                        "creator": _cl_creator,
+                        "buy_velocity_ratio": _cl_velocity,
                     },
                 )
         except Exception as e:
@@ -722,8 +861,27 @@ async def _serial_after_graduation(runtime: Any, session: aiohttp.ClientSession,
                      "creator": creator, "phase": "blocked_top10", "top10": t10})
         return
 
+    # Creator burn check — even whitelisted serial deployers can have a bad
+    # week. If their last 48h includes a -30% close on us, skip new mints
+    # until the cooldown passes.
+    if creator in _load_burned_creators():
+        print(f"[monster-serial] {mint[:8]} creator={creator[:8]} recently burned us — skip")
+        _log_signal({"source": "serial_deployer", "mint": mint,
+                     "creator": creator, "phase": "blocked_creator_burned"})
+        return
+
     pairs = await _dex_pairs(session, mint)
-    sym = (pairs[0].get("baseToken") or {}).get("symbol") if pairs else None
+    pair0 = pairs[0] if pairs else {}
+    sym = (pair0.get("baseToken") or {}).get("symbol") if pair0 else None
+
+    # Buy velocity check (when DexScreener has h1/h6 data populated yet)
+    _se_velocity = _buy_velocity_ratio(pair0)
+    if _se_velocity is not None and _se_velocity < MONSTER_BUY_VELOCITY_MIN_RATIO:
+        print(f"[monster-serial] {mint[:8]} buy_velocity={_se_velocity:.2f} — momentum decelerating, skip")
+        _log_signal({"source": "serial_deployer", "mint": mint,
+                     "creator": creator, "phase": "blocked_velocity", "velocity": _se_velocity})
+        return
+
     await monster.open_monster_position(
         mint=mint,
         token_name=sym or mint[:8],
@@ -846,6 +1004,22 @@ async def lifecycle_scout_loop(runtime: Any,
                     if not socials and not websites:
                         continue
 
+                    # Holder count floor — tokens with no organic buyer base look
+                    # healthy on price/volume but are 5-10 wallets pretending to
+                    # be a market.
+                    try:
+                        _lc_holders = int(base_info.get("holders")) if base_info.get("holders") is not None else None
+                    except (ValueError, TypeError):
+                        _lc_holders = None
+                    if _lc_holders is not None and _lc_holders < MONSTER_MIN_UNIQUE_HOLDERS:
+                        continue
+
+                    # Buy velocity — recent 1h vs prior 5h average. Skip
+                    # decelerating tokens (entering as momentum dies).
+                    _lc_velocity = _buy_velocity_ratio(p)
+                    if _lc_velocity is not None and _lc_velocity < MONSTER_BUY_VELOCITY_MIN_RATIO:
+                        continue
+
                     # Expensive last: top-1 + top-10 non-pool holders (one RPC call)
                     _lc_dist = await top_wallet_distribution(session, mint)
                     t1 = (_lc_dist or {}).get("top1_pct")
@@ -854,6 +1028,13 @@ async def lifecycle_scout_loop(runtime: Any,
                         continue
                     if t10 is not None and t10 >= MONSTER_TOP10_MAX_PCT:
                         continue  # TRADE-class: insiders hold >35% → dump liquidity
+
+                    # Creator burn check — skip if this mint's creator lost us
+                    # money on a prior trade in the last 48h.
+                    _burned, _creator = await is_creator_burned(session, mint)
+                    if _burned:
+                        print(f"[monster-lifecycle] 🚫 {mint[:8]} creator={_creator[:8]} recently burned us — skip")
+                        continue
 
                     _mark_signalled(mint)
                     print(f"[monster-lifecycle] 🎯 {mint[:8]} lifecycle match "
@@ -883,8 +1064,11 @@ async def lifecycle_scout_loop(runtime: Any,
                         metadata={"age_min": round(age_secs / 60, 1),
                                   "liq_usd": liq_usd, "mc_usd": mc_usd,
                                   "liq_mc_ratio": round(liq_mc, 4),
-                                  "buy_ratio": br, "top1_pct": t1,
-                                  "h1_change": h1_change, "m5_change": m5_change},
+                                  "buy_ratio": br, "top1_pct": t1, "top10_pct": t10,
+                                  "h1_change": h1_change, "m5_change": m5_change,
+                                  "holders_at_entry": _lc_holders,
+                                  "buy_velocity_ratio": _lc_velocity,
+                                  "creator": _creator},
                     )
                 except Exception:
                     # Isolate per-pair errors
@@ -1031,6 +1215,20 @@ async def breakout_candle_scout_loop(runtime: Any,
                     if not (base_info.get("socials") or base_info.get("websites")):
                         continue
 
+                    # Buy velocity — skip decelerating breakouts (the candle
+                    # already happened; if buys aren't accelerating we're late)
+                    _br_velocity = _buy_velocity_ratio(p)
+                    if _br_velocity is not None and _br_velocity < MONSTER_BUY_VELOCITY_MIN_RATIO:
+                        continue
+
+                    # Holder count floor — same rationale as lifecycle scout
+                    try:
+                        _br_holders = int(base_info.get("holders")) if base_info.get("holders") is not None else None
+                    except (ValueError, TypeError):
+                        _br_holders = None
+                    if _br_holders is not None and _br_holders < MONSTER_MIN_UNIQUE_HOLDERS:
+                        continue
+
                     _dist = await top_wallet_distribution(session, mint)
                     t1 = (_dist or {}).get("top1_pct")
                     t10 = (_dist or {}).get("top10_pct")
@@ -1038,6 +1236,12 @@ async def breakout_candle_scout_loop(runtime: Any,
                         continue
                     if t10 is not None and t10 >= MONSTER_TOP10_MAX_PCT:
                         continue  # top-10 concentration = rug setup, skip breakout
+
+                    # Creator burn check
+                    _br_burned, _br_creator = await is_creator_burned(session, mint)
+                    if _br_burned:
+                        print(f"[monster-breakout] 🚫 {mint[:8]} creator={_br_creator[:8]} recently burned us — skip")
+                        continue
 
                     # Rugcheck: block unlocked-LP danger tokens (LP pull = what killed MOONDOGE)
                     try:
@@ -1083,10 +1287,9 @@ async def breakout_candle_scout_loop(runtime: Any,
                             "top1_pct": t1,
                             "top10_pct": t10,
                             "pct_off_peak_at_entry": breakout_peak_ratio,
-                            "holders_at_entry": (
-                                int((p.get("info") or {}).get("holders"))
-                                if (p.get("info") or {}).get("holders") is not None else None
-                            ),
+                            "holders_at_entry": _br_holders,
+                            "buy_velocity_ratio": _br_velocity,
+                            "creator": _br_creator,
                         },
                     )
                 except Exception:
