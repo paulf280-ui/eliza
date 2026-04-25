@@ -1960,6 +1960,135 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
     app.router.add_get("/api/holder-guard/report", handle_holder_guard_report)
 
+    async def handle_near_miss_report(request: web.Request) -> web.Response:
+        """Daily near-miss analyzer — calibration check on filter thresholds.
+
+        For each rejection in the window, compute margin = |value-threshold| / threshold.
+        Bucket by margin × outcome to surface (a) close-call pumps that suggest
+        filters are too tight, and (b) far-margin pumps that suggest a missing
+        lifecycle lane (e.g. post-consolidation replay).
+
+        ?hours=24 (default).
+        """
+        try:
+            import json as _json, os as _os, time as _time
+            from collections import defaultdict
+            try:
+                hours = float(request.query.get("hours") or 24)
+            except Exception:
+                hours = 24.0
+            cutoff = _time.time() - hours * 3600
+            rej_path = _os.path.join(_os.path.dirname(__file__), "rejected_tokens.json")
+            with open(rej_path) as f:
+                rejected = _json.load(f) or []
+            last = [r for r in rejected if isinstance(r, dict) and r.get("ts", 0) >= cutoff]
+
+            def _margin(r):
+                fv, th = r.get("filter_value"), r.get("threshold")
+                if not isinstance(fv, (int, float)) or not isinstance(th, (int, float)) or th == 0:
+                    return None
+                return abs(fv - th) / abs(th) * 100.0
+
+            enriched = []
+            for r in last:
+                m = _margin(r)
+                if m is None:
+                    continue
+                enriched.append({
+                    "mint":         r.get("mint", ""),
+                    "filter":       r.get("filter_name"),
+                    "reason":       r.get("reason"),
+                    "value":        r.get("filter_value"),
+                    "threshold":    r.get("threshold"),
+                    "margin_pct":   round(m, 2),
+                    "verdict":      r.get("outcome_verdict"),
+                    "outcome_pct":  r.get("outcome_price_change_pct"),
+                    "strategy":     r.get("strategy"),
+                    "ts":           r.get("ts"),
+                })
+
+            # Bucket by margin
+            buckets_def = [
+                ("0-10%",   0,    10),
+                ("10-25%",  10,   25),
+                ("25-50%",  25,   50),
+                ("50-100%", 50,  100),
+                (">100%",   100, 1e9),
+            ]
+            buckets = {}
+            for label, lo, hi in buckets_def:
+                items = [e for e in enriched if lo <= e["margin_pct"] < hi and e["verdict"]]
+                buckets[label] = {
+                    "checked": len(items),
+                    "pumped":  sum(1 for x in items if x["verdict"] == "pumped"),
+                    "rugged":  sum(1 for x in items if x["verdict"] == "rugged"),
+                    "flat":    sum(1 for x in items if x["verdict"] == "flat"),
+                }
+                if buckets[label]["checked"]:
+                    buckets[label]["fp_rate"] = round(
+                        buckets[label]["pumped"] / buckets[label]["checked"] * 100, 1
+                    )
+
+            # Per-filter close-call stats (margin <= 25%)
+            close = [e for e in enriched if e["margin_pct"] <= 25]
+            by_filter = defaultdict(list)
+            for e in close:
+                by_filter[e["filter"]].append(e)
+            per_filter = []
+            for f, items in sorted(by_filter.items(), key=lambda kv: -len(kv[1])):
+                per_filter.append({
+                    "filter": f,
+                    "n":      len(items),
+                    "pumped": sum(1 for x in items if x["verdict"] == "pumped"),
+                    "rugged": sum(1 for x in items if x["verdict"] == "rugged"),
+                    "avg_margin_pct": round(sum(x["margin_pct"] for x in items) / len(items), 1) if items else 0,
+                })
+
+            # Closest 30 calls
+            near_misses = sorted(close, key=lambda x: x["margin_pct"])[:30]
+
+            # Far-margin pumps (the actual missed alpha)
+            far_pumps = [
+                e for e in enriched
+                if e["margin_pct"] > 100 and e["verdict"] == "pumped"
+            ]
+            far_pumps.sort(key=lambda x: -(x["outcome_pct"] or 0))
+
+            # Plain-language verdict
+            close_pumped = sum(1 for e in close if e["verdict"] == "pumped")
+            close_checked = sum(1 for e in close if e["verdict"])
+            far_pump_count = len(far_pumps)
+            if close_checked == 0 and far_pump_count == 0:
+                verdict = "Insufficient data — no rejections have outcome verdicts yet for this window."
+            elif close_pumped == 0 and far_pump_count > 0:
+                verdict = (
+                    f"Filters calibrated correctly at boundaries (0/{close_checked} close-calls pumped). "
+                    f"{far_pump_count} far-margin rejections pumped — these are tokens entirely outside "
+                    "scout windows, likely post-consolidation runners. Consider a new scout lane."
+                )
+            elif close_pumped > 0:
+                verdict = (
+                    f"Close calls leaking pumps: {close_pumped}/{close_checked} pumped. "
+                    "Investigate loosening threshold(s) on the affected filter(s)."
+                )
+            else:
+                verdict = f"Stable — {close_checked} close calls evaluated, none pumped, no far-margin pumps."
+
+            return web.json_response({
+                "window_hours":         hours,
+                "total_rejections":     len(last),
+                "rejections_with_margins": len(enriched),
+                "buckets_by_margin":    buckets,
+                "per_filter_close_calls": per_filter,
+                "near_misses":          near_misses,
+                "far_margin_pumps":     far_pumps[:30],
+                "verdict":              verdict,
+            })
+        except Exception as exc:
+            return web.json_response({"error": str(exc)}, status=500)
+
+    app.router.add_get("/api/near-miss-report", handle_near_miss_report)
+
     async def handle_copy_trade_close(request: web.Request) -> web.Response:
         try:
             import aiohttp as _aiohttp
