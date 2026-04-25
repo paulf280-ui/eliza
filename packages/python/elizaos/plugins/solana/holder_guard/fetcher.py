@@ -273,6 +273,14 @@ async def build_snapshot(
     except Exception:
         snap.bundle_bot_detected = None
 
+    # Bump-bot detection (Algorithm 3) — count of wallets repeatedly flipping
+    # equal-magnitude opposite trades. Positive signal per the paper (Fig 4c).
+    try:
+        from .bump_detect import detect_bump_bots
+        snap.bump_bot_count = await detect_bump_bots(session, mint)
+    except Exception:
+        snap.bump_bot_count = None
+
     # Holders + buy/sell from provided DexScreener pair
     snap.unique_holders = unique_holders
     snap.holder_growth_per_min = holder_growth_per_min

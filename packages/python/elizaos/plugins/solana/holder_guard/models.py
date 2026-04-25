@@ -55,6 +55,13 @@ class HolderSnapshot:
     # need a paid Bubblemaps subscription to populate).
     bundle_bot_detected: bool | None = None
 
+    # Algorithm 3 from Luo et al. 2026 — count of wallets exhibiting the
+    # bump-bot flip pattern (repeated equal-magnitude opposite-sign trades).
+    # Per Fig 4c of the paper, bump-bot presence is POSITIVELY correlated with
+    # token returns — they signal attention manipulation that attracts real
+    # buyers. We surface this as metadata, never as a hard-block reason.
+    bump_bot_count: int | None = None
+
 
 @dataclass
 class HolderDelta:
