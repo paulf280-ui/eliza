@@ -1058,10 +1058,8 @@ async def _build_compact_context(runtime: AgentRuntime) -> str:
     # All lessons
     lessons_str = ""
     try:
-        _lf = os.path.join(os.path.dirname(__file__), "eliza_lessons.txt")
-        if not os.path.exists(_lf):
-            _lf = os.path.join(os.path.dirname(os.path.dirname(__file__)), "eliza_lessons.txt")
-        if os.path.exists(_lf):
+        _lf = _find_lessons_file()
+        if _lf:
             lessons_str = open(_lf).read().strip()
     except Exception:
         pass
@@ -1446,10 +1444,11 @@ async def _build_context(runtime: AgentRuntime) -> str:
     # All learned lessons
     lessons_str = "(none yet)"
     try:
-        lessons_file = os.path.join(os.path.dirname(__file__), "..", "eliza_lessons.txt")
-        with open(lessons_file) as f:
-            content = f.read().strip()
-        lessons_str = content if content else "(none yet)"
+        lessons_file = _find_lessons_file()
+        if lessons_file:
+            with open(lessons_file) as f:
+                content = f.read().strip()
+            lessons_str = content if content else "(none yet)"
     except Exception:
         pass
 
@@ -1952,17 +1951,38 @@ async def _cmd_today_trades(runtime: AgentRuntime, focus: str = "") -> str:
     return resp.content[0].text
 
 
+def _find_lessons_file() -> str | None:
+    """Resolve the active eliza_lessons.txt path.
+
+    Two historical files coexist; the active one is whichever was modified
+    most recently. We check the three plausible locations (same dir, plugins/,
+    elizaos/) and pick the freshest.
+    """
+    here = os.path.dirname(__file__)
+    candidates = [
+        os.path.join(here, "eliza_lessons.txt"),                                           # solana/
+        os.path.join(os.path.dirname(here), "eliza_lessons.txt"),                          # plugins/
+        os.path.join(os.path.dirname(os.path.dirname(here)), "eliza_lessons.txt"),         # elizaos/
+    ]
+    existing = [p for p in candidates if os.path.exists(p)]
+    if not existing:
+        return None
+    return max(existing, key=lambda p: os.path.getmtime(p))
+
+
 async def _cmd_lessons() -> str:
     """Show learned lessons."""
+    lessons_file = _find_lessons_file()
+    if not lessons_file:
+        return "No lessons file yet — Jarvis will start learning after the first trades."
     try:
-        lessons_file = os.path.join(os.path.dirname(__file__), "..", "eliza_lessons.txt")
         with open(lessons_file) as f:
             content = f.read().strip()
         if not content:
             return "No lessons recorded yet. Jarvis learns after each trade and review cycle."
         return f"**JARVIS LESSONS (persistent memory):**\n\n{content}"
-    except FileNotFoundError:
-        return "No lessons file yet — Jarvis will start learning after the first trades."
+    except OSError as exc:
+        return f"Lessons file at {lessons_file} couldn't be read: {exc}"
 
 
 async def _cmd_journal(action: str = "show", note: str = "", category: str = "general") -> str:
@@ -2551,9 +2571,10 @@ async def _cmd_run_analysis(runtime: AgentRuntime) -> str:
 
         lessons = ""
         try:
-            lf = os.path.join(os.path.dirname(__file__), "..", "eliza_lessons.txt")
-            with open(lf) as f:
-                lessons = f.read().strip()[-800:]
+            lf = _find_lessons_file()
+            if lf:
+                with open(lf) as f:
+                    lessons = f.read().strip()[-800:]
         except Exception:
             pass
 

@@ -43,6 +43,14 @@ MONSTER_BE_TRAIL_TARGET_PCT   = 10.0  # once armed, exit if pnl falls below +10%
 MONSTER_BE_TRAIL_ENABLED      = False # disabled 2026-04-24: trail was ejecting monsters pre-TP1 on natural pulse-and-breath pullbacks. AINI peaked +25%, trail fired at +3%, token then ran to +80%+. Same pattern as SAM the day before. Pre-TP1 protection now = hard floor (-15%) + flat gate (60min). Flip to True only after classifier layer is in place and can confirm breakdowns.
 MONSTER_FLAT_TIMEOUT_SECS = 60 * 60  # 60 min pre-TP1 with pnl in flat zone → exit
 MONSTER_FLAT_ZONE_PCT     = 5.0    # ±5% = "flat"
+
+# (Smart-money TP1 override considered 2026-04-26 and REJECTED. Barron had
+# smart_money_overlap=5 — well above the proposed ≥3 threshold — peaked +45.8%,
+# then collapsed to -82%. TP1 mechanical safety banking 75% at +30% saved the
+# trade from a catastrophic full-position loss. Smart-money overlap is a
+# positive entry-side signal but is NOT predictive enough to suppress
+# mechanical exits. Keep TP1 unconditional until we have a stronger
+# distribution-detection signal that can replace it.)
 MONSTER_MAX_CONCURRENT    = 2
 MONSTER_DEFAULT_SIZE_SOL  = 0.30   # 0.3 × 2 slots = 0.6 SOL max exposure
 
