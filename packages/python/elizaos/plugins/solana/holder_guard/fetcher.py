@@ -217,6 +217,8 @@ async def build_snapshot(
     snap = HolderSnapshot(mint=mint)
 
     # Parallelise the independent fetches
+    from .bundle_detect import detect_bundle_bot
+
     dist_task = top_wallet_distribution(session, mint)
     auth_task = fetch_mint_authority(session, mint)
     dev_task = fetch_dev_wallet(session, mint)
@@ -259,6 +261,17 @@ async def build_snapshot(
         snap.dev_holding_pct = await fetch_dev_holding_pct(
             session, mint, snap.dev_wallet, snap.total_supply
         )
+
+    # Bundle-bot detection (Algorithm 1) — self-derives creator from the
+    # genesis tx's feePayer when snap.dev_wallet is None (pump.fun tokens
+    # have empty Metaplex creators). Returns None for tokens too old to walk
+    # back through Helius enhanced-tx pagination.
+    try:
+        snap.bundle_bot_detected = await detect_bundle_bot(
+            session, mint, creator=snap.dev_wallet
+        )
+    except Exception:
+        snap.bundle_bot_detected = None
 
     # Holders + buy/sell from provided DexScreener pair
     snap.unique_holders = unique_holders

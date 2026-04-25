@@ -50,6 +50,11 @@ class HolderSnapshot:
     audit_score: int | None = None   # out of 8
     fresh_pct: float | None = None    # % of top-20 wallets created recently
 
+    # Algorithm 1 from Luo et al. 2026 — same-slot non-creator buy detected at
+    # token genesis. Boolean signal, complementary to bundlers_pct (which would
+    # need a paid Bubblemaps subscription to populate).
+    bundle_bot_detected: bool | None = None
+
 
 @dataclass
 class HolderDelta:

@@ -58,5 +58,11 @@ def evaluate_hard_block(snapshot: HolderSnapshot) -> GuardDecision:
             f"fresh_wallets={snapshot.fresh_pct:.1f}% > {cfg.FRESH_WALLETS_IN_TOP_20_MAX_PCT}%"
         )
 
+    # Algorithm 1 (Luo et al. 2026): same-slot non-creator buy at genesis.
+    # Only fires when the detector returns a confident True; None (couldn't
+    # determine) and False are both treated as pass.
+    if snapshot.bundle_bot_detected is True:
+        d.block_reasons.append("bundle_bot detected at creation slot")
+
     d.hard_block = bool(d.block_reasons)
     return d
