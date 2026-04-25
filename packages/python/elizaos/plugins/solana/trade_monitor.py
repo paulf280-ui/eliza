@@ -219,6 +219,19 @@ async def entry_scan_position(
             _paper_positions[mint]["ai_entry_confidence"] = confidence
             _paper_positions[mint]["ai_entry_reason"] = reason
 
+            # Record the entry scan as a Groq decision so dashboard stats reflect
+            # brain activity the moment a trade opens (fixes 0 calls/hold/exit).
+            try:
+                _bm.record_decision(
+                    "groq", mint, pos.get("token_name", mint[:8]),
+                    action=verdict.upper(),        # RUNNER | NORMAL | RUG_RISK
+                    reason=f"entry_scan: {reason}",
+                    pnl_pct=0.0,                   # position just opened
+                    confidence=confidence,
+                )
+            except Exception as _bm_err:
+                print(f"[monitor/entry-scan] brain memory record failed: {_bm_err}")
+
             emoji = "🚀" if verdict == "RUNNER" else ("🚨" if verdict == "RUG_RISK" else "✅")
             print(
                 f"[monitor/entry-scan] {emoji} {pos.get('token_name', mint[:8])} → "
@@ -240,6 +253,88 @@ async def entry_scan_position(
 
     except Exception as exc:
         print(f"[monitor/entry-scan] {mint[:8]} error: {exc}")
+
+
+async def entry_scan_gemini(
+    mint: str,
+    session: aiohttp.ClientSession,
+) -> None:
+    """Parallel Gemini entry-quality scan so Gemini's panel shows activity at
+    trade open. Uses a different lens from Groq (cheap Gemini Flash, slightly
+    deeper context) so the two brains bring independent views.
+    """
+    from elizaos.plugins.solana.axiom_copy_trader import _paper_positions
+
+    pos = _paper_positions.get(mint)
+    if not pos:
+        return
+
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    if not gemini_key:
+        return
+
+    ctx = json.dumps({
+        "token":        pos.get("token_name", mint[:8]),
+        "whale_wallet": pos.get("wallet_name", "?"),
+        "narrative":    pos.get("narrative", "unknown"),
+        "sol_spent":    round(pos.get("sol_spent", 0.0), 3),
+        "liq_usd":      pos.get("_learning_entry_liq"),
+        "mc_usd":       pos.get("_learning_entry_mc"),
+        "holders":      pos.get("_learning_entry_holders"),
+        "entry_price":  pos.get("entry_price"),
+    })
+    brain_ctx = _bm.brain_memory_as_prompt("gemini")
+    system_note = (
+        "You assess new Solana meme-coin positions for rug risk. "
+        "Reply JSON {verdict, confidence, reason} where verdict is "
+        "RUNNER|NORMAL|RUG_RISK."
+        + brain_ctx
+    )
+    prompt = _ENTRY_SCAN_PROMPT.format(context=ctx)
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"gemini-2.5-flash-lite:generateContent?key={gemini_key}"
+    )
+    body = {
+        "contents": [{"parts": [{"text": f"{system_note}\n\n{prompt}"}]}],
+        "generationConfig": {
+            "temperature": 0.15,
+            "maxOutputTokens": 200,
+            "responseMimeType": "application/json",
+            "thinkingConfig": {"thinkingBudget": 0},
+        },
+    }
+    try:
+        async with session.post(url, json=body, timeout=aiohttp.ClientTimeout(total=8)) as r:
+            if r.status != 200:
+                err = (await r.text())[:160]
+                print(f"[monitor/entry-scan-gemini] HTTP {r.status}: {err}")
+                return
+            data = await r.json()
+            raw = data["candidates"][0]["content"]["parts"][0]["text"]
+            verdict_data = json.loads(raw)
+            verdict    = str(verdict_data.get("verdict", "NORMAL")).upper()
+            confidence = float(verdict_data.get("confidence", 0.5))
+            reason     = str(verdict_data.get("reason", ""))[:150]
+
+            try:
+                _bm.record_decision(
+                    "gemini", mint, pos.get("token_name", mint[:8]),
+                    action=verdict,
+                    reason=f"entry_scan: {reason}",
+                    pnl_pct=0.0,
+                    confidence=confidence,
+                )
+            except Exception as _bm_err:
+                print(f"[monitor/entry-scan-gemini] brain memory record failed: {_bm_err}")
+
+            emoji = "🚀" if verdict == "RUNNER" else ("🚨" if verdict == "RUG_RISK" else "✅")
+            print(
+                f"[monitor/entry-scan-gemini] {emoji} {pos.get('token_name', mint[:8])} → "
+                f"{verdict} ({confidence:.0%}) — {reason}"
+            )
+    except Exception as exc:
+        print(f"[monitor/entry-scan-gemini] {mint[:8]} error: {exc}")
 
 
 async def spawn_monitor(
@@ -277,8 +372,12 @@ async def spawn_monitor(
     )
     _active_monitors[mint] = monitor
     asyncio.get_event_loop().create_task(monitor.run(session))
-    # Fire entry scan immediately (non-blocking — result stored on pos within ~3s)
+    # Fire entry scans immediately (non-blocking — result stored on pos within ~3s).
+    # Two brains get an independent first look so the dashboard shows activity from
+    # the moment a trade opens (was 0/0/0 because fast scalps closed before the
+    # 60s/180s Gemini/Claude cascade could reach them).
     asyncio.get_event_loop().create_task(entry_scan_position(mint, session))
+    asyncio.get_event_loop().create_task(entry_scan_gemini(mint, session))
     # Ensure brain memory refresh loop is running (no-op if already started)
     _bm.ensure_memory_loop_started()
     print(f"[monitor] 🚀 TradeMonitor spawned for {pos.get('token_name', mint[:8])} ({mint[:8]})")
@@ -298,6 +397,9 @@ class PriceSnapshot:
     buy_sell_ratio: float | None
     vol_mc_ratio: float | None
     holders: int | None
+    chg_h1: float = 0.0
+    chg_h6: float = 0.0
+    chg_h24: float = 0.0
 
 
 # ── DataFeed ──────────────────────────────────────────────────────────────────
@@ -367,6 +469,9 @@ class DataFeed:
             buy_sell_ratio=mdata.get("buy_sell_ratio"),
             vol_mc_ratio=mdata.get("vol_mc_ratio"),
             holders=mdata.get("holders"),
+            chg_h1=float(mdata.get("chg_h1") or 0),
+            chg_h6=float(mdata.get("chg_h6") or 0),
+            chg_h24=float(mdata.get("chg_h24") or 0),
         )
         self.snapshots.append(snap)
 
@@ -416,7 +521,7 @@ class AICascade:
 
     GROQ_INTERVAL   = 30
     GEMINI_INTERVAL = 120
-    SONNET_INTERVAL = 300
+    SONNET_INTERVAL = 180   # Opus 4.7 every 3min — lowered from 300s so depth brain fires more on runners
 
     def __init__(self) -> None:
         self._last_groq   = 0.0
@@ -494,8 +599,11 @@ class AICascade:
                 if d.action == "SELL" and d.confidence >= 0.70:
                     decision = d  # Gemini exit — overrides any prior HOLD
 
-        # ── Tier 3: Claude Sonnet (every 5min, age ≥ 3min) ──────────────────
-        if now - self._last_sonnet >= self.SONNET_INTERVAL and self._anthropic_key and age_secs >= 180:
+        # ── Tier 3: Claude Opus 4.7 quant depth (every 3min, age ≥ 60s) ─────
+        # Dropped age gate 180s → 60s so Opus engages on any trade that survives
+        # the first minute. 122-trade history: only 10 trades lived >3min, meaning
+        # the depth brain effectively never fired. Now it fires on ~30% of trades.
+        if now - self._last_sonnet >= self.SONNET_INTERVAL and self._anthropic_key and age_secs >= 60:
             d = await self._call_claude(ctx, session, model="claude-opus-4-7", tier="sonnet")
             if d:
                 self._last_sonnet = now
@@ -528,9 +636,19 @@ class AICascade:
         except Exception:
             return False
 
+    def _strategy_hint(self, ctx: str) -> str:
+        """Pull the strategy tag from ctx so learned patterns get filtered per lane."""
+        try:
+            d = json.loads(ctx)
+            if d.get("dex") == "meteora":
+                return "meteora"
+            return d.get("strategy") or "copy_trade"
+        except Exception:
+            return "copy_trade"
+
     async def _call_groq(self, ctx: str, session: aiohttp.ClientSession) -> AIDecision | None:
         is_meteora = self._is_meteora(ctx)
-        patterns = _get_learned_patterns("meteora" if is_meteora else "")
+        patterns = _get_learned_patterns(self._strategy_hint(ctx))
         brain_ctx = _bm.brain_memory_as_prompt("groq")
         system_note = (
             "You are a Solana meme-coin trading exit advisor. Respond with JSON only.\n"
@@ -567,7 +685,7 @@ class AICascade:
 
     async def _call_gemini(self, ctx: str, session: aiohttp.ClientSession) -> AIDecision | None:
         is_meteora = self._is_meteora(ctx)
-        patterns = _get_learned_patterns("meteora" if is_meteora else "")
+        patterns = _get_learned_patterns(self._strategy_hint(ctx))
         brain_ctx = _bm.brain_memory_as_prompt("gemini")
         system_note = (
             "You are a Solana meme-coin trading exit advisor. Respond with JSON only.\n"
@@ -578,15 +696,22 @@ class AICascade:
         full_prompt = f"{system_note}\n\n{prompt}"
         url = (
             f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"gemini-2.0-flash:generateContent?key={self._gemini_key}"
+            f"gemini-2.5-flash-lite:generateContent?key={self._gemini_key}"
         )
         body = {
             "contents": [{"parts": [{"text": full_prompt}]}],
-            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 200},
+            "generationConfig": {
+                "temperature": 0.1,
+                "maxOutputTokens": 200,
+                "responseMimeType": "application/json",
+                "thinkingConfig": {"thinkingBudget": 0},
+            },
         }
         try:
             async with session.post(url, json=body, timeout=aiohttp.ClientTimeout(total=15)) as r:
                 if r.status != 200:
+                    err = (await r.text())[:160]
+                    print(f"[monitor/gemini] HTTP {r.status}: {err}")
                     return None
                 data = await r.json()
                 raw = data["candidates"][0]["content"]["parts"][0]["text"]
@@ -609,7 +734,7 @@ class AICascade:
         brain_key = "claude"
         is_meteora = self._is_meteora(ctx)
         brain_ctx = _bm.brain_memory_as_prompt(brain_key)
-        system = _CLAUDE_SYSTEM + _get_learned_patterns("meteora" if is_meteora else "") + brain_ctx
+        system = _CLAUDE_SYSTEM + _get_learned_patterns(self._strategy_hint(ctx)) + brain_ctx
         prompt_tmpl = _METEORA_HOLD_SELL_PROMPT if is_meteora else _HOLD_SELL_PROMPT
         prompt = prompt_tmpl.format(context=ctx)
         try:
@@ -960,6 +1085,15 @@ def _build_context(mint: str, pos: dict, feed: DataFeed, age_secs: float) -> str
         if l_now and l_5ago and l_5ago > 0:
             liq_chg_5min_pct = round((l_now - l_5ago) / l_5ago * 100, 1)
 
+    # Drawdown from peak (our OWN peak — how far we've given back since best P&L)
+    pct_off_peak = round(pnl_pct - peak_pnl, 1) if peak_pnl > 0 else None
+
+    # Momentum-ratio: "is the pump dying?" — h6 >> h1 means peak was hours ago,
+    # we're in the rollback. Ratio > 5 is strong dying signal; < 2 is fresh.
+    momentum_ratio: float | None = None
+    if snap.chg_h1 > 1.0 and snap.chg_h6 > 0:
+        momentum_ratio = round(snap.chg_h6 / snap.chg_h1, 1)
+
     ctx = {
         "mint":              mint[:8],
         "token":             pos.get("token_name", mint[:8]),
@@ -967,8 +1101,13 @@ def _build_context(mint: str, pos: dict, feed: DataFeed, age_secs: float) -> str
         "age_min":           round(age_secs / 60, 1),
         "pnl_pct":           round(pnl_pct, 1),
         "peak_pnl_pct":      round(peak_pnl, 1),
+        "pct_off_peak":      pct_off_peak,
         "chg_30s_pct":       round(chg_30s, 1),
         "chg_5min_pct":      round(chg_5min, 1),
+        "chg_h1_pct":        round(snap.chg_h1, 1),
+        "chg_h6_pct":        round(snap.chg_h6, 1),
+        "chg_h24_pct":       round(snap.chg_h24, 1),
+        "momentum_ratio":    momentum_ratio,
         "tp1_hit":           tp1_hit,
         "locked_sol":        round(locked, 4),
         "bsr":               round(snap.buy_sell_ratio, 2) if snap.buy_sell_ratio else None,
@@ -982,6 +1121,24 @@ def _build_context(mint: str, pos: dict, feed: DataFeed, age_secs: float) -> str
         "dex":               pos.get("dex", "unknown"),
         "narrative":         pos.get("narrative", "unknown"),
         "entry_verdict":     pos.get("ai_entry_verdict"),
+        "catalyst":          pos.get("catalyst"),
+        # Moonbag state — post-TP1 V-recovery tracking
+        "moonbag_armed":     pos.get("moonbag_armed"),
+        "post_tp1_low_pnl_pct": (
+            round((float(pos["post_tp1_low"]) / entry - 1) * 100, 1)
+            if pos.get("post_tp1_low") and entry > 0 else None
+        ),
+        "v_recovery":        (
+            round(snap.price / float(pos["post_tp1_low"]), 2)
+            if pos.get("post_tp1_low") and float(pos["post_tp1_low"]) > 0 else None
+        ),
+        # Strategy tag so the brain cascade can pull the right learned rules.
+        # "meteora" lane is a sub-strategy of copy_trade but has its own
+        # prompt template, so we keep it separate for hint purposes.
+        "strategy":          (
+            "meteora" if pos.get("dex") == "meteora"
+            else (pos.get("strategy") or "copy_trade")
+        ),
     }
     return json.dumps(ctx)
 
@@ -1023,6 +1180,22 @@ _CLAUDE_SYSTEM = """You are the depth tier of a three-brain cascade (Groq 30s �
 
 MINDSET: You are a quantitative meme-coin trader. You feed off accumulated trade data (win/loss patterns, wallet-behaviour history, bad_token_dna, learned patterns injected into your prompt) and the live token makeup (holders, liquidity, BSR, narrative, DEX, pair age, entry verdict, prior brain decisions on this mint). Every decision is data-backed and falsifiable. You are not cautious by default — you are *logical*. A rising position with expanding holders and stable liq is a HOLD even if it's already up 80%; a stalled position with holders leaving is a SELL even at +5%.
 
+MOMENTUM DIAGNOSTICS: The context includes `chg_h1_pct`, `chg_h6_pct`, `chg_h24_pct` and a derived `momentum_ratio` (= h6/h1). Use these to tell fresh continuation from dying rally:
+ - momentum_ratio 1-2, h1 strongly positive → fresh breakout, continuation likely
+ - momentum_ratio 3-5 → rally aging, cautious HOLD
+ - momentum_ratio >5 or h6 positive while h1 near zero → peak was hours ago, rollback in progress, bias to SELL
+ - `pct_off_peak` (negative number) is drawdown from our entry-relative peak: -20% off peak with stalling bsr is a SELL signal even above TP1.
+
+CATALYST: `catalyst` (if populated) is a Grok/Gemini social-buzz snapshot at entry — fields `active` (bool), `confidence` (0-10), `reason`. Use it as a softener:
+ - active=true + confidence≥6 → narrative is real, HOLD through minor noise
+ - active=false OR confidence≤3 → no catalyst backing, weaker hold bias; any negative price signal should trigger SELL faster
+ - Missing (null) → no social data yet; don't assume either way.
+
+MOONBAG PHASE (post-TP1 only): After TP1 fires the 25% bag is in one of two states:
+ - `moonbag_armed=false` (DORMANT): the bag is riding through a cooldown. The runtime will IGNORE your SELL calls — you are in observer mode only. Keep scoring so the dashboard shows your read, but your job here is informational. Don't "panic" the dormant bag.
+ - `moonbag_armed=true` (ARMED): price has V-recovered ≥1.5× from the post-TP1 low. Leg 2 is in play. You are now the primary exit driver for the 25%. Watch for DISTRIBUTION: holder_delta_5min negative, liq_chg_5min_pct < -10%, bsr < 1.0, top-10 concentration rising. If 2+ of these align, SELL at high confidence — Leg 2 exits are profit protection, not fresh entry.
+ - `v_recovery` shows current ÷ post-TP1 low; `post_tp1_low_pnl_pct` is how deep the cooldown went.
+
 TOKEN MAKEUP REASONING: Before deciding, mentally assess:
  1. Is this token's profile (age, liq, holder count, narrative) consistent with winners in our history, or with losers?
  2. What's the active flow: accumulation (growing holders + rising BSR + stable liq) or distribution (holders falling + BSR < 0.45 + liq draining)?
@@ -1032,22 +1205,31 @@ TOKEN MAKEUP REASONING: Before deciding, mentally assess:
 OUTPUT: Respond with valid JSON only — no prose. SELL only when the data shows a clear danger signal; HOLD when momentum is intact; WATCH when signals are mixed and another tick will clarify.
 """
 
-_HOLD_SELL_PROMPT = """Analyse this open Solana meme-coin position and decide whether to HOLD or SELL.
+_HOLD_SELL_PROMPT = """Decide HOLD / SELL / WATCH on this open Solana meme-coin position by evaluating five gates, then synthesizing.
+
+EVALUATION GATES (assess each independently before deciding):
+
+  G1 HOLDER_FLOW    — holder_delta_5min: < -50 = exodus → SELL signal | -50..0 = mild distribution → caution | 0..50 = stable | > 50 = accumulation → HOLD signal
+  G2 LIQUIDITY      — liq_chg_5min_pct: < -30 = rug-in-progress → SELL urgency=high | -30..-10 = draining → caution | > 0 = healthy → HOLD signal
+  G3 BUY_PRESSURE   — bsr: < 0.35 = mass selling → SELL high | 0.35..0.50 = mixed → WATCH | > 0.55 with growing liq = strong HOLD
+  G4 PRICE_ACTION   — chg_5min_pct + pct_off_peak: < -8% with no bounce = dying → SELL | -3..+3 = consolidation → WATCH | rising = HOLD
+  G5 PHASE          — tp1_hit + moonbag_armed: pre-TP1 = primary exit decider | DORMANT moonbag = observer only (your SELL is ignored) | ARMED moonbag = primary exit again
+
+FEW-SHOT EXAMPLES:
+
+Example A — clear HOLD:
+  context: pnl=+18%, bsr=0.62, holder_delta_5min=+34, liq_chg_5min_pct=+6.1, chg_5min_pct=+2.4, tp1_hit=false
+  output: {{"reasoning":{{"G1_HOLDER_FLOW":"delta=+34 = accumulation","G2_LIQUIDITY":"+6.1% = growing","G3_BUY_PRESSURE":"bsr 0.62 = buying dominant","G4_PRICE_ACTION":"+2.4% with growing liq = active","G5_PHASE":"pre-TP1, primary decider"}},"action":"HOLD","confidence":0.78,"reason":"4 of 5 gates positive, no distribution signal","urgency":"low"}}
+
+Example B — clear SELL:
+  context: pnl=+12%, bsr=0.31, holder_delta_5min=-87, liq_chg_5min_pct=-22.4, chg_5min_pct=-9.1, tp1_hit=false
+  output: {{"reasoning":{{"G1_HOLDER_FLOW":"delta=-87 = exodus","G2_LIQUIDITY":"-22.4% = draining hard","G3_BUY_PRESSURE":"bsr 0.31 = mass selling","G4_PRICE_ACTION":"-9.1% no bounce = dying","G5_PHASE":"pre-TP1, exit decisively"}},"action":"SELL","confidence":0.88,"reason":"holders fleeing + liq draining + sell pressure overwhelming","urgency":"high"}}
 
 POSITION DATA:
 {context}
 
-KEY SIGNALS (in order of importance):
-1. holder_delta_5min < -50 → holders leaving fast = distribution/dump = SELL urgency=high
-2. liq_chg_5min_pct < -30 → liquidity draining = rug in progress = SELL urgency=high
-3. bsr < 0.35 → mass sell pressure = SELL urgency=high
-4. chg_5min_pct < -8 with no bounce = token dying = SELL confidence=0.8
-5. entry_verdict = "rug_risk" → be quick to sell on any negative signal
-6. P&L rising with bsr > 0.55 and stable liq → HOLD
-7. tp1_hit=true → moonbag phase, tolerate more volatility, only sell on emergency signals
-
-Respond with JSON only:
-{{"action": "HOLD"|"SELL"|"WATCH", "confidence": 0.0-1.0, "reason": "one sentence", "urgency": "low"|"medium"|"high"}}"""
+Respond with JSON only — same shape as examples above. Be honest in `reasoning`; the JSON is parsed for `action`/`confidence`/`reason`/`urgency` but the reasoning is logged for retrospective analysis.
+{{"reasoning": {{"G1_HOLDER_FLOW":"...","G2_LIQUIDITY":"...","G3_BUY_PRESSURE":"...","G4_PRICE_ACTION":"...","G5_PHASE":"..."}}, "action": "HOLD"|"SELL"|"WATCH", "confidence": 0.0-1.0, "reason": "one sentence", "urgency": "low"|"medium"|"high"}}"""
 
 
 _METEORA_HOLD_SELL_PROMPT = """You are a quant trader managing a Meteora DLMM meme-coin position. Think precisely.
@@ -1128,7 +1310,13 @@ def _get_eliza_lessons() -> str:
 
 
 def _get_learned_patterns(strategy_hint: str = "") -> str:
-    """Return learned patterns + eliza lessons as system prompt injection. Cached 5min."""
+    """Return learned patterns + eliza lessons as system prompt injection.
+
+    If strategy_hint is set (e.g. "monster_lifecycle", "copy_trade", "meteora"),
+    patterns tagged with that strategy are surfaced first, then GLOBAL rules,
+    then everything else. Per-strategy verdict (if available) is injected as a
+    headline. Cached 5min only for the no-hint baseline.
+    """
     global _cached_patterns, _patterns_loaded_ts
     if time.time() - _patterns_loaded_ts < 300 and not strategy_hint:
         return _cached_patterns
@@ -1137,13 +1325,44 @@ def _get_learned_patterns(strategy_hint: str = "") -> str:
         if os.path.exists(_PATTERNS_PATH):
             with open(_PATTERNS_PATH) as f:
                 data = json.load(f)
-            patterns = data.get("patterns", [])
-            meteora_verdict = data.get("meteora_verdict", "")
+            patterns = data.get("patterns", []) or []
+
+            # Strategy-specific verdict injection
+            verdicts = data.get("per_strategy_verdicts") or {}
+            legacy_meteora = data.get("meteora_verdict", "")
             lines.append("\n\nLEARNED PATTERNS FROM PAST TRADES:")
-            if strategy_hint == "meteora" and meteora_verdict:
-                lines.append(f"METEORA INSIGHT: {meteora_verdict}")
-            for p in patterns[:10]:
-                lines.append(f"- {p}")
+
+            if strategy_hint:
+                hint_upper = strategy_hint.upper()
+                # Headline insight for this strategy
+                v = verdicts.get(strategy_hint) or (legacy_meteora if strategy_hint == "meteora" else "")
+                if v and v.strip() and v.strip().lower() != "insufficient_data":
+                    lines.append(f"{hint_upper} INSIGHT: {v}")
+
+                # Rank: strategy-specific → GLOBAL → other lanes
+                own, global_, other = [], [], []
+                for p in patterns:
+                    ptag = (p.split(":", 1)[0] if ":" in p else "").strip().lower()
+                    if ptag == strategy_hint.lower():
+                        own.append(p)
+                    elif ptag == "global":
+                        global_.append(p)
+                    else:
+                        other.append(p)
+                ranked = own + global_ + other
+                # Favour own+global heavily; keep a couple of cross-lane hints for context
+                for p in own[:6]:
+                    lines.append(f"- {p}")
+                for p in global_[:3]:
+                    lines.append(f"- {p}")
+                for p in other[:2]:
+                    lines.append(f"- (cross-lane) {p}")
+                if not own and not global_ and not other:
+                    lines.append("- (no learned patterns yet — need more closed trades)")
+            else:
+                for p in patterns[:10]:
+                    lines.append(f"- {p}")
+
         lessons = _get_eliza_lessons()
         result = "\n".join(lines) + lessons if lines else lessons
         if not strategy_hint:
