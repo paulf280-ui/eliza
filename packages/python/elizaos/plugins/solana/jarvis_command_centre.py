@@ -1223,8 +1223,29 @@ def _gather_monster_positions_direct() -> str:
         from elizaos.plugins.solana import strategy_e_monster as _mon
         positions = _mon.open_positions()
         closed = getattr(_mon, "_monster_closed", []) or []
+        # Always return a positive status line so the LLM has explicit
+        # confirmation that monster strategy is being monitored — instead of
+        # inferring "no positions" from absence of context. Without this,
+        # Jarvis tends to fall back to "brains in standby, nothing to watch"
+        # which sounds like the bot is asleep when it's actually actively
+        # scouting for signals.
         if not positions and not closed:
-            return ""
+            try:
+                from elizaos.plugins.solana import live_config as _lc
+                paused = bool(_lc.get("trading_paused", False))
+            except Exception:
+                paused = False
+            mode = "PAPER" if _mon.MONSTER_PAPER_ONLY else "LIVE"
+            state = "⏸ PAUSED" if paused else "🟢 ACTIVE"
+            return (
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"👾 MONSTER STRATEGY — {state}  "
+                f"(0/{_mon.MONSTER_MAX_CONCURRENT} slots in use, mode={mode}, "
+                f"size={_mon.MONSTER_DEFAULT_SIZE_SOL} SOL)\n"
+                "  Scouts armed: cluster_confirm, serial_deployer, lifecycle, breakout_candle\n"
+                "  No open positions and no recent closes — watching for signals.\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            )
 
         lines: list[str] = []
         if positions:
