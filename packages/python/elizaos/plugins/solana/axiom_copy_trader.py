@@ -331,6 +331,18 @@ def get_paper_stats() -> dict:
         _compound   = round(_paper_balance * 0.20 / 5, 3)
         _trade_size = max(_base, _compound)
 
+    # In the monster-only era (copy-trade off, monster live) the summary bar is
+    # labelled "Monster Command Centre" — surface monster sizing/slot caps so
+    # what the user sees matches what the bot is actually configured to do.
+    _max_positions = int(_lc_s.get("trenchman_max_positions", 2))
+    if _monster_live and not _copy_live:
+        try:
+            from elizaos.plugins.solana import strategy_e_monster as _mon
+            _trade_size = float(_mon.MONSTER_DEFAULT_SIZE_SOL)
+            _max_positions = int(_mon.MONSTER_MAX_CONCURRENT)
+        except Exception:
+            pass
+
     return {
         "trades":        len(closed),
         "wins":          len(wins),
@@ -345,7 +357,7 @@ def get_paper_stats() -> dict:
         "live_mode":     _live_mode,
         "paused":        _paused,
         "open_count":    len(_paper_positions),
-        "max_positions":  int(_lc_s.get("trenchman_max_positions", 2)),
+        "max_positions":  _max_positions,
         "open_positions": [
             {
                 "mint":               mint,
