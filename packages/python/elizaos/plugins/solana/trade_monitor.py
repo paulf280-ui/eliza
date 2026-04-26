@@ -1077,6 +1077,14 @@ def _build_context(mint: str, pos: dict, feed: DataFeed, age_secs: float) -> str
         if h_now is not None and h_5ago is not None and h_5ago > 0:
             holder_delta = h_now - h_5ago
 
+    # 30s holder delta — fast distribution/accumulation read
+    holder_delta_30s: int | None = None
+    if len(w30) >= 2:
+        h_now    = snap.holders
+        h_30ago  = w30[0].holders
+        if h_now is not None and h_30ago is not None and h_30ago > 0:
+            holder_delta_30s = h_now - h_30ago
+
     # Liquidity change (key rug signal: liq draining fast)
     liq_chg_5min_pct: float | None = None
     if len(w5m_snaps) >= 2:
@@ -1084,6 +1092,26 @@ def _build_context(mint: str, pos: dict, feed: DataFeed, age_secs: float) -> str
         l_5ago = w5m_snaps[0].liq
         if l_now and l_5ago and l_5ago > 0:
             liq_chg_5min_pct = round((l_now - l_5ago) / l_5ago * 100, 1)
+
+    # 30s liquidity change — catches sudden LP pulls before 5min window does
+    liq_chg_30s_pct: float | None = None
+    if len(w30) >= 2:
+        l_now   = snap.liq
+        l_30ago = w30[0].liq
+        if l_now and l_30ago and l_30ago > 0:
+            liq_chg_30s_pct = round((l_now - l_30ago) / l_30ago * 100, 1)
+
+    # Pullback-shape metrics: lowest pnl in last 5min and how far we've bounced.
+    # Lets brains tell "still falling" from "already bouncing off the dip".
+    local_low_pnl_pct: float | None = None
+    bounce_pct_from_local_low: float | None = None
+    if w5m_snaps and entry > 0:
+        prices_5m = [s.price for s in w5m_snaps if s.price > 0]
+        if prices_5m:
+            low_5m = min(prices_5m)
+            local_low_pnl_pct = round((low_5m - entry) / entry * 100, 1)
+            if low_5m > 0:
+                bounce_pct_from_local_low = round((snap.price - low_5m) / low_5m * 100, 1)
 
     # Drawdown from peak (our OWN peak — how far we've given back since best P&L)
     pct_off_peak = round(pnl_pct - peak_pnl, 1) if peak_pnl > 0 else None
@@ -1117,6 +1145,10 @@ def _build_context(mint: str, pos: dict, feed: DataFeed, age_secs: float) -> str
         "mc_usd":            round(snap.mc  or 0),
         "holders":           snap.holders,
         "holder_delta_5min": holder_delta,
+        "holder_delta_30s":  holder_delta_30s,
+        "liq_chg_30s_pct":   liq_chg_30s_pct,
+        "local_low_pnl_pct": local_low_pnl_pct,
+        "bounce_pct_from_local_low": bounce_pct_from_local_low,
         "atr_pct":           round(atr / snap.price * 100, 2) if (atr and snap.price) else None,
         "dex":               pos.get("dex", "unknown"),
         "narrative":         pos.get("narrative", "unknown"),
@@ -1205,31 +1237,43 @@ TOKEN MAKEUP REASONING: Before deciding, mentally assess:
 OUTPUT: Respond with valid JSON only — no prose. SELL only when the data shows a clear danger signal; HOLD when momentum is intact; WATCH when signals are mixed and another tick will clarify.
 """
 
-_HOLD_SELL_PROMPT = """Decide HOLD / SELL / WATCH on this open Solana meme-coin position by evaluating five gates, then synthesizing.
+_HOLD_SELL_PROMPT = """Decide HOLD / SELL / WATCH on this open Solana meme-coin position by evaluating six gates, then synthesizing.
+
+ENVIRONMENT (2026-04-26 hard-TP era): TP fires at +20% full-exit, catastrophic floor at -25% — you rule everything in between. A stalled-winner rule auto-banks if pnl camps in [+12%, +18%] for 10 min, so your high-PnL HOLD votes only matter when the move is actively progressing. You are the primary exit decider.
 
 EVALUATION GATES (assess each independently before deciding):
 
   G1 HOLDER_FLOW    — holder_delta_5min: < -50 = exodus → SELL signal | -50..0 = mild distribution → caution | 0..50 = stable | > 50 = accumulation → HOLD signal
+                      Cross-check holder_delta_30s — fast distribution shows here first.
   G2 LIQUIDITY      — liq_chg_5min_pct: < -30 = rug-in-progress → SELL urgency=high | -30..-10 = draining → caution | > 0 = healthy → HOLD signal
+                      Cross-check liq_chg_30s_pct < -10 = LP pull happening NOW → SELL high.
   G3 BUY_PRESSURE   — bsr: < 0.35 = mass selling → SELL high | 0.35..0.50 = mixed → WATCH | > 0.55 with growing liq = strong HOLD
   G4 PRICE_ACTION   — chg_5min_pct + pct_off_peak: < -8% with no bounce = dying → SELL | -3..+3 = consolidation → WATCH | rising = HOLD
-  G5 PHASE          — tp1_hit + moonbag_armed: pre-TP1 = primary exit decider | DORMANT moonbag = observer only (your SELL is ignored) | ARMED moonbag = primary exit again
+  G5 PHASE          — tp1_hit + moonbag_armed: pre-TP1 (default in hard-TP era) = primary exit decider | DORMANT moonbag (legacy) = observer only | ARMED moonbag (legacy) = primary exit again
+  G6 PULLBACK_SHAPE — bounce_pct_from_local_low + local_low_pnl_pct + holder_delta_30s + liq_chg_30s_pct:
+                      FALSE PULLBACK (HOLD bias): pnl currently negative BUT bounce_pct_from_local_low > +3% AND holder_delta_30s ≥ 0 AND liq_chg_30s_pct > -5% → dip absorbed, recovery in progress, do not panic-sell
+                      REAL DUMP (SELL bias): pnl negative AND bounce_pct_from_local_low ≤ 0 AND holder_delta_30s < 0 AND liq_chg_30s_pct < -5% → still falling with distribution, exit before catastrophic floor
+                      MIXED → WATCH another tick
 
 FEW-SHOT EXAMPLES:
 
 Example A — clear HOLD:
-  context: pnl=+18%, bsr=0.62, holder_delta_5min=+34, liq_chg_5min_pct=+6.1, chg_5min_pct=+2.4, tp1_hit=false
-  output: {{"reasoning":{{"G1_HOLDER_FLOW":"delta=+34 = accumulation","G2_LIQUIDITY":"+6.1% = growing","G3_BUY_PRESSURE":"bsr 0.62 = buying dominant","G4_PRICE_ACTION":"+2.4% with growing liq = active","G5_PHASE":"pre-TP1, primary decider"}},"action":"HOLD","confidence":0.78,"reason":"4 of 5 gates positive, no distribution signal","urgency":"low"}}
+  context: pnl=+18%, bsr=0.62, holder_delta_5min=+34, liq_chg_5min_pct=+6.1, chg_5min_pct=+2.4, tp1_hit=false, bounce_pct_from_local_low=+8, local_low_pnl_pct=+9
+  output: {{"reasoning":{{"G1_HOLDER_FLOW":"delta=+34 = accumulation","G2_LIQUIDITY":"+6.1% = growing","G3_BUY_PRESSURE":"bsr 0.62 = buying dominant","G4_PRICE_ACTION":"+2.4% with growing liq = active","G5_PHASE":"pre-TP, primary decider","G6_PULLBACK_SHAPE":"already +8% above local low and accumulating = constructive"}},"action":"HOLD","confidence":0.80,"reason":"5 of 6 gates positive, no distribution signal","urgency":"low"}}
 
-Example B — clear SELL:
-  context: pnl=+12%, bsr=0.31, holder_delta_5min=-87, liq_chg_5min_pct=-22.4, chg_5min_pct=-9.1, tp1_hit=false
-  output: {{"reasoning":{{"G1_HOLDER_FLOW":"delta=-87 = exodus","G2_LIQUIDITY":"-22.4% = draining hard","G3_BUY_PRESSURE":"bsr 0.31 = mass selling","G4_PRICE_ACTION":"-9.1% no bounce = dying","G5_PHASE":"pre-TP1, exit decisively"}},"action":"SELL","confidence":0.88,"reason":"holders fleeing + liq draining + sell pressure overwhelming","urgency":"high"}}
+Example B — clear SELL (real dump):
+  context: pnl=+12%, bsr=0.31, holder_delta_5min=-87, holder_delta_30s=-22, liq_chg_5min_pct=-22.4, liq_chg_30s_pct=-8.2, chg_5min_pct=-9.1, bounce_pct_from_local_low=0, tp1_hit=false
+  output: {{"reasoning":{{"G1_HOLDER_FLOW":"delta=-87 (5m) and -22 (30s) = exodus","G2_LIQUIDITY":"-22.4% (5m) and -8.2% (30s) = active drain","G3_BUY_PRESSURE":"bsr 0.31 = mass selling","G4_PRICE_ACTION":"-9.1% no bounce = dying","G5_PHASE":"pre-TP, exit decisively","G6_PULLBACK_SHAPE":"no bounce + holders fleeing + liq draining = real dump"}},"action":"SELL","confidence":0.90,"reason":"holders fleeing + liq actively draining + sell pressure dominant + no bounce","urgency":"high"}}
+
+Example C — false pullback (HOLD through dip):
+  context: pnl=-8%, bsr=0.58, holder_delta_5min=-3, holder_delta_30s=+5, liq_chg_5min_pct=-2.1, liq_chg_30s_pct=+1.4, chg_5min_pct=-4.2, bounce_pct_from_local_low=+5.8, local_low_pnl_pct=-13, peak_pnl_pct=+11, tp1_hit=false
+  output: {{"reasoning":{{"G1_HOLDER_FLOW":"5m -3 but 30s +5 = base holders absorbing dip","G2_LIQUIDITY":"5m -2.1% but 30s +1.4% = stabilising","G3_BUY_PRESSURE":"bsr 0.58 = buyers stepping in","G4_PRICE_ACTION":"-4.2% but rebounding","G5_PHASE":"pre-TP","G6_PULLBACK_SHAPE":"already +5.8% off local -13% low with positive 30s flow = false pullback, recovery in progress"}},"action":"HOLD","confidence":0.74,"reason":"dip absorbed, holders/liq stabilising, ride the recovery","urgency":"low"}}
 
 POSITION DATA:
 {context}
 
 Respond with JSON only — same shape as examples above. Be honest in `reasoning`; the JSON is parsed for `action`/`confidence`/`reason`/`urgency` but the reasoning is logged for retrospective analysis.
-{{"reasoning": {{"G1_HOLDER_FLOW":"...","G2_LIQUIDITY":"...","G3_BUY_PRESSURE":"...","G4_PRICE_ACTION":"...","G5_PHASE":"..."}}, "action": "HOLD"|"SELL"|"WATCH", "confidence": 0.0-1.0, "reason": "one sentence", "urgency": "low"|"medium"|"high"}}"""
+{{"reasoning": {{"G1_HOLDER_FLOW":"...","G2_LIQUIDITY":"...","G3_BUY_PRESSURE":"...","G4_PRICE_ACTION":"...","G5_PHASE":"...","G6_PULLBACK_SHAPE":"..."}}, "action": "HOLD"|"SELL"|"WATCH", "confidence": 0.0-1.0, "reason": "one sentence", "urgency": "low"|"medium"|"high"}}"""
 
 
 _METEORA_HOLD_SELL_PROMPT = """You are a quant trader managing a Meteora DLMM meme-coin position. Think precisely.

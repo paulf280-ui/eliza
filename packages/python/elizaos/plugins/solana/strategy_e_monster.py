@@ -32,27 +32,27 @@ from typing import Any
 import aiohttp
 
 # ─── Config ───────────────────────────────────────────────────────────────
-MONSTER_TP1_GAIN_PCT     = 30.0    # +30% → fire TP1 (2026-04-22: raised from +20, recovers 97.5% of stake at TP1)
-MONSTER_TP1_SELL_FRACTION = 0.75   # sell 75% at TP1, 25% rides for runner upside (was 0.90)
-MONSTER_PRE_TP1_FLOOR_PCT = -15.0  # hard SL before TP1 fires (tightened -25 → -15, unconditional)
-# Break-even trail: once peak pnl ≥ +10%, SL ratchets up to BE_TRAIL_TARGET_PCT.
-# SOLMONEY 2026-04-22 peaked +19.4% then collapsed to -14.8% in 30s — this trap
-# would have banked ≥ +5% instead of stopping at the -15% floor.
-MONSTER_BE_TRAIL_ACTIVATE_PCT = 20.0  # peak must reach +20% before trail arms (was 10 — SAM 2026-04-23 cut at +4% after peak +25%, then ran +106% past our exit)
-MONSTER_BE_TRAIL_TARGET_PCT   = 10.0  # once armed, exit if pnl falls below +10% (was 5 — tolerate deeper retrace for dip-and-rip shapes)
-MONSTER_BE_TRAIL_ENABLED      = False # disabled 2026-04-24: trail was ejecting monsters pre-TP1 on natural pulse-and-breath pullbacks. AINI peaked +25%, trail fired at +3%, token then ran to +80%+. Same pattern as SAM the day before. Pre-TP1 protection now = hard floor (-15%) + flat gate (60min). Flip to True only after classifier layer is in place and can confirm breakdowns.
-MONSTER_FLAT_TIMEOUT_SECS = 60 * 60  # 60 min pre-TP1 with pnl in flat zone → exit
-MONSTER_FLAT_ZONE_PCT     = 5.0    # ±5% = "flat"
+# 2026-04-26 hard-TP era: 1 slot × 0.6 SOL, full exit at +20%, no moonbag.
+# Brains rule the band between catastrophic floor (-25%) and TP (+20%).
+MONSTER_TP1_GAIN_PCT     = 20.0    # hard TP — full exit, no moonbag
+MONSTER_TP1_SELL_FRACTION = 1.0    # sell 100% at TP (no 25% tail to rug)
+MONSTER_PRE_TP1_FLOOR_PCT = -25.0  # catastrophic floor only — brains manage between -25 and +20
+MONSTER_BE_TRAIL_ACTIVATE_PCT = 20.0  # legacy — unused while TP1 is full exit
+MONSTER_BE_TRAIL_TARGET_PCT   = 10.0  # legacy — unused while TP1 is full exit
+MONSTER_BE_TRAIL_ENABLED      = False # legacy — unused while TP1 is full exit
+MONSTER_FLAT_TIMEOUT_SECS = 60 * 60  # 60 min pre-TP with pnl in flat zone → exit
+MONSTER_FLAT_ZONE_PCT     = 5.0    # ±5% = "flat" (around break-even)
 
-# (Smart-money TP1 override considered 2026-04-26 and REJECTED. Barron had
-# smart_money_overlap=5 — well above the proposed ≥3 threshold — peaked +45.8%,
-# then collapsed to -82%. TP1 mechanical safety banking 75% at +30% saved the
-# trade from a catastrophic full-position loss. Smart-money overlap is a
-# positive entry-side signal but is NOT predictive enough to suppress
-# mechanical exits. Keep TP1 unconditional until we have a stronger
-# distribution-detection signal that can replace it.)
-MONSTER_MAX_CONCURRENT    = 2
-MONSTER_DEFAULT_SIZE_SOL  = 0.30   # 0.3 × 2 slots = 0.6 SOL max exposure
+# Stalled-winner gate: pnl camped near TP without breaking through → bank it.
+# Triggers at 2026-04-26 user request: if we're already +12-18% and idling
+# for 10 min, take what we've got rather than waiting for a +20% break that
+# may never come. Bypassed by an active brain HOLD vote at conf ≥ 0.75.
+MONSTER_STALLED_WINNER_LOW_PCT  = 12.0  # bottom of stalled-winner band
+MONSTER_STALLED_WINNER_HIGH_PCT = 18.0  # top of stalled-winner band (just below TP)
+MONSTER_STALLED_WINNER_SECS     = 10 * 60  # 10 min in band → exit
+
+MONSTER_MAX_CONCURRENT    = 1      # 1 slot — single concentrated position
+MONSTER_DEFAULT_SIZE_SOL  = 0.6    # one trade × 0.6 SOL = 0.6 SOL exposure
 
 # Don't re-enter a mint that recently lost. Learned from MIM/hijabunc re-entry
 # bleed 2026-04-20 (lost -100%, re-entered at lower liq, lost again at -56/-36/-25).
@@ -389,24 +389,32 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
     tp1_fired = pos.get("tp1_fired", False)
     now = time.time()
 
-    # ── TP1: +100% → sell 50% ────────────────────────────────────────────
+    # ── Hard TP at +20% → full exit ──────────────────────────────────────
     if not tp1_fired and pnl_pct >= MONSTER_TP1_GAIN_PCT:
-        return "tp1_100pct", MONSTER_TP1_SELL_FRACTION
+        return "tp_hard_20pct", MONSTER_TP1_SELL_FRACTION
 
-    # ── Pre-TP1 break-even trail: peak ≥ +10% → exit if pnl drops below +5% ─
-    # SOLMONEY 2026-04-22 trap: peaked +19.4% then collapsed to -14.8% in 30s.
-    # This trail would have banked +5% instead of waiting for the -15% floor.
-    # Gated off 2026-04-24 (MONSTER_BE_TRAIL_ENABLED=False) — see flag comment.
-    if MONSTER_BE_TRAIL_ENABLED and not tp1_fired:
-        peak = float(pos.get("peak_pnl_pct") or 0.0)
-        if peak >= MONSTER_BE_TRAIL_ACTIVATE_PCT and pnl_pct <= MONSTER_BE_TRAIL_TARGET_PCT:
-            return f"be_trail_peak{peak:.0f}_pnl{pnl_pct:.0f}", 1.0
+    # ── Stalled-winner exit: camped in [+12%, +18%] for 10min → bank ─────
+    # User-requested 2026-04-26: if we're up ~+15% but the move stalls
+    # without breaking through to the +20% TP, take the profit rather than
+    # sit there hoping. Resets if pnl exits the band in either direction.
+    if not tp1_fired:
+        in_stalled_zone = (
+            MONSTER_STALLED_WINNER_LOW_PCT <= pnl_pct <= MONSTER_STALLED_WINNER_HIGH_PCT
+        )
+        first_stalled = pos.get("first_in_stalled_winner_ts")
+        if in_stalled_zone:
+            if first_stalled is None:
+                pos["first_in_stalled_winner_ts"] = now
+            elif (now - first_stalled) >= MONSTER_STALLED_WINNER_SECS:
+                return f"stalled_winner_{pnl_pct:.0f}pct_{int((now - first_stalled) / 60)}min", 1.0
+        else:
+            pos["first_in_stalled_winner_ts"] = None
 
-    # ── Pre-TP1 hard floor: -40% → full exit ─────────────────────────────
+    # ── Catastrophic floor: -25% → full exit (brains rule above this) ────
     if not tp1_fired and pnl_pct <= MONSTER_PRE_TP1_FLOOR_PCT:
         return f"pre_tp1_floor_{pnl_pct:.0f}pct", 1.0
 
-    # ── Pre-TP1 flat gate: flat for 60min → full exit ───────────────────
+    # ── Pre-TP flat gate: flat for 60min → full exit ────────────────────
     if not tp1_fired:
         in_flat = abs(pnl_pct) <= MONSTER_FLAT_ZONE_PCT
         first = pos.get("first_in_flat_zone_ts")
@@ -966,42 +974,33 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                             tier = decision.tier
                             conf = decision.confidence
 
-                            # Dormant moonbag exemption — post-TP1, pre-V-recovery.
-                            # Brains still score for dashboard visibility but cannot
-                            # force an exit. evaluate_exit owns the safety rails
-                            # (liq collapse, 8h cap). This is the whole point of
-                            # letting the 25% bag ride through cooldown.
-                            _dormant_bag = tp1_fired and not pos.get("moonbag_armed", False)
-
+                            # Hard-TP era (2026-04-26): with TP=full-exit at +20%
+                            # and floor at -25%, the brains rule the entire band
+                            # in between. Any tier with conf ≥ 0.70 is enough —
+                            # the catastrophic floor still catches anything they
+                            # miss. Old multi-condition runner-protection gate
+                            # (opus≥0.85, drawdown thresholds) is gone — it was
+                            # the reason MEOWJESTY died at the floor on 2026-04-26
+                            # despite Claude correctly calling SELL at -10.6%.
                             ai_allowed = False
                             gate_reason = ""
-                            if _dormant_bag:
-                                _low = float(pos.get("post_tp1_low") or 0)
-                                _vr = (current_price / _low) if _low > 0 else 0.0
-                                print(f"[monster] 💤 dormant-bag ignored AI SELL "
-                                      f"{pos.get('token_name', mint[:8])} tier={tier} conf={conf:.2f} "
-                                      f"pnl={cur_pnl:+.1f}% v_recovery={_vr:.2f}× (need 1.50×)")
-                            else:
-                                # Opus depth-brain: raised from 0.70 → 0.85 (2026-04-23).
-                                # LARP was cut at opus 0.72 conf with -13% pnl — token then ran
-                                # +77% past our exit. Opus's own pattern rule said raise floor.
-                                if tier == "opus" and conf >= 0.85:
+                            if tp1_fired:
+                                # tp1_fired implies a legacy partial-exit position
+                                # opened before the hard-TP migration. Keep the
+                                # old dormant-moonbag exemption out of caution.
+                                _dormant_bag = not pos.get("moonbag_armed", False)
+                                if _dormant_bag:
+                                    _low = float(pos.get("post_tp1_low") or 0)
+                                    _vr = (current_price / _low) if _low > 0 else 0.0
+                                    print(f"[monster] 💤 dormant-bag ignored AI SELL "
+                                          f"{pos.get('token_name', mint[:8])} tier={tier} conf={conf:.2f} "
+                                          f"pnl={cur_pnl:+.1f}% v_recovery={_vr:.2f}× (need 1.50×)")
+                                elif conf >= 0.70:
                                     ai_allowed = True
-                                    gate_reason = "opus_emergency"
-                                # Real drawdown with any tier: conf ≥ 0.70 is enough.
-                                # Rationale: on 2026-04-20 we bled -56% on MIM because
-                                # the old 0.80/-20% gate + a broken executor combined
-                                # into hours of no exits while brains unanimously
-                                # screamed SELL. Trust the consensus earlier.
-                                elif cur_pnl <= -15.0 and conf >= 0.70:
-                                    ai_allowed = True
-                                    gate_reason = f"drawdown_{cur_pnl:.0f}pct"
-                                elif tp1_fired and drawdown_from_peak >= 40.0 and conf >= 0.70:
-                                    ai_allowed = True
-                                    gate_reason = f"post_tp1_peak_fade_{drawdown_from_peak:.0f}pct"
-                                elif peak_pnl >= 30.0 and drawdown_from_peak >= 35.0 and conf >= 0.70:
-                                    ai_allowed = True
-                                    gate_reason = f"runner_fade_{drawdown_from_peak:.0f}pct_from_{peak_pnl:.0f}pct_peak"
+                                    gate_reason = f"armed_moonbag_{tier}"
+                            elif conf >= 0.70:
+                                ai_allowed = True
+                                gate_reason = f"brain_primary_{tier}_pnl{cur_pnl:+.0f}"
 
                             if ai_allowed:
                                 ai_reason = f"ai_{tier}_{conf:.2f}_{gate_reason}"
@@ -1009,9 +1008,9 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                                       f"tier={tier} conf={conf:.2f} pnl={cur_pnl:+.1f}% peak={peak_pnl:+.1f}% "
                                       f"gate={gate_reason} why={decision.reason[:80]}")
                             else:
-                                print(f"[monster] 🧠 AI sell signal IGNORED (runner protection) "
+                                print(f"[monster] 🧠 AI sell signal below conf threshold "
                                       f"{pos.get('token_name', mint[:8])} tier={tier} conf={conf:.2f} "
-                                      f"pnl={cur_pnl:+.1f}% peak={peak_pnl:+.1f}% dd_from_peak={drawdown_from_peak:.1f}% "
+                                      f"pnl={cur_pnl:+.1f}% peak={peak_pnl:+.1f}% (need conf≥0.70) "
                                       f"why={decision.reason[:80]}")
                     except Exception as _ai_err:
                         print(f"[monster] AI cascade error for {mint[:8]}: {_ai_err}")
