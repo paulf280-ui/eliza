@@ -165,6 +165,81 @@ def _mark_signalled(mint: str) -> None:
     _recent_signalled[mint] = time.time()
 
 
+# ─── Lifecycle bounce-watchlist ─────────────────────────────────────────
+# Mints that pass all baseline filters but have a bad entry shape (m5 deeply
+# negative, h1 high + rolling over, m5 overheated) are deferred here instead
+# of skipped. Each cycle we append a snapshot and re-evaluate; once the shape
+# turns "good" AND we see a confirmed bounce off the local low, we enter.
+# 2026-04-28 user-requested: SCAMDEX entered at m5=-7.5%/h1=+70% (post-peak
+# rollover) and rugged in 27s. The chart later formed a higher low and ran
+# back up — that's the entry we should have caught.
+_lifecycle_deferred: dict[str, dict] = {}  # mint → {"first_seen": ts, "snapshots": [...]}
+
+LIFECYCLE_WATCHLIST_TTL_SECS    = 180 * 60   # drop deferred mints after 3h
+LIFECYCLE_WATCHLIST_MAX_AGE_SECS = 180 * 60  # extend age cap for deferred mints (vs 90min normal)
+LIFECYCLE_SNAPSHOT_WINDOW_SECS   = 30 * 60   # keep last 30min of price snapshots per mint
+LIFECYCLE_BOUNCE_MIN_PCT         = 5.0       # price must be ≥+5% above local low for bounce
+LIFECYCLE_M5_GOOD_LOW            = -3.0      # m5 in [-3%, +8%] = clean entry shape
+LIFECYCLE_M5_GOOD_HIGH           = 8.0
+LIFECYCLE_POSTPEAK_H1_THRESHOLD  = 30.0      # h1 ≥ +30% with m5 ≤ 0 = post-peak rollover, defer
+
+
+def _lifecycle_record_snapshot(mint: str, price: float, m5: float, h1: float, liq: float) -> None:
+    now = time.time()
+    entry = _lifecycle_deferred.setdefault(mint, {"first_seen": now, "snapshots": []})
+    entry["snapshots"].append({"ts": now, "price": price, "m5": m5, "h1": h1, "liq": liq})
+    cutoff = now - LIFECYCLE_SNAPSHOT_WINDOW_SECS
+    entry["snapshots"] = [s for s in entry["snapshots"] if s["ts"] >= cutoff]
+
+
+def _lifecycle_local_low_price(mint: str) -> float | None:
+    snaps = (_lifecycle_deferred.get(mint) or {}).get("snapshots") or []
+    prices = [s["price"] for s in snaps if s.get("price", 0) > 0]
+    return min(prices) if prices else None
+
+
+def _lifecycle_bounce_confirmed(mint: str, current_price: float, current_m5: float, current_liq: float) -> tuple[bool, float]:
+    """Returns (confirmed, bounce_pct). A real bounce needs:
+       - price ≥+LIFECYCLE_BOUNCE_MIN_PCT% above the lowest price we've seen
+       - m5 currently positive (momentum has flipped, not just an oscillation)
+       - liquidity stable or growing through the bounce (real buyers, not thin-book ramp)
+    """
+    low = _lifecycle_local_low_price(mint)
+    if not low or low <= 0:
+        return False, 0.0
+    bounce_pct = (current_price - low) / low * 100.0
+    if bounce_pct < LIFECYCLE_BOUNCE_MIN_PCT:
+        return False, bounce_pct
+    if current_m5 < 0:
+        return False, bounce_pct
+    snaps = (_lifecycle_deferred.get(mint) or {}).get("snapshots") or []
+    if snaps:
+        first_liq = snaps[0].get("liq") or 0
+        if first_liq > 0 and current_liq < first_liq * 0.85:
+            # liquidity dropped >15% since we started watching = LP draining, not a healthy bounce
+            return False, bounce_pct
+    return True, bounce_pct
+
+
+def _lifecycle_cleanup_deferred() -> None:
+    now = time.time()
+    expired = [m for m, e in _lifecycle_deferred.items()
+               if (now - e.get("first_seen", now)) > LIFECYCLE_WATCHLIST_TTL_SECS]
+    for m in expired:
+        _lifecycle_deferred.pop(m, None)
+
+
+def _lifecycle_classify_entry_shape(m5: float, h1: float) -> tuple[str, str]:
+    """Returns (shape, reason). shape ∈ {good, pullback, postpeak, overheated}."""
+    if m5 > LIFECYCLE_M5_GOOD_HIGH:
+        return "overheated", f"m5=+{m5:.1f}% > +{LIFECYCLE_M5_GOOD_HIGH:.0f}% — mid-spike chase"
+    if m5 < LIFECYCLE_M5_GOOD_LOW:
+        return "pullback", f"m5={m5:.1f}% < {LIFECYCLE_M5_GOOD_LOW:.0f}% — actively falling"
+    if h1 >= LIFECYCLE_POSTPEAK_H1_THRESHOLD and m5 <= 0:
+        return "postpeak", f"h1=+{h1:.0f}% with m5={m5:.1f}% — rollover from peak"
+    return "good", f"m5={m5:.1f}%, h1={h1:.0f}%"
+
+
 # ─── Helius helpers ─────────────────────────────────────────────────────
 async def _rpc(session: aiohttp.ClientSession, method: str, params: Any, timeout: int = 20) -> dict:
     payload = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
@@ -980,6 +1055,7 @@ async def lifecycle_scout_loop(runtime: Any,
 
     while True:
         try:
+            _lifecycle_cleanup_deferred()
             pairs = await _recent_pumpswap_profiles(session)
             now_ms = time.time() * 1000
             for p in pairs:
@@ -995,8 +1071,12 @@ async def lifecycle_scout_loop(runtime: Any,
                     pca = p.get("pairCreatedAt")
                     if not pca:
                         continue
+                    on_watch = mint in _lifecycle_deferred
                     age_secs = (now_ms - float(pca)) / 1000
-                    if not (LIFECYCLE_MIN_AGE_SECS <= age_secs <= LIFECYCLE_MAX_AGE_SECS):
+                    age_max = LIFECYCLE_WATCHLIST_MAX_AGE_SECS if on_watch else LIFECYCLE_MAX_AGE_SECS
+                    if age_secs < LIFECYCLE_MIN_AGE_SECS or age_secs > age_max:
+                        if on_watch and age_secs > age_max:
+                            _lifecycle_deferred.pop(mint, None)  # aged out of watchlist
                         continue
                     liq_usd = float((p.get("liquidity") or {}).get("usd") or 0)
                     if not (LIFECYCLE_MIN_LIQ_USD <= liq_usd <= LIFECYCLE_MAX_LIQ_USD):
@@ -1014,8 +1094,29 @@ async def lifecycle_scout_loop(runtime: Any,
                         continue  # ran too hard in the last hour — chase risk
                     if h1_change < LIFECYCLE_H1_CHANGE_MIN_PCT:
                         continue  # falling knife — token is mid-fade, don't catch
-                    if m5_change > LIFECYCLE_M5_CHANGE_MAX_PCT:
-                        continue  # micro-spike — wait for consolidation
+
+                    # ── Entry-shape gate (with bounce-watchlist) ─────────
+                    # Instead of rejecting bad-shape tokens outright, defer
+                    # them to a per-mint watchlist. On future scan cycles we
+                    # re-evaluate; once shape turns "good" AND we see a
+                    # confirmed bounce off the local low, we enter.
+                    price_native = float(p.get("priceNative") or p.get("priceUsd") or 0)
+                    shape, shape_reason = _lifecycle_classify_entry_shape(m5_change, h1_change)
+                    if shape != "good":
+                        _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
+                        print(f"[monster-lifecycle] 👁 {mint[:8]} {shape} — {shape_reason} (watchlist)")
+                        continue
+                    if on_watch:
+                        bounced, bounce_pct = _lifecycle_bounce_confirmed(
+                            mint, price_native, m5_change, liq_usd
+                        )
+                        if not bounced:
+                            _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
+                            print(f"[monster-lifecycle] 👁 {mint[:8]} shape good but no bounce yet — "
+                                  f"bounce={bounce_pct:.1f}% < {LIFECYCLE_BOUNCE_MIN_PCT:.0f}% (watchlist)")
+                            continue
+                        print(f"[monster-lifecycle] 🔄 {mint[:8]} bounce confirmed — "
+                              f"+{bounce_pct:.1f}% off local low, m5=+{m5_change:.1f}%, liq=${liq_usd:,.0f}")
                     txns_h1 = (p.get("txns") or {}).get("h1") or {}
                     buys = txns_h1.get("buys") or 0
                     sells = txns_h1.get("sells") or 0
@@ -1076,10 +1177,11 @@ async def lifecycle_scout_loop(runtime: Any,
                         print(f"[monster-lifecycle] rugcheck import error: {_rc_err} — allowing")
 
                     _mark_signalled(mint)
-                    print(f"[monster-lifecycle] 🎯 {mint[:8]} lifecycle match "
+                    sig_src = "lifecycle_bounce" if on_watch else "lifecycle"
+                    print(f"[monster-lifecycle] 🎯 {mint[:8]} {sig_src} match "
                           f"age={age_secs/60:.0f}min liq=${liq_usd:,.0f} br={br:.0f}% top1={t1}%")
                     _log_signal({
-                        "source": "lifecycle",
+                        "source": sig_src,
                         "mint": mint,
                         "age_min": round(age_secs / 60, 1),
                         "liq_usd": liq_usd,
@@ -1090,13 +1192,17 @@ async def lifecycle_scout_loop(runtime: Any,
                         "h1_change_pct": h1_change,
                         "m5_change_pct": m5_change,
                     })
+                    # Drop from watchlist on entry; the position now lives in
+                    # _monster_positions and the deferred snapshot history is no
+                    # longer needed.
+                    _lifecycle_deferred.pop(mint, None)
                     if not monster.can_open_new_position():
                         continue
                     sym = (p.get("baseToken") or {}).get("symbol") or mint[:8]
                     await monster.open_monster_position(
                         mint=mint,
                         token_name=sym,
-                        signal_source="lifecycle",
+                        signal_source=sig_src,
                         sol_size=monster.MONSTER_DEFAULT_SIZE_SOL,
                         session=session,
                         runtime=runtime,
