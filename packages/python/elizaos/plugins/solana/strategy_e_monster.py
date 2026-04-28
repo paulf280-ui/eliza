@@ -52,7 +52,7 @@ MONSTER_STALLED_WINNER_HIGH_PCT = 18.0  # top of stalled-winner band (just below
 MONSTER_STALLED_WINNER_SECS     = 10 * 60  # 10 min in band → exit
 
 MONSTER_MAX_CONCURRENT    = 1      # 1 slot — single concentrated position
-MONSTER_DEFAULT_SIZE_SOL  = 0.6    # one trade × 0.6 SOL = 0.6 SOL exposure
+MONSTER_DEFAULT_SIZE_SOL  = 0.45   # one trade × 0.45 SOL — leaves headroom for full 50% slippage on 0.77 SOL wallet
 
 # Don't re-enter a mint that recently lost. Learned from MIM/hijabunc re-entry
 # bleed 2026-04-20 (lost -100%, re-entered at lower liq, lost again at -56/-36/-25).
