@@ -219,13 +219,44 @@ async def open_monster_position(
             if not pump_svc:
                 print("[monster] no pump service — cannot buy")
                 return False
+
+            # ── Dynamic slippage from wallet headroom ────────────────────
+            # PumpPortal builds pump-amm buys with max_amount_in =
+            # sol_size × (1 + slippage). The wallet must hold that full
+            # amount even though only the actual fill is spent. With a
+            # 0.77 SOL wallet and 0.6 SOL trade, 50% slippage requires
+            # 0.9 SOL on hand → buy fails with System Program 0x1
+            # (insufficient lamports). Cap slippage at affordable.
+            wallet_svc_pre = runtime.get_service("wallet") if runtime else None
+            wallet_sol = 0.0
+            if wallet_svc_pre is not None:
+                try:
+                    wallet_sol = await wallet_svc_pre.get_sol_balance()
+                except Exception as _bal_err:
+                    print(f"[monster] wallet balance fetch error pre-buy: {_bal_err}")
+                    return False
+            BUFFER_SOL = 0.02  # rent + Jito tip + signature fees + margin
+            affordable = wallet_sol - BUFFER_SOL
+            if affordable < sol_size:
+                print(
+                    f"[monster] 🛑 wallet {wallet_sol:.4f} SOL < {sol_size + BUFFER_SOL:.4f} "
+                    f"required ({sol_size:.3f} buy + {BUFFER_SOL:.3f} buffer) — skip {token_name}"
+                )
+                return False
+            max_slip = affordable / sol_size - 1.0
+            slippage = min(0.50, max(0.10, max_slip))
+            print(
+                f"[monster] 💰 wallet={wallet_sol:.4f} SOL, sizing buy at {sol_size:.3f} "
+                f"with slippage={slippage * 100:.1f}% (max-affordable={max_slip * 100:.1f}%)"
+            )
+
             try:
-                sig = await pump_svc.buy(mint, sol_size, slippage=0.50, pool=pool)
+                sig = await pump_svc.buy(mint, sol_size, slippage=slippage, pool=pool)
             except Exception as e1:
                 if "400" in str(e1) or "Bad Request" in str(e1):
                     alt = "pump" if pool == "pump-amm" else "pump-amm"
                     print(f"[monster] pool={pool} rejected — retry with {alt}")
-                    sig = await pump_svc.buy(mint, sol_size, slippage=0.50, pool=alt)
+                    sig = await pump_svc.buy(mint, sol_size, slippage=slippage, pool=alt)
                     pool = alt
                 else:
                     raise
