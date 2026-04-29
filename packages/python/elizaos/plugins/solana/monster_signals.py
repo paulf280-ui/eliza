@@ -1012,7 +1012,7 @@ async def _serial_after_graduation(runtime: Any, session: aiohttp.ClientSession,
 
 LIFECYCLE_MIN_LIQ_USD       = 30_000          # dropped 50k → 30k 2026-04-29: fresh tokens commonly sit at $30-45k for the first 60-90min; with 0.45 SOL trades the pool impact stays under 2%
 LIFECYCLE_MAX_LIQ_USD       = 300_000
-LIFECYCLE_MIN_MC_USD        = 300_000
+LIFECYCLE_MIN_MC_USD        = 250_000          # dropped 300k → 250k 2026-04-29: Sunny-class post-peak rollovers ($250-300k mc) blocked at the floor; watchlist still gates entry on bounce confirmation
 LIFECYCLE_MAX_MC_USD        = 3_000_000
 LIFECYCLE_MIN_LIQ_MC_RATIO  = 0.04
 LIFECYCLE_MAX_LIQ_MC_RATIO  = 0.20
