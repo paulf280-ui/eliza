@@ -1026,16 +1026,10 @@ LIFECYCLE_H1_CHANGE_MIN_PCT = -10.0           # added 2026-04-24: reject free-fa
 LIFECYCLE_M5_CHANGE_MAX_PCT = 15.0            # raised 5→15 (2026-04-23): caught only pullbacks, missed first-leg breakouts. Safety held by mcap velocity + peak ratio + LP burn.
 
 
-async def _recent_pumpswap_profiles(session: aiohttp.ClientSession) -> list[dict]:
-    """DexScreener's trending/search feed for PumpSwap base tokens.
-
-    DexScreener doesn't expose a public 'list new pumpswap pairs' endpoint, so
-    we use the search endpoint filtered by pumpswap. This is best-effort;
-    operator can seed via MONSTER_LIFECYCLE_WATCHLIST env var too.
-    """
+async def _fetch_via_search(session: aiohttp.ClientSession, query: str) -> list[dict]:
     try:
         async with session.get(
-            "https://api.dexscreener.com/latest/dex/search?q=pumpswap",
+            f"https://api.dexscreener.com/latest/dex/search?q={query}",
             timeout=aiohttp.ClientTimeout(total=8),
         ) as r:
             if r.status != 200:
@@ -1044,6 +1038,84 @@ async def _recent_pumpswap_profiles(session: aiohttp.ClientSession) -> list[dict
             return d.get("pairs") or []
     except Exception:
         return []
+
+
+async def _fetch_via_profile_feed(session: aiohttp.ClientSession) -> list[dict]:
+    """Pull recently-profiled Solana tokens, then resolve their pumpswap/pump-amm
+    pair data via the bulk tokens endpoint. The token-profiles feed surfaces
+    *just-launched* tokens that the search endpoint often misses (search ranks
+    by social/volume which lags fresh launches by hours).
+    """
+    try:
+        async with session.get(
+            "https://api.dexscreener.com/token-profiles/latest/v1",
+            timeout=aiohttp.ClientTimeout(total=8),
+        ) as r:
+            if r.status != 200:
+                return []
+            profiles = await r.json()
+    except Exception:
+        return []
+    if not isinstance(profiles, list):
+        return []
+    sol_addrs = [
+        str(p.get("tokenAddress") or "")
+        for p in profiles
+        if p.get("chainId") == "solana" and p.get("tokenAddress")
+    ]
+    if not sol_addrs:
+        return []
+    # DexScreener accepts up to 30 comma-separated mints in one call.
+    addrs_chunk = ",".join(sol_addrs[:30])
+    try:
+        async with session.get(
+            f"https://api.dexscreener.com/latest/dex/tokens/{addrs_chunk}",
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as r2:
+            if r2.status != 200:
+                return []
+            d2 = await r2.json()
+    except Exception:
+        return []
+    pairs = d2.get("pairs") or []
+    # For each token, keep only the highest-liquidity pumpswap/pump-amm pair.
+    by_mint: dict[str, dict] = {}
+    for p in pairs:
+        if (p.get("dexId") or "").lower() not in ("pumpswap", "pump-amm"):
+            continue
+        mint = (p.get("baseToken") or {}).get("address")
+        if not mint:
+            continue
+        liq = float((p.get("liquidity") or {}).get("usd") or 0)
+        existing = by_mint.get(mint)
+        if not existing or liq > float((existing.get("liquidity") or {}).get("usd") or 0):
+            by_mint[mint] = p
+    return list(by_mint.values())
+
+
+async def _recent_pumpswap_profiles(session: aiohttp.ClientSession) -> list[dict]:
+    """Fresh PumpSwap pair feed for the lifecycle scout.
+
+    Merges two DexScreener sources:
+      1. search?q=pumpswap — broader feed, ranks by social/volume
+      2. token-profiles/latest/v1 — fresh-launch feed, resolves to pair data
+    The search feed alone goes stale during quiet markets (oldest token in the
+    feed can be 3-6h old, well past our 90min age window). The profile feed
+    surfaces recently-launched tokens reliably. 2026-04-29 fix.
+    """
+    primary = await _fetch_via_search(session, "pumpswap")
+    fresh = await _fetch_via_profile_feed(session)
+    # Dedupe by mint, preferring the entry with higher liquidity (more current data).
+    by_mint: dict[str, dict] = {}
+    for p in primary + fresh:
+        mint = (p.get("baseToken") or {}).get("address")
+        if not mint:
+            continue
+        liq = float((p.get("liquidity") or {}).get("usd") or 0)
+        existing = by_mint.get(mint)
+        if not existing or liq > float((existing.get("liquidity") or {}).get("usd") or 0):
+            by_mint[mint] = p
+    return list(by_mint.values())
 
 
 async def lifecycle_scout_loop(runtime: Any,
@@ -1058,6 +1130,11 @@ async def lifecycle_scout_loop(runtime: Any,
             _lifecycle_cleanup_deferred()
             pairs = await _recent_pumpswap_profiles(session)
             now_ms = time.time() * 1000
+            cycle_seen = 0
+            cycle_in_age_window = 0
+            cycle_passed_baseline = 0
+            cycle_added_to_watchlist = 0
+            cycle_entered = 0
             for p in pairs:
                 try:
                     dex_id = (p.get("dexId") or "").lower()
@@ -1066,6 +1143,7 @@ async def lifecycle_scout_loop(runtime: Any,
                     mint = (p.get("baseToken") or {}).get("address")
                     if not mint or mint in _MONSTER_SKIP_MINTS:
                         continue
+                    cycle_seen += 1
                     if _recently_signalled(mint):
                         continue
                     pca = p.get("pairCreatedAt")
@@ -1078,6 +1156,7 @@ async def lifecycle_scout_loop(runtime: Any,
                         if on_watch and age_secs > age_max:
                             _lifecycle_deferred.pop(mint, None)  # aged out of watchlist
                         continue
+                    cycle_in_age_window += 1
                     liq_usd = float((p.get("liquidity") or {}).get("usd") or 0)
                     if not (LIFECYCLE_MIN_LIQ_USD <= liq_usd <= LIFECYCLE_MAX_LIQ_USD):
                         continue
@@ -1100,10 +1179,12 @@ async def lifecycle_scout_loop(runtime: Any,
                     # them to a per-mint watchlist. On future scan cycles we
                     # re-evaluate; once shape turns "good" AND we see a
                     # confirmed bounce off the local low, we enter.
+                    cycle_passed_baseline += 1
                     price_native = float(p.get("priceNative") or p.get("priceUsd") or 0)
                     shape, shape_reason = _lifecycle_classify_entry_shape(m5_change, h1_change)
                     if shape != "good":
                         _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
+                        cycle_added_to_watchlist += 1
                         print(f"[monster-lifecycle] 👁 {mint[:8]} {shape} — {shape_reason} (watchlist)")
                         continue
                     if on_watch:
@@ -1112,6 +1193,7 @@ async def lifecycle_scout_loop(runtime: Any,
                         )
                         if not bounced:
                             _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
+                            cycle_added_to_watchlist += 1
                             print(f"[monster-lifecycle] 👁 {mint[:8]} shape good but no bounce yet — "
                                   f"bounce={bounce_pct:.1f}% < {LIFECYCLE_BOUNCE_MIN_PCT:.0f}% (watchlist)")
                             continue
@@ -1216,9 +1298,22 @@ async def lifecycle_scout_loop(runtime: Any,
                                   "creator": _creator,
                                   "smart_money_overlap": await _try_smart_money_overlap(session, mint)},
                     )
+                    cycle_entered += 1
                 except Exception:
                     # Isolate per-pair errors
                     continue
+            # Per-cycle summary so silence is diagnosable. If candidates=0 the
+            # data source is starving; if in_age=0 the feed is stale; if
+            # baseline=0 filters are too tight; if entered=0+watched>0 we're
+            # patiently waiting for bounce confirmation.
+            print(
+                f"[monster-lifecycle] cycle: candidates={cycle_seen} "
+                f"in_age_window={cycle_in_age_window} "
+                f"passed_baseline={cycle_passed_baseline} "
+                f"watchlisted={cycle_added_to_watchlist} "
+                f"deferred_total={len(_lifecycle_deferred)} "
+                f"entered={cycle_entered}"
+            )
         except Exception as e:
             print(f"[monster-lifecycle] loop error: {e}")
         await asyncio.sleep(LIFECYCLE_POLL_SECS)
