@@ -1010,7 +1010,7 @@ async def _serial_after_graduation(runtime: Any, session: aiohttp.ClientSession,
 #   * m5 price change ≤ +5%     (don't buy the micro-spike)
 #   * socials present on base token
 
-LIFECYCLE_MIN_LIQ_USD       = 50_000
+LIFECYCLE_MIN_LIQ_USD       = 30_000          # dropped 50k → 30k 2026-04-29: fresh tokens commonly sit at $30-45k for the first 60-90min; with 0.45 SOL trades the pool impact stays under 2%
 LIFECYCLE_MAX_LIQ_USD       = 300_000
 LIFECYCLE_MIN_MC_USD        = 300_000
 LIFECYCLE_MAX_MC_USD        = 3_000_000
