@@ -508,6 +508,49 @@ class AIDecision:
     triggered_exit: bool = False  # True if this decision caused the position to close
 
 
+# ── Per-tier health surface ──────────────────────────────────────────────────
+# Tracks last call outcome per tier so the dashboard can show "DOWN — reason"
+# instead of an empty panel that the user reads as "no decisions". Updated by
+# AICascade on every API call (success or failure). Read by dashboard_api.
+_tier_health: dict[str, dict] = {
+    "groq":   {"last_ok_ts": 0.0, "last_err_ts": 0.0, "last_err_msg": ""},
+    "gemini": {"last_ok_ts": 0.0, "last_err_ts": 0.0, "last_err_msg": ""},
+    "claude": {"last_ok_ts": 0.0, "last_err_ts": 0.0, "last_err_msg": ""},
+}
+
+
+def _mark_tier_ok(tier: str) -> None:
+    h = _tier_health.get(tier)
+    if h is not None:
+        h["last_ok_ts"] = time.time()
+
+
+def _mark_tier_err(tier: str, msg: str) -> None:
+    h = _tier_health.get(tier)
+    if h is not None:
+        h["last_err_ts"] = time.time()
+        h["last_err_msg"] = msg[:200]
+
+
+def get_tier_health() -> dict:
+    """Return a snapshot of per-tier health for the dashboard. A tier is
+    "down" if its last error was more recent than its last success and within
+    the last 15 minutes."""
+    now = time.time()
+    out = {}
+    for tier, h in _tier_health.items():
+        last_ok = float(h.get("last_ok_ts") or 0)
+        last_err = float(h.get("last_err_ts") or 0)
+        is_down = last_err > last_ok and (now - last_err) < 900
+        out[tier] = {
+            "status": "down" if is_down else ("idle" if last_ok == 0 else "ok"),
+            "last_ok_secs_ago": int(now - last_ok) if last_ok > 0 else None,
+            "last_err_secs_ago": int(now - last_err) if last_err > 0 else None,
+            "last_err_msg": str(h.get("last_err_msg") or "") if is_down else "",
+        }
+    return out
+
+
 class AICascade:
     """Tiered AI evaluation of position health.
 
@@ -671,16 +714,21 @@ class AICascade:
                 timeout=aiohttp.ClientTimeout(total=10),
             ) as r:
                 if r.status != 200:
+                    err = (await r.text())[:200]
+                    print(f"[monitor/groq] HTTP {r.status}: {err}")
+                    _mark_tier_err("groq", f"HTTP {r.status}: {err}")
                     return None
                 data = await r.json()
                 raw = data["choices"][0]["message"]["content"]
                 dec = _parse_ai_decision(raw, tier="groq")
                 if dec:
+                    _mark_tier_ok("groq")
                     _bm.record_decision("groq", self._mint, self._token_name,
                                         dec.action, dec.reason, self._last_pnl_pct, dec.confidence)
                 return dec
         except Exception as exc:
             print(f"[monitor/groq] {exc}")
+            _mark_tier_err("groq", str(exc))
             return None
 
     async def _call_gemini(self, ctx: str, session: aiohttp.ClientSession) -> AIDecision | None:
@@ -710,18 +758,21 @@ class AICascade:
         try:
             async with session.post(url, json=body, timeout=aiohttp.ClientTimeout(total=15)) as r:
                 if r.status != 200:
-                    err = (await r.text())[:160]
+                    err = (await r.text())[:200]
                     print(f"[monitor/gemini] HTTP {r.status}: {err}")
+                    _mark_tier_err("gemini", f"HTTP {r.status}: {err}")
                     return None
                 data = await r.json()
                 raw = data["candidates"][0]["content"]["parts"][0]["text"]
                 dec = _parse_ai_decision(raw, tier="gemini")
                 if dec:
+                    _mark_tier_ok("gemini")
                     _bm.record_decision("gemini", self._mint, self._token_name,
                                         dec.action, dec.reason, self._last_pnl_pct, dec.confidence)
                 return dec
         except Exception as exc:
             print(f"[monitor/gemini] {exc}")
+            _mark_tier_err("gemini", str(exc))
             return None
 
     async def _call_claude(
@@ -754,16 +805,21 @@ class AICascade:
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as r:
                 if r.status != 200:
+                    err = (await r.text())[:200]
+                    print(f"[monitor/{tier}] HTTP {r.status}: {err}")
+                    _mark_tier_err("claude", f"HTTP {r.status}: {err}")
                     return None
                 data = await r.json()
                 raw = data["content"][0]["text"]
                 dec = _parse_ai_decision(raw, tier=tier)
                 if dec:
+                    _mark_tier_ok("claude")
                     _bm.record_decision(brain_key, self._mint, self._token_name,
                                         dec.action, dec.reason, self._last_pnl_pct, dec.confidence)
                 return dec
         except Exception as exc:
             print(f"[monitor/{tier}] {exc}")
+            _mark_tier_err("claude", str(exc))
             return None
 
 

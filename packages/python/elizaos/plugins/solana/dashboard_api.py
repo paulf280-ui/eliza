@@ -2148,6 +2148,16 @@ When adjusting a filter, always explain your reasoning based on the data above."
             mint_filter = request.query.get("mint", "").strip()
             mint_prefix = mint_filter[:12] if mint_filter else None
 
+            # Per-tier health (down/idle/ok) so the panel can show degraded
+            # status instead of an empty list when an API is rate-limited or
+            # over its spending cap. Tracked in trade_monitor._tier_health.
+            tier_health = {}
+            try:
+                from elizaos.plugins.solana.trade_monitor import get_tier_health
+                tier_health = get_tier_health()
+            except Exception:
+                pass
+
             brains = {}
             for brain in BRAIN_FILES.keys():
                 mem = load_brain_memory(brain)
@@ -2161,6 +2171,7 @@ When adjusting a filter, always explain your reasoning based on the data above."
                     "historical_summary": mem.get("historical_summary") or {},
                     "recent_decisions": decisions[-20:][::-1],  # newest first
                     "decision_count":   len(mem.get("recent_decisions", [])),
+                    "tier_health":      tier_health.get(brain) or {},
                 }
             return web.json_response({
                 "brains": brains,

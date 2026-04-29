@@ -32,6 +32,13 @@ interface HistoricalSummary {
   by_wallet?: Record<string, { wr: number; net_sol: number; trades: number }>
 }
 
+interface TierHealth {
+  status?: 'ok' | 'idle' | 'down'
+  last_ok_secs_ago?: number | null
+  last_err_secs_ago?: number | null
+  last_err_msg?: string
+}
+
 interface BrainData {
   last_updated?: string
   session_stats: SessionStats
@@ -39,6 +46,7 @@ interface BrainData {
   historical_summary: HistoricalSummary
   recent_decisions: Decision[]
   decision_count: number
+  tier_health?: TierHealth
 }
 
 interface BrainPayload {
@@ -89,6 +97,8 @@ function BrainColumn({ name, data, hasFilter }: { name: BrainName; data: BrainDa
   const awakeThresholdSecs = name === 'groq' ? 90 : name === 'gemini' ? 360 : 900
   const ageSecs = lastTs ? Math.max(0, Math.floor((Date.now() - new Date(lastTs).getTime()) / 1000)) : 99999
   const isAwake = ageSecs < awakeThresholdSecs
+  const health = data.tier_health
+  const isDown = health?.status === 'down'
 
   return (
     <div className="flex flex-col gap-2 min-w-0">
@@ -112,7 +122,9 @@ function BrainColumn({ name, data, hasFilter }: { name: BrainName; data: BrainDa
               style={{ background: 'rgba(0,0,0,0.3)', color: meta.color }}>
               {meta.tick}
             </span>
-            {isAwake ? (
+            {isDown ? (
+              <span className="text-[9px] font-bold text-red-400">● DOWN</span>
+            ) : isAwake ? (
               <span className="text-[9px] font-bold text-emerald-400">● AWAKE</span>
             ) : (
               <span className="text-[9px] text-zinc-600">○ idle</span>
@@ -121,6 +133,12 @@ function BrainColumn({ name, data, hasFilter }: { name: BrainName; data: BrainDa
           <div className="text-[9px] text-zinc-500 truncate">{meta.role}</div>
         </div>
       </div>
+      {isDown && health?.last_err_msg && (
+        <div className="text-[9px] text-red-400 px-2 py-1 rounded border border-red-500/30 bg-red-500/5 line-clamp-2"
+          title={health.last_err_msg}>
+          ⚠ {health.last_err_msg}
+        </div>
+      )}
 
       {/* Session stats */}
       <div className="flex items-center gap-2 text-[9px] text-zinc-500 px-2">
