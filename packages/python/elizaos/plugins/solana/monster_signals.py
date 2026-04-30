@@ -90,7 +90,7 @@ SERIAL_POLL_SECS          = 20     # poll deployer wallets every 20s — fast la
 SERIAL_GRAD_WAIT_SECS     = 60 * 60  # wait up to 1h for graduation
 SERIAL_GRAD_POLL_SECS     = 30     # re-check graduation every 30s
 
-LIFECYCLE_POLL_SECS       = 120    # DexScreener lifecycle scan every 2min
+LIFECYCLE_POLL_SECS       = 60     # DexScreener lifecycle scan every 60s (halved from 120s 2026-04-30 to widen entry-margin past TP)
 
 SIGNAL_DEDUP_WINDOW_SECS  = 60 * 60 * 12  # don't re-signal the same mint within 12h
 
@@ -178,8 +178,8 @@ _lifecycle_deferred: dict[str, dict] = {}  # mint → {"first_seen": ts, "snapsh
 LIFECYCLE_WATCHLIST_TTL_SECS    = 180 * 60   # drop deferred mints after 3h
 LIFECYCLE_WATCHLIST_MAX_AGE_SECS = 180 * 60  # extend age cap for deferred mints (vs 90min normal)
 LIFECYCLE_SNAPSHOT_WINDOW_SECS   = 30 * 60   # keep last 30min of price snapshots per mint
-LIFECYCLE_BOUNCE_MIN_PCT         = 5.0       # price must be ≥+5% above local low for bounce
-LIFECYCLE_M5_GOOD_LOW            = -3.0      # m5 in [-3%, +8%] = clean entry shape
+LIFECYCLE_BOUNCE_MIN_PCT         = 3.0       # price must be ≥+3% above local low for bounce (lowered from 5% 2026-04-30 — fire earlier on the recovery leg, liq-stable check still gates dead-cat bounces)
+LIFECYCLE_M5_GOOD_LOW            = -5.0      # m5 in [-5%, +8%] = clean entry shape (widened from -3% 2026-04-30 — catch deeper consolidation-dip entries; bounce-watchlist still defers tokens with m5 < -5%)
 LIFECYCLE_M5_GOOD_HIGH           = 8.0
 LIFECYCLE_POSTPEAK_H1_THRESHOLD  = 30.0      # h1 ≥ +30% with m5 ≤ 0 = post-peak rollover, defer
 
