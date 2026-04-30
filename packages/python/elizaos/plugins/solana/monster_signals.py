@@ -165,6 +165,48 @@ def _mark_signalled(mint: str) -> None:
     _recent_signalled[mint] = time.time()
 
 
+# ─── Helius webhook fast-path queue ──────────────────────────────────────
+# Populated by /api/webhooks/helius/pumpswap-grad in dashboard_api when
+# Helius pushes a CREATE_POOL event on the PumpSwap program. The lifecycle
+# scout drains this queue at the start of every cycle and fetches each
+# mint's data immediately rather than waiting for DexScreener's
+# search?q=pumpswap feed to surface it (which lags 30-90s).
+#
+# Each entry: {"mint": str, "pool": str, "ts": float, "received_at": float}
+# Capacity bounded so a misconfigured webhook can't OOM the bot.
+_helius_fresh_grad_queue: list[dict] = []
+_HELIUS_QUEUE_MAX_LEN = 500
+
+
+def push_fresh_grad(mint: str, pool: str, on_chain_ts: float | None = None) -> None:
+    """Called by the dashboard webhook receiver. Bounded list semantics —
+    drop oldest if we hit the cap (means lifecycle scout is starving)."""
+    import time as _time
+    if not mint:
+        return
+    rec = {
+        "mint": mint,
+        "pool": pool or "",
+        "ts": float(on_chain_ts) if on_chain_ts else _time.time(),
+        "received_at": _time.time(),
+    }
+    _helius_fresh_grad_queue.append(rec)
+    if len(_helius_fresh_grad_queue) > _HELIUS_QUEUE_MAX_LEN:
+        # Drop oldest. If we're hitting this, the scout is stuck or the
+        # webhook firehose is too aggressive — log it.
+        dropped = _helius_fresh_grad_queue.pop(0)
+        print(f"[helius-fast-path] ⚠️  queue full ({_HELIUS_QUEUE_MAX_LEN}), "
+              f"dropped oldest mint={dropped.get('mint','?')[:8]}")
+
+
+def drain_fresh_grad_queue() -> list[dict]:
+    """Called by lifecycle scout at the start of every cycle. Returns and
+    clears the queue atomically (single-threaded asyncio context)."""
+    drained = list(_helius_fresh_grad_queue)
+    _helius_fresh_grad_queue.clear()
+    return drained
+
+
 # ─── Lifecycle bounce-watchlist ─────────────────────────────────────────
 # Mints that pass all baseline filters but have a bad entry shape (m5 deeply
 # negative, h1 high + rolling over, m5 overheated) are deferred here instead
@@ -1128,13 +1170,54 @@ async def lifecycle_scout_loop(runtime: Any,
     while True:
         try:
             _lifecycle_cleanup_deferred()
+            # ── Drain Helius webhook fast-path queue first ─────────────────
+            # Fresh graduations pushed via /api/webhooks/helius/pumpswap-grad
+            # are merged with the regular DexScreener feed below. We resolve
+            # each fresh-grad mint via the bulk tokens endpoint so the rest
+            # of the pipeline sees them as standard DexScreener pair entries.
+            fresh_grads = drain_fresh_grad_queue()
+            fresh_grad_pairs: list[dict] = []
+            if fresh_grads:
+                fresh_mints = [g.get("mint") for g in fresh_grads if g.get("mint")]
+                if fresh_mints:
+                    chunk = ",".join(fresh_mints[:30])
+                    try:
+                        async with session.get(
+                            f"https://api.dexscreener.com/latest/dex/tokens/{chunk}",
+                            timeout=aiohttp.ClientTimeout(total=10),
+                        ) as r_fg:
+                            if r_fg.status == 200:
+                                d_fg = await r_fg.json()
+                                # Keep only the highest-liq pump-amm pair per mint
+                                by_mint: dict[str, dict] = {}
+                                for p in (d_fg.get("pairs") or []):
+                                    if (p.get("dexId") or "").lower() not in ("pumpswap", "pump-amm"):
+                                        continue
+                                    m = (p.get("baseToken") or {}).get("address")
+                                    if not m:
+                                        continue
+                                    liq = float((p.get("liquidity") or {}).get("usd") or 0)
+                                    if m not in by_mint or liq > float((by_mint[m].get("liquidity") or {}).get("usd") or 0):
+                                        by_mint[m] = p
+                                fresh_grad_pairs = list(by_mint.values())
+                                print(f"[monster-lifecycle] 📬 webhook fast-path: "
+                                      f"{len(fresh_grads)} mints received, "
+                                      f"{len(fresh_grad_pairs)} resolved to pump-amm pairs")
+                    except Exception as _fg_err:
+                        print(f"[monster-lifecycle] webhook resolve error: {_fg_err}")
+
             pairs = await _recent_pumpswap_profiles(session)
+            # Webhook-sourced pairs go FIRST so any matching mint is evaluated
+            # before the DexScreener-sourced ones; same-mint dedup happens via
+            # _recently_signalled inside the loop.
+            pairs = fresh_grad_pairs + pairs
             now_ms = time.time() * 1000
             cycle_seen = 0
             cycle_in_age_window = 0
             cycle_passed_baseline = 0
             cycle_added_to_watchlist = 0
             cycle_entered = 0
+            cycle_fresh_grads = len(fresh_grad_pairs)
             for p in pairs:
                 try:
                     dex_id = (p.get("dexId") or "").lower()
@@ -1332,6 +1415,7 @@ async def lifecycle_scout_loop(runtime: Any,
             # patiently waiting for bounce confirmation.
             print(
                 f"[monster-lifecycle] cycle: candidates={cycle_seen} "
+                f"fresh_grads={cycle_fresh_grads} "
                 f"in_age_window={cycle_in_age_window} "
                 f"passed_baseline={cycle_passed_baseline} "
                 f"watchlisted={cycle_added_to_watchlist} "

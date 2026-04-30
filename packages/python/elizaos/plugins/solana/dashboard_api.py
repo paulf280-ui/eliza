@@ -2182,6 +2182,83 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
     app.router.add_get("/api/brain-memory", handle_brain_memory)
 
+    # ── Helius webhook receiver: fresh PumpSwap pool creations ────────────
+    # When a token graduates from the pump.fun bonding curve, a CREATE_POOL
+    # event fires on the PumpSwap program. Helius pushes the event to this
+    # endpoint within seconds; we extract the mint and queue it for the
+    # lifecycle scout to evaluate at next cycle.
+    #
+    # Auth: the X-Helius-Auth header must match HELIUS_WEBHOOK_AUTH env var.
+    # If env unset, the endpoint accepts unauthenticated POSTs but logs a
+    # warning — set the env in production.
+    PUMP_AMM_PROGRAM_ID = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
+
+    async def handle_helius_pumpswap_grad(request: web.Request) -> web.Response:
+        try:
+            expected_auth = os.getenv("HELIUS_WEBHOOK_AUTH", "").strip()
+            if expected_auth:
+                provided = request.headers.get("Authorization", "").strip()
+                if provided != expected_auth:
+                    print(f"[helius-webhook] ❌ auth mismatch — provided header rejected")
+                    return web.json_response({"error": "unauthorized"}, status=401)
+            payload = await request.json()
+            # Helius enhanced webhooks send a list of events. Each event has
+            # `description`, `type`, `accountData`, `tokenTransfers`, etc.
+            events = payload if isinstance(payload, list) else [payload]
+            from elizaos.plugins.solana.monster_signals import push_fresh_grad
+
+            queued = 0
+            for ev in events:
+                if not isinstance(ev, dict):
+                    continue
+                # Only act on pool-creation events touching the PumpSwap program.
+                # Defensive: accept either explicit type=CREATE_POOL or any
+                # event involving the PumpSwap program with token transfers.
+                ev_type = (ev.get("type") or "").upper()
+                instructions = ev.get("instructions") or []
+                touches_pump_amm = any(
+                    (i.get("programId") == PUMP_AMM_PROGRAM_ID)
+                    for i in instructions
+                ) or any(
+                    (acc.get("account") == PUMP_AMM_PROGRAM_ID)
+                    for acc in (ev.get("accountData") or [])
+                )
+                if ev_type not in ("CREATE_POOL", "ANY", "UNKNOWN") and not touches_pump_amm:
+                    continue
+                # Extract the mint — it's the non-WSOL side of tokenTransfers,
+                # or the first non-system account in accountData.
+                mint = None
+                for tt in (ev.get("tokenTransfers") or []):
+                    candidate = tt.get("mint")
+                    if candidate and candidate not in (
+                        "So11111111111111111111111111111111111111112",  # WSOL
+                    ):
+                        mint = candidate
+                        break
+                if not mint:
+                    continue
+                pool = ""
+                # Best-effort pool address extraction from accountData; the
+                # exact field name depends on Helius enhanced parser version.
+                for acc in (ev.get("accountData") or []):
+                    addr = acc.get("account") or ""
+                    if addr and addr != PUMP_AMM_PROGRAM_ID and len(addr) == 44:
+                        pool = addr
+                        break
+                on_chain_ts = ev.get("timestamp") or ev.get("blockTime")
+                push_fresh_grad(mint, pool, float(on_chain_ts) if on_chain_ts else None)
+                queued += 1
+                print(f"[helius-webhook] 📬 fresh grad queued: mint={mint[:8]}... "
+                      f"pool={pool[:8] if pool else '?'} ts={on_chain_ts}")
+            return web.json_response({"queued": queued})
+        except Exception as exc:
+            print(f"[helius-webhook] error: {exc}")
+            # Return 200 so Helius doesn't retry-storm on a parse bug — we'd
+            # rather drop one event than have N replays compound the issue.
+            return web.json_response({"error": str(exc), "queued": 0})
+
+    app.router.add_post("/api/webhooks/helius/pumpswap-grad", handle_helius_pumpswap_grad)
+
     app.router.add_get("/ws", handle_ws)
 
     if os.path.isdir(dashboard_dist):
