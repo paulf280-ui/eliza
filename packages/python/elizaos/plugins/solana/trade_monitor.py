@@ -571,6 +571,11 @@ class AICascade:
         self._last_gemini = 0.0
         self._last_sonnet = 0.0
         self._last_opus   = 0.0
+        # Skip-until: skip API calls until this wall-clock time. Set on
+        # transient (5xx/429 → +60s) or hard (4xx → +1h) failures so we
+        # stop hammering an overloaded or capped endpoint at every tick.
+        self._gemini_skip_until = 0.0
+        self._claude_skip_until = 0.0
         # Set by TradeMonitor before each evaluate() call
         self._mint:        str   = ""
         self._token_name:  str   = ""
@@ -634,7 +639,9 @@ class AICascade:
                     decision = d   # propagate HOLD for logging
 
         # ── Tier 2: Gemini Flash (every 2min, age ≥ 60s) ────────────────────
-        if now - self._last_gemini >= self.GEMINI_INTERVAL and self._gemini_key and age_secs >= 60:
+        if (now - self._last_gemini >= self.GEMINI_INTERVAL
+                and self._gemini_key and age_secs >= 60
+                and now >= self._gemini_skip_until):
             d = await self._call_gemini(ctx, session)
             if d:
                 self._last_gemini = now
@@ -646,7 +653,9 @@ class AICascade:
         # Dropped age gate 180s → 60s so Opus engages on any trade that survives
         # the first minute. 122-trade history: only 10 trades lived >3min, meaning
         # the depth brain effectively never fired. Now it fires on ~30% of trades.
-        if now - self._last_sonnet >= self.SONNET_INTERVAL and self._anthropic_key and age_secs >= 60:
+        if (now - self._last_sonnet >= self.SONNET_INTERVAL
+                and self._anthropic_key and age_secs >= 60
+                and now >= self._claude_skip_until):
             d = await self._call_claude(ctx, session, model="claude-opus-4-7", tier="sonnet")
             if d:
                 self._last_sonnet = now
@@ -661,7 +670,7 @@ class AICascade:
             self._pending_escalation
         ) and (now - self._last_opus >= 120)
 
-        if _is_emergency and self._anthropic_key:
+        if _is_emergency and self._anthropic_key and now >= self._claude_skip_until:
             d = await self._call_claude(ctx, session, model="claude-opus-4-7", tier="opus")
             if d:
                 self._last_opus = now
@@ -744,7 +753,7 @@ class AICascade:
         full_prompt = f"{system_note}\n\n{prompt}"
         url = (
             f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"gemini-2.5-flash-lite:generateContent?key={self._gemini_key}"
+            f"gemini-2.5-flash:generateContent?key={self._gemini_key}"
         )
         body = {
             "contents": [{"parts": [{"text": full_prompt}]}],
@@ -761,18 +770,25 @@ class AICascade:
                     err = (await r.text())[:200]
                     print(f"[monitor/gemini] HTTP {r.status}: {err}")
                     _mark_tier_err("gemini", f"HTTP {r.status}: {err}")
+                    # Back off so we don't pummel an overloaded endpoint.
+                    # 5xx/429 = transient (60s); 4xx = persistent (1h).
+                    self._gemini_skip_until = time.time() + (
+                        60 if r.status in (429, 500, 502, 503, 504) else 3600
+                    )
                     return None
                 data = await r.json()
                 raw = data["candidates"][0]["content"]["parts"][0]["text"]
                 dec = _parse_ai_decision(raw, tier="gemini")
                 if dec:
                     _mark_tier_ok("gemini")
+                    self._gemini_skip_until = 0.0
                     _bm.record_decision("gemini", self._mint, self._token_name,
                                         dec.action, dec.reason, self._last_pnl_pct, dec.confidence)
                 return dec
         except Exception as exc:
             print(f"[monitor/gemini] {exc}")
             _mark_tier_err("gemini", str(exc))
+            self._gemini_skip_until = time.time() + 60
             return None
 
     async def _call_claude(
@@ -808,18 +824,25 @@ class AICascade:
                     err = (await r.text())[:200]
                     print(f"[monitor/{tier}] HTTP {r.status}: {err}")
                     _mark_tier_err("claude", f"HTTP {r.status}: {err}")
+                    # Anthropic 400 with "API usage limits" = spending cap;
+                    # back off 1h. Other 4xx also 1h. 5xx/429 = 60s.
+                    self._claude_skip_until = time.time() + (
+                        60 if r.status in (429, 500, 502, 503, 504) else 3600
+                    )
                     return None
                 data = await r.json()
                 raw = data["content"][0]["text"]
                 dec = _parse_ai_decision(raw, tier=tier)
                 if dec:
                     _mark_tier_ok("claude")
+                    self._claude_skip_until = 0.0
                     _bm.record_decision(brain_key, self._mint, self._token_name,
                                         dec.action, dec.reason, self._last_pnl_pct, dec.confidence)
                 return dec
         except Exception as exc:
             print(f"[monitor/{tier}] {exc}")
             _mark_tier_err("claude", str(exc))
+            self._claude_skip_until = time.time() + 60
             return None
 
 
