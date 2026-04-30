@@ -1246,6 +1246,29 @@ async def lifecycle_scout_loop(runtime: Any,
                         print(f"[monster-lifecycle] 🚫 {mint[:8]} creator={_creator[:8]} recently burned us — skip")
                         continue
 
+                    # Dev reputation tier (per pump.fun quant guide: creator history)
+                    # Hard-blocks blacklisted creators (2+ confirmed rugs); logs a
+                    # positive flag for proven/whitelisted creators so the trade
+                    # journal captures the signal. We don't loosen filters for
+                    # whitelisted creators — entry quality stays constant; this
+                    # is for retrospective analysis and future tier-aware sizing.
+                    _creator_tier = "unknown"
+                    if _creator:
+                        try:
+                            from elizaos.plugins.solana.dev_reputation import get_reputation
+                            _rep = get_reputation()
+                            if _rep.is_blacklisted(_creator):
+                                print(f"[monster-lifecycle] 🚫 {mint[:8]} creator={_creator[:8]} BLACKLISTED — skip")
+                                continue
+                            if _rep.is_proven(_creator):
+                                _creator_tier = "proven"
+                                print(f"[monster-lifecycle] ⭐ {mint[:8]} creator={_creator[:8]} PROVEN tier")
+                            elif _rep.is_whitelisted(_creator):
+                                _creator_tier = "whitelisted"
+                                print(f"[monster-lifecycle] ✓ {mint[:8]} creator={_creator[:8]} whitelisted")
+                        except Exception as _rep_err:
+                            print(f"[monster-lifecycle] dev_reputation lookup error: {_rep_err} — allowing")
+
                     # Rugcheck safety gate — catches unlocked LP, bundled/concentrated
                     # ownership that made it past our top-10 check, and other
                     # structural red flags. Same gate breakout scout uses.
@@ -1296,6 +1319,7 @@ async def lifecycle_scout_loop(runtime: Any,
                                   "holders_at_entry": _lc_holders,
                                   "buy_velocity_ratio": _lc_velocity,
                                   "creator": _creator,
+                                  "creator_tier": _creator_tier,
                                   "smart_money_overlap": await _try_smart_money_overlap(session, mint)},
                     )
                     cycle_entered += 1

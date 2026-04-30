@@ -9,59 +9,14 @@ from typing import TYPE_CHECKING, Any
 from elizaos.types import Service, ServiceTypeRegistry
 
 from elizaos.plugins.solana.constants import (
-    ASSOCIATED_TOKEN_PROGRAM,
     BONDING_CURVE_LAYOUT,
     BONDING_CURVE_LAYOUT_OFFSET,
-    COMPUTE_BUDGET_PROGRAM,
-    PUMP_FUN_BUY_DISCRIMINATOR,
-    PUMP_FUN_FEE_RECIPIENT,
     PUMP_FUN_PROGRAM_ID,
-    PUMP_FUN_SELL_DISCRIMINATOR,
-    RENT_SYSVAR,
-    SYSTEM_PROGRAM,
-    TOKEN_PROGRAM,
 )
 
 if TYPE_CHECKING:
     from elizaos.types import IAgentRuntime
 
-
-def _get_ata(owner_str: str, mint_str: str) -> Any:
-    """Derive Associated Token Account address."""
-    from solders.pubkey import Pubkey
-
-    owner = Pubkey.from_string(owner_str)
-    mint = Pubkey.from_string(mint_str)
-    token_prog = Pubkey.from_string(TOKEN_PROGRAM)
-    ata, _ = Pubkey.find_program_address(
-        [bytes(owner), bytes(token_prog), bytes(mint)],
-        Pubkey.from_string(ASSOCIATED_TOKEN_PROGRAM),
-    )
-    return ata
-
-
-def _set_compute_unit_limit(units: int) -> Any:
-    """Build ComputeBudget SetComputeUnitLimit instruction."""
-    from solders.instruction import Instruction
-    from solders.pubkey import Pubkey
-
-    return Instruction(
-        program_id=Pubkey.from_string(COMPUTE_BUDGET_PROGRAM),
-        accounts=[],
-        data=bytes([0x02]) + struct.pack("<I", units),
-    )
-
-
-def _set_compute_unit_price(microlamports: int) -> Any:
-    """Build ComputeBudget SetComputeUnitPrice instruction."""
-    from solders.instruction import Instruction
-    from solders.pubkey import Pubkey
-
-    return Instruction(
-        program_id=Pubkey.from_string(COMPUTE_BUDGET_PROGRAM),
-        accounts=[],
-        data=bytes([0x03]) + struct.pack("<Q", microlamports),
-    )
 
 
 class PumpFunService(Service):
@@ -79,7 +34,14 @@ class PumpFunService(Service):
     async def start(cls, runtime: IAgentRuntime) -> PumpFunService:
         service = cls()
         service._runtime = runtime
-        service._helius_api_key = os.getenv("HELIUS_API_KEY", "")
+        # Prefer explicit HELIUS_API_KEY; fall back to extracting it from the
+        # RPC URL (which is formatted as "https://...helius-rpc.com/?api-key=<KEY>")
+        key = os.getenv("HELIUS_API_KEY", "")
+        if not key:
+            rpc_url = os.getenv("SOLANA_RPC_URL", "")
+            if "api-key=" in rpc_url:
+                key = rpc_url.split("api-key=", 1)[1].split("&")[0].strip()
+        service._helius_api_key = key
         runtime.logger.info(
             "PumpFunService started",
             src="service:pump_fun",
@@ -216,126 +178,149 @@ class PumpFunService(Service):
 
     # ----------------------------------------------------------------- writing
 
-    async def buy(self, mint: str, sol_amount: float, slippage: float = 0.01) -> str:
-        """Buy a token on the pump.fun bonding curve. Returns transaction signature."""
-        from solders.instruction import AccountMeta, Instruction
-        from solders.pubkey import Pubkey
-        from solders.transaction import Transaction
+    _PUMPPORTAL_URL = "https://pumpportal.fun/api/trade-local"
+
+    async def _pumpportal_trade(
+        self,
+        action: str,
+        mint: str,
+        amount: float | int | str,
+        denominated_in_sol: bool,
+        slippage_pct: int,
+        pool: str,
+        priority_fee: float = 0.005,
+    ) -> str:
+        """Call pumpportal.fun to get a pre-built transaction, sign it, and submit.
+
+        pumpportal handles all pump.fun v2 Token-2022 account derivation
+        (17 complex accounts including per-mint PDAs with unknown seeds) so we
+        don't have to. The returned VersionedTransaction just needs signing.
+        """
+        import aiohttp
+        from solders.transaction import VersionedTransaction
 
         wallet_svc = self._wallet_service()
-        user_pubkey = Pubkey.from_string(wallet_svc.get_public_key())
-        mint_pubkey = Pubkey.from_string(mint)
-        program_id = Pubkey.from_string(PUMP_FUN_PROGRAM_ID)
+        keypair = wallet_svc.get_keypair()
+        if keypair is None:
+            raise RuntimeError("Wallet keypair not available (read-only mode)")
 
-        # Derive PDAs
-        global_pda, _ = Pubkey.find_program_address([b"global"], program_id)
-        bc_pda, _ = Pubkey.find_program_address(
-            [b"bonding-curve", bytes(mint_pubkey)], program_id
+        payload = {
+            "publicKey": wallet_svc.get_public_key(),
+            "action": action,
+            "mint": mint,
+            "amount": amount,
+            "denominatedInSol": "true" if denominated_in_sol else "false",
+            "slippage": slippage_pct,
+            "priorityFee": priority_fee,  # caller controls fee; default 0.005 SOL (raised from 0.002 2026-04-30 per pump.fun quant guide for landing reliability on contested blockspace)
+            "pool": pool,
+        }
+
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=8)
+        ) as session:
+            async with session.post(self._PUMPPORTAL_URL, json=payload) as resp:
+                if resp.status != 200:
+                    text = await resp.text()
+                    # If bonding curve is gone (token graduated), auto-retry with pump-amm
+                    if pool == "pump" and ("migrated" in text.lower() or action == "sell") and action in ("buy", "sell"):
+                        # For sells on pump pool: token may have graduated → try pump-amm
+                        payload["pool"] = "pump-amm"
+                        async with session.post(self._PUMPPORTAL_URL, json=payload) as resp2:
+                            if resp2.status != 200:
+                                text2 = await resp2.text()
+                                raise RuntimeError(
+                                    f"pumpportal {action} failed HTTP {resp2.status}: {text2[:200]}"
+                                )
+                            tx_bytes = await resp2.read()
+                    elif pool == "pump-amm" and action == "sell":
+                        # pump-amm sell failed — try legacy "pump" pool as fallback
+                        payload["pool"] = "pump"
+                        async with session.post(self._PUMPPORTAL_URL, json=payload) as resp2:
+                            if resp2.status != 200:
+                                text2 = await resp2.text()
+                                raise RuntimeError(
+                                    f"pumpportal {action} (pump fallback) failed HTTP {resp2.status}: {text2[:200]}"
+                                )
+                            tx_bytes = await resp2.read()
+                    else:
+                        raise RuntimeError(
+                            f"pumpportal {action} failed HTTP {resp.status}: {text[:200]}"
+                        )
+                else:
+                    tx_bytes = await resp.read()
+
+        vtx = VersionedTransaction.from_bytes(tx_bytes)
+        signed_vtx = VersionedTransaction(vtx.message, [keypair])
+        signed_bytes = bytes(signed_vtx)
+
+        # Pre-flight simulation with current state (replaces blockhash, skips sig check).
+        # Catches BondingCurveComplete (error 6005 / 0x1775) before wasting priority fees.
+        if pool == "pump" and action == "buy":
+            sim = await wallet_svc.rpc.simulate_transaction(signed_bytes)
+            err = sim.get("err")
+            if err:
+                inner = err.get("InstructionError") if isinstance(err, dict) else None
+                is_bc_complete = (
+                    isinstance(inner, list)
+                    and len(inner) > 1
+                    and isinstance(inner[1], dict)
+                    and inner[1].get("Custom") == 6005
+                )
+                if is_bc_complete:
+                    # Token graduated — retry with PumpSwap (pump-amm) pool
+                    payload["pool"] = "pump-amm"
+                    async with aiohttp.ClientSession(
+                        timeout=aiohttp.ClientTimeout(total=15)
+                    ) as session2:
+                        async with session2.post(self._PUMPPORTAL_URL, json=payload) as resp2:
+                            if resp2.status != 200:
+                                text2 = await resp2.text()
+                                raise RuntimeError(
+                                    f"pumpportal buy (pump-amm retry) failed HTTP {resp2.status}: {text2[:200]}"
+                                )
+                            tx_bytes2 = await resp2.read()
+                    vtx2 = VersionedTransaction.from_bytes(tx_bytes2)
+                    signed_bytes = bytes(VersionedTransaction(vtx2.message, [keypair]))
+                elif err:
+                    raise RuntimeError(f"pumpportal {action} simulation failed: {err}")
+
+        sig = await wallet_svc.rpc.send_transaction(signed_bytes)
+        # Confirm on-chain — raises if tx failed, preventing ghost trade logging
+        await wallet_svc.rpc.confirm_transaction(sig, timeout=35)
+        return sig
+
+    async def buy(
+        self, mint: str, sol_amount: float, slippage: float = 0.10, pool: str = "pump"
+    ) -> str:
+        """Buy a token via pumpportal. Returns transaction signature.
+
+        pool: "pump" (bonding curve), "pump-amm" (PumpSwap/graduated),
+              "raydium" (Raydium AMM)
+        """
+        slippage_pct = max(1, int(slippage * 100))
+        return await self._pumpportal_trade(
+            action="buy",
+            mint=mint,
+            amount=sol_amount,
+            denominated_in_sol=True,
+            slippage_pct=slippage_pct,
+            pool=pool,
         )
-        event_auth_pda, _ = Pubkey.find_program_address([b"__event_authority"], program_id)
 
-        # Derive ATAs
-        assoc_bc = _get_ata(str(bc_pda), mint)
-        assoc_user = _get_ata(str(user_pubkey), mint)
+    async def sell(
+        self, mint: str, token_amount: int, slippage: float = 0.10, pool: str = "pump"
+    ) -> str:
+        """Sell tokens via pumpportal. Returns transaction signature.
 
-        # Fetch bonding curve to compute token amount
-        bc_data = await self.get_bonding_curve(mint)
-        if not bc_data:
-            raise RuntimeError(f"Could not fetch bonding curve for {mint}")
-
-        lamports_per_sol = 1_000_000_000
-        sol_lamports = int(sol_amount * lamports_per_sol)
-        max_sol_lamports = int(sol_lamports * (1 + slippage))
-
-        # Estimate token amount from virtual reserves
-        vt = bc_data["virtual_tokens"] * 1_000_000  # back to raw
-        vs = bc_data["virtual_sol"] * lamports_per_sol  # back to lamports
-        if vs + sol_lamports > 0:
-            token_amount = int(vt * sol_lamports / (vs + sol_lamports))
-        else:
-            token_amount = 0
-        token_amount = int(token_amount * (1 - slippage))  # apply slippage
-
-        # Build instruction data
-        data = PUMP_FUN_BUY_DISCRIMINATOR + struct.pack("<Q", token_amount) + struct.pack("<Q", max_sol_lamports)
-
-        accounts = [
-            AccountMeta(pubkey=global_pda, is_signer=False, is_writable=False),
-            AccountMeta(pubkey=Pubkey.from_string(PUMP_FUN_FEE_RECIPIENT), is_signer=False, is_writable=True),
-            AccountMeta(pubkey=mint_pubkey, is_signer=False, is_writable=False),
-            AccountMeta(pubkey=bc_pda, is_signer=False, is_writable=True),
-            AccountMeta(pubkey=assoc_bc, is_signer=False, is_writable=True),
-            AccountMeta(pubkey=assoc_user, is_signer=False, is_writable=True),
-            AccountMeta(pubkey=user_pubkey, is_signer=True, is_writable=True),
-            AccountMeta(pubkey=Pubkey.from_string(SYSTEM_PROGRAM), is_signer=False, is_writable=False),
-            AccountMeta(pubkey=Pubkey.from_string(TOKEN_PROGRAM), is_signer=False, is_writable=False),
-            AccountMeta(pubkey=Pubkey.from_string(RENT_SYSVAR), is_signer=False, is_writable=False),
-            AccountMeta(pubkey=event_auth_pda, is_signer=False, is_writable=False),
-            AccountMeta(pubkey=program_id, is_signer=False, is_writable=False),
-        ]
-
-        buy_ix = Instruction(program_id=program_id, data=bytes(data), accounts=accounts)
-        cu_limit_ix = _set_compute_unit_limit(200_000)
-        cu_price_ix = _set_compute_unit_price(1_000_000)
-
-        tx = Transaction.new_with_payer([cu_limit_ix, cu_price_ix, buy_ix], user_pubkey)
-        return await wallet_svc.sign_and_send(tx)
-
-    async def sell(self, mint: str, token_amount: int, slippage: float = 0.01) -> str:
-        """Sell tokens on the pump.fun bonding curve. Returns transaction signature."""
-        from solders.instruction import AccountMeta, Instruction
-        from solders.pubkey import Pubkey
-        from solders.transaction import Transaction
-
-        wallet_svc = self._wallet_service()
-        user_pubkey = Pubkey.from_string(wallet_svc.get_public_key())
-        mint_pubkey = Pubkey.from_string(mint)
-        program_id = Pubkey.from_string(PUMP_FUN_PROGRAM_ID)
-
-        # Derive PDAs
-        global_pda, _ = Pubkey.find_program_address([b"global"], program_id)
-        bc_pda, _ = Pubkey.find_program_address(
-            [b"bonding-curve", bytes(mint_pubkey)], program_id
+        pool: "pump" (bonding curve), "pump-amm" (PumpSwap/graduated),
+              "raydium" (Raydium AMM)
+        """
+        slippage_pct = max(1, int(slippage * 100))
+        return await self._pumpportal_trade(
+            action="sell",
+            mint=mint,
+            amount=token_amount,
+            denominated_in_sol=False,
+            slippage_pct=slippage_pct,
+            pool=pool,
         )
-        event_auth_pda, _ = Pubkey.find_program_address([b"__event_authority"], program_id)
-
-        # Derive ATAs
-        assoc_bc = _get_ata(str(bc_pda), mint)
-        assoc_user = _get_ata(str(user_pubkey), mint)
-
-        # Compute min SOL output from bonding curve
-        bc_data = await self.get_bonding_curve(mint)
-        lamports_per_sol = 1_000_000_000
-        if bc_data:
-            vt = bc_data["virtual_tokens"] * 1_000_000
-            vs = bc_data["virtual_sol"] * lamports_per_sol
-            if vt - token_amount > 0:
-                sol_out = int(vs * token_amount / vt)
-            else:
-                sol_out = 0
-            min_sol_lamports = int(sol_out * (1 - slippage))
-        else:
-            min_sol_lamports = 0
-
-        data = PUMP_FUN_SELL_DISCRIMINATOR + struct.pack("<Q", token_amount) + struct.pack("<Q", min_sol_lamports)
-
-        accounts = [
-            AccountMeta(pubkey=global_pda, is_signer=False, is_writable=False),
-            AccountMeta(pubkey=Pubkey.from_string(PUMP_FUN_FEE_RECIPIENT), is_signer=False, is_writable=True),
-            AccountMeta(pubkey=mint_pubkey, is_signer=False, is_writable=False),
-            AccountMeta(pubkey=bc_pda, is_signer=False, is_writable=True),
-            AccountMeta(pubkey=assoc_bc, is_signer=False, is_writable=True),
-            AccountMeta(pubkey=assoc_user, is_signer=False, is_writable=True),
-            AccountMeta(pubkey=user_pubkey, is_signer=True, is_writable=True),
-            AccountMeta(pubkey=Pubkey.from_string(SYSTEM_PROGRAM), is_signer=False, is_writable=False),
-            AccountMeta(pubkey=Pubkey.from_string(TOKEN_PROGRAM), is_signer=False, is_writable=False),
-            AccountMeta(pubkey=event_auth_pda, is_signer=False, is_writable=False),
-            AccountMeta(pubkey=program_id, is_signer=False, is_writable=False),
-        ]
-
-        sell_ix = Instruction(program_id=program_id, data=bytes(data), accounts=accounts)
-        cu_limit_ix = _set_compute_unit_limit(200_000)
-        cu_price_ix = _set_compute_unit_price(1_000_000)
-
-        tx = Transaction.new_with_payer([cu_limit_ix, cu_price_ix, sell_ix], user_pubkey)
-        return await wallet_svc.sign_and_send(tx)

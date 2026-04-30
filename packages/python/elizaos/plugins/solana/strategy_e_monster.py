@@ -743,6 +743,34 @@ async def _apply_exit(mint: str, reason: str, sell_fraction: float, runtime: Any
         except Exception as _le_err:
             print(f"[monster] learning_engine record failed: {_le_err}")
 
+        # ── Dev reputation: record outcome per creator wallet ──
+        # Builds the proven/whitelisted/blacklisted tier ladder over time.
+        # Auto-promotes after 2 wins (zero rugs) → PROVEN; auto-blacklists
+        # after 2 confirmed rugs. Classification thresholds match
+        # dev_reputation: pnl ≤ -50% in <120s = rug, ≥ +5% = win, else loss.
+        try:
+            _meta = pos.get("metadata") or {}
+            _creator_wallet = _meta.get("creator")
+            if _creator_wallet:
+                from elizaos.plugins.solana.dev_reputation import get_reputation
+                _hold_s = max(0.0, now - float(pos.get("entry_ts") or now))
+                if final_pnl_pct <= -50.0 and _hold_s < 120:
+                    _outcome_tag = "rug"
+                elif final_pnl_pct >= 5.0:
+                    _outcome_tag = "win"
+                else:
+                    _outcome_tag = "loss"
+                get_reputation().record_outcome(
+                    wallet=_creator_wallet,
+                    mint=mint,
+                    outcome=_outcome_tag,
+                    pnl_pct=final_pnl_pct / 100.0,  # dev_reputation uses fraction not percent
+                    hold_secs=_hold_s,
+                    dex=pos.get("dex", "pump-amm"),
+                )
+        except Exception as _rep_err:
+            print(f"[monster] dev_reputation record failed: {_rep_err}")
+
         # Resolve all PENDING brain decisions for this mint so each brain
         # builds real learned_patterns from its own track record. Without
         # this, brains stay in cold-start and show only 2 seed patterns.
