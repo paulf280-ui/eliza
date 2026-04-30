@@ -703,7 +703,7 @@ class AICascade:
         patterns = _get_learned_patterns(self._strategy_hint(ctx))
         brain_ctx = _bm.brain_memory_as_prompt("groq")
         system_note = (
-            "You are a Solana meme-coin trading exit advisor. Respond with JSON only.\n"
+            "You are a Solana meme-coin trading exit advisor. Respond with a single JSON object only — no prose, no markdown fences. The JSON must contain action (HOLD|SELL|WATCH), confidence (0.0-1.0), reason, and urgency (low|medium|high).\n"
             + patterns + brain_ctx
         )
         prompt_tmpl = _METEORA_HOLD_SELL_PROMPT if is_meteora else _HOLD_SELL_PROMPT
@@ -717,8 +717,13 @@ class AICascade:
                     "model": "llama-3.3-70b-versatile",
                     "messages": [{"role": "user", "content": full_prompt}],
                     "temperature": 0.1,
-                    "max_tokens": 150,
-                    "response_format": {"type": "json_object"},
+                    "max_tokens": 300,
+                    # Dropped response_format=json_object: Groq's strict mode
+                    # was rejecting valid model outputs with HTTP 400
+                    # "json_validate_failed" — happened on every call once
+                    # the prompt grew (G6 PULLBACK_SHAPE + 3 few-shot
+                    # examples). The lenient _parse_ai_decision regex-
+                    # extracts JSON from prose-wrapped output as a backstop.
                 },
                 timeout=aiohttp.ClientTimeout(total=10),
             ) as r:
@@ -1264,14 +1269,44 @@ def _calc_drawdown(pos: dict) -> float | None:
 
 
 def _parse_ai_decision(raw: str, tier: str) -> AIDecision | None:
-    """Parse AI JSON response into an AIDecision. Lenient parsing."""
+    """Parse AI JSON response into an AIDecision. Lenient parsing.
+
+    Order of attempts:
+      1. Strip markdown code fences and try json.loads on the whole thing.
+      2. Regex-extract the first {...} block and try json.loads on that.
+      3. Give up (return None — the cascade just retries on next tick).
+    """
+    text = (raw or "").strip()
+    if not text:
+        return None
+    # Strip markdown code fences if present
+    if text.startswith("```"):
+        lines = text.split("\n")
+        text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+
+    d: dict | None = None
     try:
-        # Strip markdown code fences if present
-        text = raw.strip()
-        if text.startswith("```"):
-            lines = text.split("\n")
-            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-        d = json.loads(text)
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            d = parsed
+    except Exception:
+        # Fallback: extract the first balanced {...} JSON object from the
+        # text and try that. Handles prose-wrapped JSON outputs which Groq
+        # sometimes produces when not in strict json_object mode.
+        import re
+        match = re.search(r"\{(?:[^{}]|(?:\{[^{}]*\}))*\}", text, re.DOTALL)
+        if match:
+            try:
+                parsed = json.loads(match.group(0))
+                if isinstance(parsed, dict):
+                    d = parsed
+            except Exception:
+                d = None
+
+    if d is None:
+        return None
+
+    try:
         action     = str(d.get("action", "HOLD")).upper()
         confidence = float(d.get("confidence", 0.5))
         reason     = str(d.get("reason", ""))[:200]
