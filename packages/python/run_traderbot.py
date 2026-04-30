@@ -9401,17 +9401,32 @@ async def main():
     grad_confirm_task = asyncio.create_task(graduation_confirmation_loop(runtime))  # Strategy B confirmation timer
     raydium_task  = asyncio.create_task(raydium_scout_loop(runtime)) if (_strategy_c or _strategy_d) else None  # Strategy C + D (Meteora)
     monster_task  = asyncio.create_task(monster_scanner_loop(runtime))  # Monster scanner (logs when disabled)
+    # BC strategy (pre-graduation bonding curve lane) — gated by BC_STRATEGY_ENABLED.
+    # Scaffold only at present; loop refuses to start unless infra (Geyser
+    # gRPC URL) is configured. Import is lazy so the dep isn't loaded when
+    # the lane is off, matching the copy-trade pattern below.
+    bc_strategy_task = None
+    if os.getenv("BC_STRATEGY_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on"):
+        try:
+            from elizaos.plugins.solana.bc_strategy.loop import bc_strategy_loop as _run_bc
+            bc_strategy_task = asyncio.create_task(_run_bc(runtime))
+        except Exception as _bc_exc:
+            print(f"[warn] BC strategy failed to start: {_bc_exc}")
     social_task   = asyncio.create_task(social_momentum_loop(runtime))  # Strategy E — always runs in research mode, trades when enabled
     _grok_key_present = bool(os.getenv("GROK_API_KEY", "").strip())
     grok_sniper_task   = asyncio.create_task(grok_bc_sniper_loop(runtime)) if _grok_key_present else None  # Grok BC sniper — only when API key set
     smart_wallet_task  = asyncio.create_task(smart_wallet_loop(runtime))    # Strategy SW
-    # Copy-trade monitor — polls Axiom leaderboard wallets every 3s via Helius
-    try:
-        from elizaos.plugins.solana.axiom_copy_trader import run_copy_trade_monitor as _run_ct
-        copy_trade_task = asyncio.create_task(_run_ct(runtime))
-    except Exception as _ct_exc:
-        print(f"[warn] Copy-trade monitor failed to start: {_ct_exc}")
-        copy_trade_task = None
+    # Copy-trade monitor — gated by COPY_TRADE_ENABLED (default false; monster-only focus 2026-04-20)
+    copy_trade_task = None
+    if os.getenv("COPY_TRADE_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on"):
+        try:
+            from elizaos.plugins.solana.axiom_copy_trader import run_copy_trade_monitor as _run_ct
+            copy_trade_task = asyncio.create_task(_run_ct(runtime))
+        except Exception as _ct_exc:
+            print(f"[warn] Copy-trade monitor failed to start: {_ct_exc}")
+            copy_trade_task = None
+    else:
+        print("[copy-trade] disabled via COPY_TRADE_ENABLED=false — monster strategy only")
     reset_task    = asyncio.create_task(smart_reset_loop(runtime))
     status_task   = asyncio.create_task(status_log_loop(runtime))
     analysis_task    = asyncio.create_task(analysis_loop(runtime))
