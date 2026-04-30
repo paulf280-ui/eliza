@@ -34,7 +34,16 @@ class SolanaWalletService(Service):
 
         rpc_url = os.getenv("SOLANA_RPC_URL", "")
         ws_url = os.getenv("SOLANA_WS_URL", "")
-        service._rpc = SolanaRpcClient(rpc_url=rpc_url, ws_url=ws_url or None)
+        # Helius Sender — dual-routes sendTransaction to staked validators +
+        # Jito for faster inclusion. Other RPC methods stay on the primary.
+        sender_url = os.getenv("SOLANA_SENDER_URL", "") or None
+        service._rpc = SolanaRpcClient(
+            rpc_url=rpc_url,
+            ws_url=ws_url or None,
+            sender_url=sender_url,
+        )
+        if sender_url:
+            print(f"[wallet] Sender dual-submit enabled → {sender_url}")
 
         raw_key = os.getenv("SOLANA_PRIVATE_KEY", "")
         if raw_key:
@@ -99,9 +108,16 @@ class SolanaWalletService(Service):
     async def get_token_balances(self) -> list[dict[str, Any]]:
         if not self._public_key:
             return []
-        accounts = await self.rpc.get_token_accounts_by_owner(self._public_key)
+        from elizaos.plugins.solana.constants import TOKEN_PROGRAM_2022
+        import asyncio as _asyncio
+
+        # Query both SPL Token and Token-2022 programs (pump.fun v2 uses Token-2022)
+        accounts_spl, accounts_t22 = await _asyncio.gather(
+            self.rpc.get_token_accounts_by_owner(self._public_key),
+            self.rpc.get_token_accounts_by_owner(self._public_key, program_id=TOKEN_PROGRAM_2022),
+        )
         result = []
-        for acc in accounts:
+        for acc in accounts_spl + accounts_t22:
             info = (
                 acc.get("account", {})
                 .get("data", {})
