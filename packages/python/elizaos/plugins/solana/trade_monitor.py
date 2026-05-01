@@ -756,10 +756,6 @@ class AICascade:
         prompt_tmpl = _METEORA_HOLD_SELL_PROMPT if is_meteora else _HOLD_SELL_PROMPT
         prompt = prompt_tmpl.format(context=ctx)
         full_prompt = f"{system_note}\n\n{prompt}"
-        url = (
-            f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"gemini-2.5-flash:generateContent?key={self._gemini_key}"
-        )
         body = {
             "contents": [{"parts": [{"text": full_prompt}]}],
             "generationConfig": {
@@ -769,32 +765,44 @@ class AICascade:
                 "thinkingConfig": {"thinkingBudget": 0},
             },
         }
-        try:
-            async with session.post(url, json=body, timeout=aiohttp.ClientTimeout(total=15)) as r:
-                if r.status != 200:
-                    err = (await r.text())[:200]
-                    print(f"[monitor/gemini] HTTP {r.status}: {err}")
-                    _mark_tier_err("gemini", f"HTTP {r.status}: {err}")
-                    # Back off so we don't pummel an overloaded endpoint.
-                    # 5xx/429 = transient (60s); 4xx = persistent (1h).
-                    self._gemini_skip_until = time.time() + (
-                        60 if r.status in (429, 500, 502, 503, 504) else 3600
-                    )
-                    return None
-                data = await r.json()
-                raw = data["candidates"][0]["content"]["parts"][0]["text"]
-                dec = _parse_ai_decision(raw, tier="gemini")
-                if dec:
-                    _mark_tier_ok("gemini")
-                    self._gemini_skip_until = 0.0
-                    _bm.record_decision("gemini", self._mint, self._token_name,
-                                        dec.action, dec.reason, self._last_pnl_pct, dec.confidence)
-                return dec
-        except Exception as exc:
-            print(f"[monitor/gemini] {exc}")
-            _mark_tier_err("gemini", str(exc))
-            self._gemini_skip_until = time.time() + 60
-            return None
+        # Model fallback ladder: try the capable model first, fall back to the
+        # lighter one if Google returns 5xx/429 (gemini-2.5-flash sees demand
+        # spikes that gemini-2.5-flash-lite usually rides through). 4xx errors
+        # are persistent — bail out of the ladder immediately.
+        last_status = None
+        last_err = ""
+        for model in ("gemini-2.5-flash", "gemini-2.5-flash-lite"):
+            url = (
+                f"https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{model}:generateContent?key={self._gemini_key}"
+            )
+            try:
+                async with session.post(url, json=body, timeout=aiohttp.ClientTimeout(total=15)) as r:
+                    if r.status == 200:
+                        data = await r.json()
+                        raw = data["candidates"][0]["content"]["parts"][0]["text"]
+                        dec = _parse_ai_decision(raw, tier="gemini")
+                        if dec:
+                            _mark_tier_ok("gemini")
+                            self._gemini_skip_until = 0.0
+                            _bm.record_decision("gemini", self._mint, self._token_name,
+                                                dec.action, dec.reason, self._last_pnl_pct, dec.confidence)
+                        return dec
+                    last_status = r.status
+                    last_err = (await r.text())[:200]
+                    print(f"[monitor/gemini/{model}] HTTP {r.status}: {last_err}")
+                    if r.status not in (429, 500, 502, 503, 504):
+                        break  # persistent 4xx — don't waste the fallback
+            except Exception as exc:
+                last_err = str(exc)
+                print(f"[monitor/gemini/{model}] {exc}")
+                continue
+        # All ladder attempts failed.
+        _mark_tier_err("gemini", f"HTTP {last_status}: {last_err}" if last_status else last_err)
+        self._gemini_skip_until = time.time() + (
+            60 if last_status in (429, 500, 502, 503, 504, None) else 3600
+        )
+        return None
 
     async def _call_claude(
         self,

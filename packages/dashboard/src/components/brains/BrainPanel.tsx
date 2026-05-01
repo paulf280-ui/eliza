@@ -56,7 +56,7 @@ interface BrainPayload {
 
 const BRAIN_META: Record<BrainName, { label: string; role: string; tick: string; color: string; accent: string }> = {
   groq:   { label: 'GROQ',   role: 'Speed · llama-3.3-70b',   tick: '30s',  color: '#fb923c', accent: 'rgba(249,115,22,0.15)' },
-  gemini: { label: 'GEMINI', role: 'Analysis · gemini-2.0',   tick: '2m',   color: '#60a5fa', accent: 'rgba(59,130,246,0.15)' },
+  gemini: { label: 'GEMINI', role: 'Analysis · 2.5-flash → lite', tick: '2m',   color: '#60a5fa', accent: 'rgba(59,130,246,0.15)' },
   claude: { label: 'CLAUDE', role: 'Depth · sonnet',          tick: '5m',   color: '#a78bfa', accent: 'rgba(139,92,246,0.15)' },
 }
 
