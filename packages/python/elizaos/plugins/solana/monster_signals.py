@@ -224,6 +224,17 @@ LIFECYCLE_BOUNCE_MIN_PCT         = 3.0       # price must be ≥+3% above local 
 LIFECYCLE_M5_GOOD_LOW            = -5.0      # m5 in [-5%, +8%] = clean entry shape (widened from -3% 2026-04-30 — catch deeper consolidation-dip entries; bounce-watchlist still defers tokens with m5 < -5%)
 LIFECYCLE_M5_GOOD_HIGH           = 8.0
 LIFECYCLE_POSTPEAK_H1_THRESHOLD  = 30.0      # h1 ≥ +30% with m5 ≤ 0 = post-peak rollover, defer
+LIFECYCLE_MAX_M5_VOL_LIQ         = 3.0       # vol_m5/liq cap — same gate breakout scout uses (CCP 2026-04-30: vol/liq=4x flagged WASH on raydium-scout but bypassed on lifecycle_bounce → bought a wash-driven dead-cat bounce, -10%)
+
+# ── Bounce-watchlist entry gates (calibrated 2026-05-01 from on-chain swap data
+# of CCP/TRUTH/FOFAR + 23-trade monster outcome history). All apply only when
+# the bounce is firing from the watchlist (on_watch=True). CCP failed on FOUR
+# of these gates simultaneously; both winners (TRUTH +21%, FOFAR +21%) pass all.
+LIFECYCLE_BOUNCE_H1_MIN_PCT          = 0.0   # h1 must be net positive at bounce-confirm (winners +5 to +80%; CCP -2.6%)
+LIFECYCLE_BOUNCE_TOP10_MAX_PCT       = 13.5  # winner ceiling 12.53%; CCP 15.95%
+LIFECYCLE_BOUNCE_TOP1_MAX_PCT        = 2.0   # winner ceiling 1.74%; CCP 1.625% borderline
+LIFECYCLE_BOUNCE_M5_BUYS_MIN         = 20    # winners had 28-66 m5 buyers; CCP had 11
+LIFECYCLE_BOUNCE_M5_BUY_SELL_RATIO   = 1.5   # winners 1.66x to 9.3x; CCP 0.85x (more sells than buys = distribution pretending to be a bounce)
 
 
 def _lifecycle_record_snapshot(mint: str, price: float, m5: float, h1: float, liq: float) -> None:
@@ -1257,6 +1268,16 @@ async def lifecycle_scout_loop(runtime: Any,
                     if h1_change < LIFECYCLE_H1_CHANGE_MIN_PCT:
                         continue  # falling knife — token is mid-fade, don't catch
 
+                    # Wash-trading cap — vol_m5/liq > 3x is the same gate the
+                    # breakout scout uses; lifecycle_bounce was bypassing it.
+                    vol_m5_lc = float((p.get("volume") or {}).get("m5") or 0)
+                    if liq_usd > 0 and (vol_m5_lc / liq_usd) > LIFECYCLE_MAX_M5_VOL_LIQ:
+                        if on_watch:
+                            print(f"[monster-lifecycle] 🧼 {mint[:8]} wash-flagged "
+                                  f"vol_m5/liq={vol_m5_lc / liq_usd:.1f}x > {LIFECYCLE_MAX_M5_VOL_LIQ:.0f}x — drop watch")
+                            _lifecycle_deferred.pop(mint, None)
+                        continue
+
                     # ── Entry-shape gate (with bounce-watchlist) ─────────
                     # Instead of rejecting bad-shape tokens outright, defer
                     # them to a per-mint watchlist. On future scan cycles we
@@ -1271,6 +1292,44 @@ async def lifecycle_scout_loop(runtime: Any,
                         print(f"[monster-lifecycle] 👁 {mint[:8]} {shape} — {shape_reason} (watchlist)")
                         continue
                     if on_watch:
+                        # ── Empirical bounce-entry gates (data-validated 2026-05-01) ─
+                        # CCP failed on FOUR of these; both lifecycle_bounce winners
+                        # (TRUTH +21%, FOFAR +21%) pass all. See on-chain validation
+                        # in commit message.
+
+                        # Gate 1 — h1 must be net positive at bounce-confirm.
+                        # Winners had h1 ∈ [+4.9%, +80.8%]; CCP h1=-2.64% means the
+                        # bounce is a recovery off rollover, not a structural reentry.
+                        if h1_change < LIFECYCLE_BOUNCE_H1_MIN_PCT:
+                            print(f"[monster-lifecycle] 🪦 {mint[:8]} bounce-reject "
+                                  f"h1={h1_change:.1f}% < {LIFECYCLE_BOUNCE_H1_MIN_PCT}% "
+                                  f"(rollover from peak — drop watch)")
+                            _lifecycle_deferred.pop(mint, None)
+                            continue
+
+                        # Gate 2 — m5 buyer count must show real participation.
+                        # Winners had 28-66 unique m5 buyers; CCP had 11.
+                        # Gate 3 — m5 buy/sell ratio ≥ 1.5x. CCP had 11 buys vs 13
+                        # sells (0.85x = distribution wearing a buy mask). Winners:
+                        # TRUTH 9.3x, FOFAR 1.66x, EVA 3.5x.
+                        txns_m5 = (p.get("txns") or {}).get("m5") or {}
+                        m5_buys_n = int(txns_m5.get("buys") or 0)
+                        m5_sells_n = int(txns_m5.get("sells") or 0)
+                        if m5_buys_n < LIFECYCLE_BOUNCE_M5_BUYS_MIN:
+                            _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
+                            cycle_added_to_watchlist += 1
+                            print(f"[monster-lifecycle] 👁 {mint[:8]} weak bounce — "
+                                  f"m5_buys={m5_buys_n} < {LIFECYCLE_BOUNCE_M5_BUYS_MIN} (watchlist)")
+                            continue
+                        bs_ratio = (m5_buys_n / m5_sells_n) if m5_sells_n > 0 else float("inf")
+                        if bs_ratio < LIFECYCLE_BOUNCE_M5_BUY_SELL_RATIO:
+                            _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
+                            cycle_added_to_watchlist += 1
+                            print(f"[monster-lifecycle] 👁 {mint[:8]} distribution-shaped — "
+                                  f"m5 buys/sells={bs_ratio:.2f}x < {LIFECYCLE_BOUNCE_M5_BUY_SELL_RATIO}x "
+                                  f"({m5_buys_n}B/{m5_sells_n}S) (watchlist)")
+                            continue
+
                         bounced, bounce_pct = _lifecycle_bounce_confirmed(
                             mint, price_native, m5_change, liq_usd
                         )
@@ -1321,6 +1380,21 @@ async def lifecycle_scout_loop(runtime: Any,
                         continue
                     if t10 is not None and t10 >= MONSTER_TOP10_MAX_PCT:
                         continue  # TRADE-class: insiders hold >35% → dump liquidity
+                    # Bounce-path tighter holder caps — winners had top10 ≤ 12.53%
+                    # and top1 ≤ 1.74%. CCP entered at top10=15.95%, top1=1.625%
+                    # (borderline) and lost. Drop the watchlist entry — re-add only
+                    # if accumulation thins concentration later.
+                    if on_watch:
+                        if t1 is not None and t1 >= LIFECYCLE_BOUNCE_TOP1_MAX_PCT:
+                            print(f"[monster-lifecycle] 🪦 {mint[:8]} bounce-reject "
+                                  f"top1={t1}% > {LIFECYCLE_BOUNCE_TOP1_MAX_PCT}% (winner ceiling 1.74%)")
+                            _lifecycle_deferred.pop(mint, None)
+                            continue
+                        if t10 is not None and t10 >= LIFECYCLE_BOUNCE_TOP10_MAX_PCT:
+                            print(f"[monster-lifecycle] 🪦 {mint[:8]} bounce-reject "
+                                  f"top10={t10}% > {LIFECYCLE_BOUNCE_TOP10_MAX_PCT}% (winner ceiling 12.53%)")
+                            _lifecycle_deferred.pop(mint, None)
+                            continue
 
                     # Creator burn check — skip if this mint's creator lost us
                     # money on a prior trade in the last 48h.
