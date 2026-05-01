@@ -1061,6 +1061,23 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                             # despite Claude correctly calling SELL at -10.6%.
                             ai_allowed = False
                             gate_reason = ""
+
+                            # Peak-protection threshold: if this position was a
+                            # real winner at some point (peak ≥ +5%) AND we're
+                            # not in catastrophic territory (pnl > -10%), require
+                            # higher confidence from non-Claude tiers to exit.
+                            # EWON 2026-05-01: peak +10.7%, Claude held at +4%,
+                            # Groq sold at -2.1% with conf=0.85, then the price
+                            # recovered to +18% which would have hit our TP. The
+                            # deeper brain's HOLD signal deserves more weight on
+                            # previously-winning positions. Claude SELLs always
+                            # use the base 0.70 (we trust the depth tier).
+                            min_conf = 0.70
+                            if (tier != "claude"
+                                and peak_pnl >= 5.0
+                                and cur_pnl > -10.0):
+                                min_conf = 0.90
+
                             if tp1_fired:
                                 # tp1_fired implies a legacy partial-exit position
                                 # opened before the hard-TP migration. Keep the
@@ -1072,10 +1089,10 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                                     print(f"[monster] 💤 dormant-bag ignored AI SELL "
                                           f"{pos.get('token_name', mint[:8])} tier={tier} conf={conf:.2f} "
                                           f"pnl={cur_pnl:+.1f}% v_recovery={_vr:.2f}× (need 1.50×)")
-                                elif conf >= 0.70:
+                                elif conf >= min_conf:
                                     ai_allowed = True
                                     gate_reason = f"armed_moonbag_{tier}"
-                            elif conf >= 0.70:
+                            elif conf >= min_conf:
                                 ai_allowed = True
                                 gate_reason = f"brain_primary_{tier}_pnl{cur_pnl:+.0f}"
 
@@ -1085,9 +1102,10 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                                       f"tier={tier} conf={conf:.2f} pnl={cur_pnl:+.1f}% peak={peak_pnl:+.1f}% "
                                       f"gate={gate_reason} why={decision.reason[:80]}")
                             else:
-                                print(f"[monster] 🧠 AI sell signal below conf threshold "
+                                tag = "🛡 PEAK-PROTECT" if min_conf > 0.70 else "🧠 below threshold"
+                                print(f"[monster] {tag} AI sell signal blocked "
                                       f"{pos.get('token_name', mint[:8])} tier={tier} conf={conf:.2f} "
-                                      f"pnl={cur_pnl:+.1f}% peak={peak_pnl:+.1f}% (need conf≥0.70) "
+                                      f"pnl={cur_pnl:+.1f}% peak={peak_pnl:+.1f}% (need conf≥{min_conf:.2f}) "
                                       f"why={decision.reason[:80]}")
                     except Exception as _ai_err:
                         print(f"[monster] AI cascade error for {mint[:8]}: {_ai_err}")
