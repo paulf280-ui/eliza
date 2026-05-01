@@ -42,7 +42,7 @@ BRAIN_ROLES: dict[str, str] = {
         "SELL with confidence≥0.75 triggers immediate exit. You are first responder."
     ),
     "gemini": (
-        "GEMINI ANALYSIS BRAIN (gemini-2.0-flash). You fire every 2 minutes. "
+        "GEMINI ANALYSIS BRAIN (gemini-2.5-flash-lite). You fire every 2 minutes. "
         "Your job: confirm or override Groq's call with deeper pattern analysis. "
         "Check holder trends, liquidity shifts, momentum direction. SELL confidence≥0.70 exits."
     ),
@@ -280,6 +280,41 @@ def record_meteora_exit(
     save_brain_memory(brain, mem)
 
 
+def claude_recently_holding(mint: str, max_age_secs: int = 600) -> tuple[bool, float]:
+    """Did Claude's MOST RECENT decision on this mint say HOLD within the last
+    max_age_secs? Returns (is_holding, confidence). Used by strategy_e_monster's
+    brain gate as a veto on lower-tier SELL signals — if the depth tier is
+    actively holding, don't let Groq override.
+
+    Returns False if Claude's last decision on this mint was anything other than
+    HOLD (SELL, WATCH, or none), or if no recent decision exists.
+    """
+    try:
+        mem = load_brain_memory("claude")
+        decisions = mem.get("recent_decisions", []) or []
+        now = datetime.now(timezone.utc)
+        # Walk newest-first — recent_decisions is appended chronologically.
+        for d in reversed(decisions):
+            if (d.get("mint") or "")[:12] != mint[:12]:
+                continue
+            try:
+                ts_raw = d.get("ts", "")
+                # ISO format with timezone; tolerate Z suffix
+                ts = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
+                age = (now - ts).total_seconds()
+                if age > max_age_secs:
+                    return False, 0.0
+                if d.get("action") == "HOLD":
+                    return True, float(d.get("confidence") or 0.0)
+                # Most recent decision was SELL or WATCH — no veto
+                return False, 0.0
+            except Exception:
+                continue
+        return False, 0.0
+    except Exception:
+        return False, 0.0
+
+
 def brain_memory_as_prompt(brain: str) -> str:
     """Format this brain's memory as a compact system-prompt block (~600 chars).
 
@@ -350,11 +385,18 @@ def brain_memory_as_prompt(brain: str) -> str:
                 f"@ {d.get('pnl_pct_at_decision','?')}%  conf={d.get('confidence','?')}"
             )
 
-    # Top learned patterns
+    # Brain-specific learned patterns (YOUR own track record, not shared)
     if patterns:
-        lines.append("Your top patterns (from past trades):")
-        for p in patterns[:3]:
+        lines.append("YOUR independent patterns:")
+        for p in patterns[:6]:
             lines.append(f"  - {p}")
+
+    # Shared historical baseline (same across all brains — cross-brain context)
+    shared = mem.get("shared_context") or []
+    if shared:
+        lines.append("Shared historical baseline (across all brains):")
+        for s in shared[:3]:
+            lines.append(f"  - {s}")
 
     # Historical summary (from backfill — 119 closed trades as of 2026-04-18)
     hist = mem.get("historical_summary") or {}
@@ -405,6 +447,17 @@ def brain_memory_as_prompt(brain: str) -> str:
                 f"  {l.get('token','?')}: {l.get('outcome','?')} {l.get('pnl_pct','?'):+.1f}% "
                 f"liq={l.get('liq_trend','?')} holders={l.get('holder_trend','?')} → {l.get('exit_reason','?')}"
             )
+
+    # Scout-rejection stats — teaches the brain how tight each scout's filter
+    # is. If a scout is over-rejecting (false-positive-heavy), brains should
+    # ease up on aggressive SELL calls; if tight, trust the scout picks more.
+    try:
+        from elizaos.plugins.solana import rejection_tracker as _rt
+        _rej_block = _rt.get_brain_summary(lookback_hours=48.0)
+        if _rej_block:
+            lines.append(_rej_block)
+    except Exception:
+        pass
 
     lines.append("=== END MEMORY ===")
     return "\n".join(lines)
@@ -520,8 +573,9 @@ async def memory_refresh_loop() -> None:
             config_snap = _build_config_snapshot(lc_dict)
             pos_snap = _build_position_snapshot(_active_monitors, _paper_positions)
 
-            # Distil learned patterns from winning_patterns.json for each brain
-            _patterns = _load_winning_patterns()
+            # Shared historical baseline (same for every brain — it's the same trade
+            # data). Goes into shared_context, NOT learned_patterns.
+            _shared = _load_winning_patterns()
 
             # Build a per-brain peer summary: last 5 decisions from the OTHER brains.
             # This gives each brain "consciousness" of what its siblings recently saw,
@@ -536,8 +590,13 @@ async def memory_refresh_loop() -> None:
                 mem = load_brain_memory(brain)
                 mem["config_snapshot"] = config_snap
                 mem["open_positions"]  = pos_snap
-                if _patterns:
-                    mem["learned_patterns"] = _patterns[:8]
+                # Shared historical baseline (same across brains by design).
+                if _shared:
+                    mem["shared_context"] = _shared[:6]
+                # Brain-specific learned_patterns derived from THIS brain's own
+                # decision history — so Groq learns Groq's biases, Gemini learns
+                # Gemini's, Claude learns Claude's. No longer identical across brains.
+                mem["learned_patterns"] = _derive_brain_specific_patterns(brain, mem)
                 # peer_summary = recent decisions from the OTHER two brains
                 peers = {b: _brain_recent[b] for b in ("groq", "gemini", "claude") if b != brain}
                 mem["peer_summary"] = peers
@@ -556,6 +615,110 @@ async def memory_refresh_loop() -> None:
             break
         except Exception as e:
             print(f"[brain-memory] Refresh error: {e}")
+
+
+def _derive_brain_specific_patterns(brain: str, mem: dict) -> list[str]:
+    """Build patterns unique to THIS brain from its own decision history.
+
+    Each brain learns from its own track record: HOLD/SELL accuracy, best
+    pnl_pct buckets for correct calls, confidence calibration, and recurring
+    failure modes. The output is distinct per brain — Groq's patterns reflect
+    Groq's biases, not a shared corpus.
+    """
+    decisions: list = mem.get("recent_decisions") or []
+    # Only AI-made decisions — rule-engine events (SL/TP/wallet_exit) are shared
+    ai_calls = [
+        d for d in decisions
+        if (d.get("source") or "ai") != "rule_engine"
+        and d.get("outcome") not in ("PENDING", None)
+    ]
+    patterns: list[str] = []
+
+    # Brain self-identity — reminds each model who it is independently.
+    role_tag = {"groq": "SPEED", "gemini": "ANALYSIS", "claude": "DEPTH"}.get(brain, brain.upper())
+    patterns.append(
+        f"YOU ARE {brain.upper()} BRAIN ({role_tag}). Your patterns below come from YOUR "
+        f"own track record — not a shared corpus. Bring your independent view."
+    )
+
+    if len(ai_calls) < 3:
+        # Cold start — seed with role-appropriate prior guidance
+        seed = {
+            "groq":   "Cold start: you haven't resolved 3+ calls yet. Lean toward SELL confidence≥0.80 "
+                      "on any rug signal (liq drain, mass holder drop). Your value is catching rugs in <30s.",
+            "gemini": "Cold start: you haven't resolved 3+ calls yet. Your edge is confirming Groq's SELL "
+                      "or overriding with pattern context. Demand holder+liq alignment before HOLD.",
+            "claude": "Cold start: you haven't resolved 3+ calls yet. Your edge is strategic depth — "
+                      "only HOLD when accumulation (buys>sells, holders growing, liq growing) is clear.",
+        }
+        patterns.append(seed.get(brain, "Cold start — build your track record."))
+        return patterns
+
+    # Accuracy by action
+    holds = [d for d in ai_calls if d.get("action") in ("HOLD", "RUNNER", "WATCH")]
+    sells = [d for d in ai_calls if d.get("action") in ("SELL", "EXIT")]
+    hold_wins = [d for d in holds if d.get("outcome") == "TP_HIT" or (d.get("final_pnl_pct") or 0) > 0]
+    sell_saves = [d for d in sells if (d.get("final_pnl_pct") or 0) <= 0]  # saved us from a loss
+    premature_sells = [d for d in sells if (d.get("final_pnl_pct") or 0) > 5]  # exited a winner
+
+    if holds:
+        hold_acc = round(len(hold_wins) / len(holds) * 100, 0)
+        patterns.append(
+            f"Your HOLD calls: {len(hold_wins)}/{len(holds)} ended profitable ({hold_acc:.0f}% acc). "
+            + ("Your HOLDs are working — keep conviction." if hold_acc >= 50 else
+               "Your HOLDs under-perform — demand stronger signals before HOLD.")
+        )
+    if sells:
+        sell_acc = round(len(sell_saves) / len(sells) * 100, 0)
+        premature_rate = round(len(premature_sells) / len(sells) * 100, 0)
+        patterns.append(
+            f"Your SELL calls: {len(sell_saves)}/{len(sells)} avoided a loss ({sell_acc:.0f}% acc), "
+            f"but {len(premature_sells)}/{len(sells)} ({premature_rate:.0f}%) exited a winner too early."
+        )
+
+    # pnl_pct bucket where this brain's calls land best
+    win_by_bucket: dict[str, list[float]] = {}
+    for d in ai_calls:
+        p = d.get("pnl_pct_at_decision")
+        f = d.get("final_pnl_pct")
+        if p is None or f is None:
+            continue
+        if p < -10:
+            bucket = "crash(<-10%)"
+        elif p < 0:
+            bucket = "early_red(-10→0%)"
+        elif p < 10:
+            bucket = "mild_green(0→10%)"
+        elif p < 30:
+            bucket = "run(10→30%)"
+        else:
+            bucket = "moonbag(>30%)"
+        win_by_bucket.setdefault(bucket, []).append(f)
+
+    for bucket, finals in sorted(win_by_bucket.items(), key=lambda kv: -sum(kv[1])):
+        if len(finals) >= 2:
+            avg_f = round(sum(finals) / len(finals), 1)
+            patterns.append(
+                f"At pnl={bucket}: your calls finished avg {avg_f:+.1f}% on {len(finals)} trades."
+            )
+            if len(patterns) >= 5:
+                break
+
+    # Recent mistake — surface one concrete failure so the brain can reason about it
+    recent_misses = [
+        d for d in ai_calls[-15:]
+        if d.get("action") in ("HOLD", "RUNNER")
+        and (d.get("final_pnl_pct") or 0) < -5
+    ]
+    if recent_misses:
+        m = recent_misses[-1]
+        patterns.append(
+            f"Recent miss: you said {m.get('action')} on {m.get('token','?')} at "
+            f"{m.get('pnl_pct_at_decision','?')}% — it closed {m.get('final_pnl_pct','?')}%. "
+            "Consider what signal you overweighted."
+        )
+
+    return patterns[:6]
 
 
 def _load_winning_patterns() -> list[str]:

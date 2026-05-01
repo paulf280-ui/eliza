@@ -1078,6 +1078,23 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                                 and cur_pnl > -10.0):
                                 min_conf = 0.90
 
+                            # Claude-HOLD veto on lower tiers — extends below
+                            # the peak-protection band. PETS 2026-05-01 had
+                            # peak=0.0% so peak-protection didn't fire, but
+                            # Claude was on record HOLD at -1.9% and at -12.3%
+                            # right before Groq sold at -19.5%. The depth tier's
+                            # active HOLD deserves to override Groq even on
+                            # never-winning positions. Catastrophic floor (-25%)
+                            # is a separate exit and still fires regardless.
+                            claude_veto = False
+                            claude_veto_conf = 0.0
+                            if tier != "claude":
+                                try:
+                                    from elizaos.plugins.solana import brain_memory as _bm_v
+                                    claude_veto, claude_veto_conf = _bm_v.claude_recently_holding(mint, 600)
+                                except Exception:
+                                    pass
+
                             if tp1_fired:
                                 # tp1_fired implies a legacy partial-exit position
                                 # opened before the hard-TP migration. Keep the
@@ -1089,10 +1106,10 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                                     print(f"[monster] 💤 dormant-bag ignored AI SELL "
                                           f"{pos.get('token_name', mint[:8])} tier={tier} conf={conf:.2f} "
                                           f"pnl={cur_pnl:+.1f}% v_recovery={_vr:.2f}× (need 1.50×)")
-                                elif conf >= min_conf:
+                                elif conf >= min_conf and not claude_veto:
                                     ai_allowed = True
                                     gate_reason = f"armed_moonbag_{tier}"
-                            elif conf >= min_conf:
+                            elif conf >= min_conf and not claude_veto:
                                 ai_allowed = True
                                 gate_reason = f"brain_primary_{tier}_pnl{cur_pnl:+.0f}"
 
@@ -1102,7 +1119,12 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                                       f"tier={tier} conf={conf:.2f} pnl={cur_pnl:+.1f}% peak={peak_pnl:+.1f}% "
                                       f"gate={gate_reason} why={decision.reason[:80]}")
                             else:
-                                tag = "🛡 PEAK-PROTECT" if min_conf > 0.70 else "🧠 below threshold"
+                                if claude_veto:
+                                    tag = f"🛡 CLAUDE-VETO (Claude HOLD conf={claude_veto_conf:.2f})"
+                                elif min_conf > 0.70:
+                                    tag = "🛡 PEAK-PROTECT"
+                                else:
+                                    tag = "🧠 below threshold"
                                 print(f"[monster] {tag} AI sell signal blocked "
                                       f"{pos.get('token_name', mint[:8])} tier={tier} conf={conf:.2f} "
                                       f"pnl={cur_pnl:+.1f}% peak={peak_pnl:+.1f}% (need conf≥{min_conf:.2f}) "
