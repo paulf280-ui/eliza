@@ -617,7 +617,19 @@ class AICascade:
         now = time.time()
         age_secs = now - pos.get("entry_ts", now)
 
-        ctx = _build_context(mint, pos, feed, age_secs)
+        # Probe single-whale concentration from on-chain swap history (cached
+        # 10s, so multiple brain tiers within a window share one fetch). Only
+        # for positions with a known pool address — older legacy positions
+        # without it just skip the G7 gate.
+        whale_data: dict | None = None
+        pool_addr = pos.get("pool_address")
+        if pool_addr:
+            try:
+                whale_data = await _whale_concentration(session, mint, pool_addr)
+            except Exception as _w_err:
+                print(f"[monitor/whale] {mint[:8]} probe error: {_w_err}")
+
+        ctx = _build_context(mint, pos, feed, age_secs, whale=whale_data)
         if not ctx:
             return None
 
@@ -1137,8 +1149,111 @@ class TradeMonitor:
 
 # ── Context builder ───────────────────────────────────────────────────────────
 
-def _build_context(mint: str, pos: dict, feed: DataFeed, age_secs: float) -> str | None:
-    """Build a concise JSON context string for the AI prompt."""
+# ── Whale-concentration probe ────────────────────────────────────────────
+# Detects "single-whale exit" vs "broad distribution" on dips. PETS 2026-05-01
+# went from -2% to -19% on what may have been one large sell — without this
+# signal, brains see only aggregate "price dropping" and react.
+_whale_cache: dict[str, tuple[float, dict]] = {}
+_WHALE_CACHE_TTL = 10.0  # seconds — multi-brain calls within this window share data
+
+
+def _parse_swap_simple(tx_resp: dict | None, mint: str) -> tuple[str, float] | None:
+    """Lightweight pump-amm swap parser → ('BUY'|'SELL', sol_amount). None if not a swap."""
+    if not tx_resp or not tx_resp.get("meta") or tx_resp.get("meta", {}).get("err"):
+        return None
+    meta = tx_resp["meta"]
+    msg = (tx_resp.get("transaction") or {}).get("message") or {}
+    keys = msg.get("accountKeys") or []
+    pre_sol = meta.get("preBalances") or []
+    post_sol = meta.get("postBalances") or []
+    pre_tok = meta.get("preTokenBalances") or []
+    post_tok = meta.get("postTokenBalances") or []
+    pre_map = {b["accountIndex"]: b for b in pre_tok if b.get("mint") == mint}
+    post_map = {b["accountIndex"]: b for b in post_tok if b.get("mint") == mint}
+    user: dict[str, float] = {}
+    for idx in set(pre_map) | set(post_map):
+        pre = float((pre_map.get(idx, {}).get("uiTokenAmount") or {}).get("uiAmount") or 0)
+        post = float((post_map.get(idx, {}).get("uiTokenAmount") or {}).get("uiAmount") or 0)
+        owner = (post_map.get(idx, {}) or pre_map.get(idx, {})).get("owner")
+        d = post - pre
+        if owner and abs(d) > 0.01:
+            user[owner] = user.get(owner, 0) + d
+    if not keys: return None
+    signer = keys[0] if isinstance(keys[0], str) else (keys[0].get("pubkey") if isinstance(keys[0], dict) else None)
+    if not signer or not pre_sol: return None
+    sol_swap = -(post_sol[0] - pre_sol[0]) / 1e9 - (meta.get("fee") or 0) / 1e9
+    md = user.get(signer, 0)
+    if abs(md) < 0.01: return None
+    if sol_swap > 0.001 and md > 0: return ("BUY", sol_swap)
+    if sol_swap < -0.001 and md < 0: return ("SELL", -sol_swap)
+    return None
+
+
+async def _whale_concentration(session: aiohttp.ClientSession, mint: str, pool_addr: str) -> dict:
+    """Last-30s pool swap concentration: was a dip from 1 whale or broad distribution?
+
+    Returns dict with: largest_sell_sol, sell_concentration, largest_buy_sol,
+    buy_concentration, m30s_swap_count. concentration ∈ [0,1] where 1.0 = single
+    wallet did all the volume.
+    """
+    now = time.time()
+    cached = _whale_cache.get(mint)
+    if cached and (now - cached[0]) < _WHALE_CACHE_TTL:
+        return cached[1]
+    blank = {"largest_sell_sol": 0.0, "sell_concentration": 0.0,
+             "largest_buy_sol": 0.0, "buy_concentration": 0.0,
+             "m30s_swap_count": 0}
+    try:
+        # 1. Last 30 sigs on the pool — cap fetched sigs at 20 to limit cost
+        payload = {"jsonrpc": "2.0", "id": 1, "method": "getSignaturesForAddress",
+                   "params": [pool_addr, {"limit": 30}]}
+        async with session.post(HELIUS_RPC, json=payload, timeout=aiohttp.ClientTimeout(total=4)) as r:
+            if r.status != 200:
+                _whale_cache[mint] = (now, blank); return blank
+            data = await r.json()
+        sigs = data.get("result") or []
+        cutoff = now - 30
+        recent = [s["signature"] for s in sigs
+                  if (s.get("blockTime") or 0) >= cutoff and not s.get("err")][:15]
+        # 2. Parse each into BUY/SELL with SOL amount
+        buys: list[float] = []
+        sells: list[float] = []
+        for sig in recent:
+            try:
+                tp = {"jsonrpc": "2.0", "id": 1, "method": "getTransaction",
+                      "params": [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}]}
+                async with session.post(HELIUS_RPC, json=tp, timeout=aiohttp.ClientTimeout(total=3)) as r:
+                    if r.status != 200: continue
+                    td = await r.json()
+                p = _parse_swap_simple(td.get("result"), mint)
+                if p:
+                    (buys if p[0] == "BUY" else sells).append(p[1])
+            except Exception:
+                continue
+        result = dict(blank)
+        if buys:
+            result["largest_buy_sol"] = round(max(buys), 3)
+            tot = sum(buys)
+            result["buy_concentration"] = round(max(buys) / tot, 2) if tot > 0 else 0
+        if sells:
+            result["largest_sell_sol"] = round(max(sells), 3)
+            tot = sum(sells)
+            result["sell_concentration"] = round(max(sells) / tot, 2) if tot > 0 else 0
+        result["m30s_swap_count"] = len(buys) + len(sells)
+        _whale_cache[mint] = (now, result)
+        return result
+    except Exception:
+        _whale_cache[mint] = (now, blank)
+        return blank
+
+
+def _build_context(mint: str, pos: dict, feed: DataFeed, age_secs: float,
+                   whale: dict | None = None) -> str | None:
+    """Build a concise JSON context string for the AI prompt.
+
+    whale: optional dict from _whale_concentration() — when provided, its fields
+    are merged into the context so brains can evaluate G7 WHALE_PATTERN.
+    """
     if not feed.snapshots:
         return None
 
@@ -1264,6 +1379,13 @@ def _build_context(mint: str, pos: dict, feed: DataFeed, age_secs: float) -> str
             else (pos.get("strategy") or "copy_trade")
         ),
     }
+    # Merge whale-concentration probe (G7 WHALE_PATTERN gate). Optional —
+    # when None, the fields are absent and brains skip the gate.
+    if whale:
+        for k in ("largest_sell_sol", "sell_concentration",
+                  "largest_buy_sol", "buy_concentration", "m30s_swap_count"):
+            if k in whale:
+                ctx[k] = whale[k]
     return json.dumps(ctx)
 
 
@@ -1376,6 +1498,11 @@ EVALUATION GATES (assess each independently before deciding):
                       FALSE PULLBACK (HOLD bias): pnl currently negative BUT bounce_pct_from_local_low > +3% AND holder_delta_30s ≥ 0 AND liq_chg_30s_pct > -5% → dip absorbed, recovery in progress, do not panic-sell
                       REAL DUMP (SELL bias): pnl negative AND bounce_pct_from_local_low ≤ 0 AND holder_delta_30s < 0 AND liq_chg_30s_pct < -5% → still falling with distribution, exit before catastrophic floor
                       MIXED → WATCH another tick
+  G7 WHALE_PATTERN  — sell_concentration + largest_sell_sol (last 30s on-chain). Disambiguates "1 whale exit" from "broad distribution":
+                      SINGLE WHALE EXIT (HOLD bias): sell_concentration > 0.65 AND largest_sell_sol > 1.5 AND m30s_swap_count >= 5 → one wallet dumped, base holders unchanged. Don't panic — wait for absorption.
+                      BROAD DISTRIBUTION (SELL bias): sell_concentration < 0.40 AND multiple sells > 1 SOL → many wallets exiting, real exodus
+                      THIN BOOK (caution): m30s_swap_count < 5 → not enough data, lean on G1-G6
+                      Field absent → fields not provided this tick, skip the gate
 
 FEW-SHOT EXAMPLES:
 
@@ -1395,7 +1522,7 @@ POSITION DATA:
 {context}
 
 Respond with JSON only — same shape as examples above. Be honest in `reasoning`; the JSON is parsed for `action`/`confidence`/`reason`/`urgency` but the reasoning is logged for retrospective analysis.
-{{"reasoning": {{"G1_HOLDER_FLOW":"...","G2_LIQUIDITY":"...","G3_BUY_PRESSURE":"...","G4_PRICE_ACTION":"...","G5_PHASE":"...","G6_PULLBACK_SHAPE":"..."}}, "action": "HOLD"|"SELL"|"WATCH", "confidence": 0.0-1.0, "reason": "one sentence", "urgency": "low"|"medium"|"high"}}"""
+{{"reasoning": {{"G1_HOLDER_FLOW":"...","G2_LIQUIDITY":"...","G3_BUY_PRESSURE":"...","G4_PRICE_ACTION":"...","G5_PHASE":"...","G6_PULLBACK_SHAPE":"...","G7_WHALE_PATTERN":"..."}}, "action": "HOLD"|"SELL"|"WATCH", "confidence": 0.0-1.0, "reason": "one sentence", "urgency": "low"|"medium"|"high"}}"""
 
 
 _METEORA_HOLD_SELL_PROMPT = """You are a quant trader managing a Meteora DLMM meme-coin position. Think precisely.
