@@ -82,6 +82,9 @@ export default function LifecycleRejectsPanel() {
         </div>
         <div className="text-right text-xs text-zinc-400">
           {data.cycles} cycles · {data.candidates_total.toLocaleString()} candidates · {data.entered_total} entered
+          {data.viral_fires_total != null && data.viral_fires_total > 0 && (
+            <span className="ml-2 text-orange-400 font-semibold">· 🚀 {data.viral_fires_total} viral</span>
+          )}
         </div>
       </div>
 

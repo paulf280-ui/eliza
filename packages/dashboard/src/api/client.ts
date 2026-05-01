@@ -70,6 +70,7 @@ export interface LifecycleRejectsResponse {
   cycles: number
   candidates_total: number
   entered_total: number
+  viral_fires_total?: number
   totals: Record<string, number>
   per_cycle_avg: Record<string, number>
   recent: Array<{
@@ -81,6 +82,7 @@ export interface LifecycleRejectsResponse {
     watchlisted: number
     deferred_total: number
     entered: number
+    viral_fires?: number
     rejects: Record<string, number>
   }>
 }

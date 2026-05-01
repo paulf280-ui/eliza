@@ -1873,9 +1873,11 @@ When adjusting a filter, always explain your reasoning based on the data above."
             totals: dict = _dd(int)
             cands_total = 0
             entered_total = 0
+            viral_fires_total = 0
             for s in recent:
                 cands_total += int(s.get("candidates") or 0)
                 entered_total += int(s.get("entered") or 0)
+                viral_fires_total += int(s.get("viral_fires") or 0)
                 for k, v in (s.get("rejects") or {}).items():
                     totals[k] += int(v)
             n = max(len(recent), 1)
@@ -1885,6 +1887,7 @@ When adjusting a filter, always explain your reasoning based on the data above."
                 "cycles": len(recent),
                 "candidates_total": cands_total,
                 "entered_total": entered_total,
+                "viral_fires_total": viral_fires_total,
                 "totals": dict(totals),
                 "per_cycle_avg": per_avg,
                 "recent": recent[-60:],

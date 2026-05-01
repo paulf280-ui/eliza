@@ -262,6 +262,18 @@ LIFECYCLE_BOUNCE_TOP1_MAX_PCT        = 2.0   # winner ceiling 1.74%; CCP 1.625% 
 LIFECYCLE_BOUNCE_M5_BUYS_MIN         = 20    # winners had 28-66 m5 buyers; CCP had 11
 LIFECYCLE_BOUNCE_M5_BUY_SELL_RATIO   = 1.5   # winners 1.66x to 9.3x; CCP 0.85x (more sells than buys = distribution pretending to be a bounce)
 
+# ── Viral-momentum override (catches early-pump fresh-grads) ───────────────
+# 5-token on-chain backtest (CCP, FOFAR, EVA had viral signatures; TRUTH, RC
+# did not). For all 3 viral tokens TP+20% would have hit in the SAME minute
+# the override fires. CCP would convert from -10% loss → +20% win. Slow
+# tokens (TRUTH, RC) never reach 50 unique buyers in 30min, so override
+# stays off and bounce path catches them later. Survivorship bias: we have
+# zero data on viral-fire-then-rug — the -25% SL is the backstop.
+LIFECYCLE_VIRAL_OVERRIDE_BUYERS = 80      # DexScreener m5.buys txn count threshold
+LIFECYCLE_VIRAL_BS_MIN          = 1.5     # buy-dominant pressure (m5_buys / m5_sells)
+LIFECYCLE_VIRAL_H1_MAX_PCT      = 600.0   # cap relaxation when override fires (vs normal 100)
+LIFECYCLE_VIRAL_AGE_MIN_SECS    = 10 * 60 # drop the 20-min age floor to 10 when viral
+
 
 def _lifecycle_record_snapshot(mint: str, price: float, m5: float, h1: float, liq: float) -> None:
     now = time.time()
@@ -1254,6 +1266,7 @@ async def lifecycle_scout_loop(runtime: Any,
             cycle_passed_baseline = 0
             cycle_added_to_watchlist = 0
             cycle_entered = 0
+            cycle_viral_fires = 0   # how many tokens triggered the viral-momentum override this cycle
             cycle_fresh_grads = len(fresh_grad_pairs)
             # Per-reason reject counters — emitted in cycle summary so
             # we can see WHY passed_baseline is low without per-token logs.
@@ -1275,7 +1288,29 @@ async def lifecycle_scout_loop(runtime: Any,
                     on_watch = mint in _lifecycle_deferred
                     age_secs = (now_ms - float(pca)) / 1000
                     age_max = LIFECYCLE_WATCHLIST_MAX_AGE_SECS if on_watch else LIFECYCLE_MAX_AGE_SECS
-                    if age_secs < LIFECYCLE_MIN_AGE_SECS or age_secs > age_max:
+
+                    # Viral-momentum eligibility — checked once and reused at every
+                    # soft-gate site below. Token must pass all of:
+                    #   age >= 10min (vs normal 20min)
+                    #   m5_buys >= 80 (DexScreener txn count)
+                    #   m5 buys/sells >= 1.5 (buy-dominant pressure)
+                    # When viral_eligible=True the bot can bypass the age floor,
+                    # the h1>100% cap, and the shape gate. Hard safety gates
+                    # (top1, top10, rugcheck, creator_burn) still apply.
+                    _txns_m5 = (p.get("txns") or {}).get("m5") or {}
+                    _vir_buys = int(_txns_m5.get("buys") or 0)
+                    _vir_sells = int(_txns_m5.get("sells") or 0)
+                    _vir_bs = (_vir_buys / _vir_sells) if _vir_sells > 0 else float("inf")
+                    _vir_h1 = float((p.get("priceChange") or {}).get("h1") or 0)
+                    viral_eligible = (
+                        age_secs >= LIFECYCLE_VIRAL_AGE_MIN_SECS
+                        and _vir_buys >= LIFECYCLE_VIRAL_OVERRIDE_BUYERS
+                        and _vir_bs >= LIFECYCLE_VIRAL_BS_MIN
+                        and _vir_h1 <= LIFECYCLE_VIRAL_H1_MAX_PCT
+                    )
+
+                    age_floor = LIFECYCLE_VIRAL_AGE_MIN_SECS if viral_eligible else LIFECYCLE_MIN_AGE_SECS
+                    if age_secs < age_floor or age_secs > age_max:
                         if on_watch and age_secs > age_max:
                             _lifecycle_deferred.pop(mint, None)  # aged out of watchlist
                         cycle_rejects["age"] += 1
@@ -1297,8 +1332,14 @@ async def lifecycle_scout_loop(runtime: Any,
                     h1_change = float(pc.get("h1") or 0)
                     m5_change = float(pc.get("m5") or 0)
                     if h1_change > LIFECYCLE_H1_CHANGE_MAX_PCT:
-                        cycle_rejects["h1_high"] += 1
-                        continue  # ran too hard in the last hour — chase risk
+                        # Viral override: catch early-pump fresh-grads that
+                        # DexScreener reports with inflated h1 (since pair has
+                        # < 1h of data). 5-token backtest showed CCP/FOFAR/EVA
+                        # all viral-positive at +10min and TP+20% would have
+                        # hit in same minute.
+                        if not viral_eligible:
+                            cycle_rejects["h1_high"] += 1
+                            continue  # ran too hard in the last hour — chase risk
                     if h1_change < LIFECYCLE_H1_CHANGE_MIN_PCT:
                         cycle_rejects["h1_low"] += 1
                         continue  # falling knife — token is mid-fade, don't catch
@@ -1332,11 +1373,22 @@ async def lifecycle_scout_loop(runtime: Any,
                     cycle_passed_baseline += 1
                     price_native = float(p.get("priceNative") or p.get("priceUsd") or 0)
                     shape, shape_reason = _lifecycle_classify_entry_shape(m5_change, h1_change)
-                    if shape != "good":
+                    if shape != "good" and not viral_eligible:
+                        # Viral override fast-paths through the shape gate — at the
+                        # peak of a viral pump, m5 will read "overheated" (>+8%) but
+                        # the buyer-flow signal tells us this IS the entry, not a
+                        # reason to defer. Still falls through to safety gates below.
                         _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
                         cycle_added_to_watchlist += 1
                         print(f"[monster-lifecycle] 👁 {mint[:8]} {shape} — {shape_reason} (watchlist)")
                         continue
+                    if viral_eligible and shape != "good":
+                        # Log the override fire so we can audit outcomes in real time.
+                        print(f"[monster-lifecycle] 🚀 {mint[:8]} VIRAL-OVERRIDE: "
+                              f"m5_buys={_vir_buys}/{_vir_sells} ({_vir_bs:.1f}x) "
+                              f"h1={h1_change:.0f}% age={age_secs/60:.0f}min "
+                              f"shape={shape} — bypassing soft gates")
+                        cycle_viral_fires += 1
                     if on_watch:
                         # ── Empirical bounce-entry gates (data-validated 2026-05-01) ─
                         # CCP failed on FOUR of these; both lifecycle_bounce winners
@@ -1492,7 +1544,10 @@ async def lifecycle_scout_loop(runtime: Any,
                         print(f"[monster-lifecycle] rugcheck import error: {_rc_err} — allowing")
 
                     _mark_signalled(mint)
-                    sig_src = "lifecycle_bounce" if on_watch else "lifecycle"
+                    if viral_eligible and shape != "good":
+                        sig_src = "lifecycle_viral"
+                    else:
+                        sig_src = "lifecycle_bounce" if on_watch else "lifecycle"
                     print(f"[monster-lifecycle] 🎯 {mint[:8]} {sig_src} match "
                           f"age={age_secs/60:.0f}min liq=${liq_usd:,.0f} br={br:.0f}% top1={t1}%")
                     _log_signal({
@@ -1549,6 +1604,7 @@ async def lifecycle_scout_loop(runtime: Any,
                 f"watchlisted={cycle_added_to_watchlist} "
                 f"deferred_total={len(_lifecycle_deferred)} "
                 f"entered={cycle_entered}"
+                + (f" viral_fires={cycle_viral_fires}" if cycle_viral_fires else "")
                 + (f" rej[{rej_str}]" if rej_str else "")
             )
             _persist_reject_snapshot({
@@ -1560,6 +1616,7 @@ async def lifecycle_scout_loop(runtime: Any,
                 "watchlisted": cycle_added_to_watchlist,
                 "deferred_total": len(_lifecycle_deferred),
                 "entered": cycle_entered,
+                "viral_fires": cycle_viral_fires,
                 "rejects": dict(cycle_rejects),
             })
         except Exception as e:
