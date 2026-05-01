@@ -269,7 +269,13 @@ LIFECYCLE_BOUNCE_M5_BUY_SELL_RATIO   = 1.5   # winners 1.66x to 9.3x; CCP 0.85x 
 # tokens (TRUTH, RC) never reach 50 unique buyers in 30min, so override
 # stays off and bounce path catches them later. Survivorship bias: we have
 # zero data on viral-fire-then-rug — the -25% SL is the backstop.
-LIFECYCLE_VIRAL_OVERRIDE_BUYERS = 80      # DexScreener m5.buys txn count threshold
+LIFECYCLE_VIRAL_OVERRIDE_BUYERS = 50      # DexScreener m5.buys txn count threshold
+                                          # Dropped 80→50 (2026-05-01 DWOGE post-mortem):
+                                          # at 80 the override fired 4 min after the true
+                                          # inflection on DWOGE, putting us at the spike top
+                                          # (-5.8% loss). 50 fires at the inflection minute
+                                          # (15:29 UTC instead of 15:33), 4 min earlier in
+                                          # the same pump structure. -25% SL caps misfires.
 LIFECYCLE_VIRAL_BS_MIN          = 1.5     # buy-dominant pressure (m5_buys / m5_sells)
 LIFECYCLE_VIRAL_H1_MAX_PCT      = 600.0   # cap relaxation when override fires (vs normal 100)
 LIFECYCLE_VIRAL_AGE_MIN_SECS    = 10 * 60 # drop the 20-min age floor to 10 when viral
