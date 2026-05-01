@@ -1305,14 +1305,24 @@ async def lifecycle_scout_loop(runtime: Any,
 
                     # Wash-trading cap — vol_m5/liq > 3x is the same gate the
                     # breakout scout uses; lifecycle_bounce was bypassing it.
+                    # WITH override: m5_buys ≥ 20 indicates viral momentum, not wash
+                    # (GOBLIN 2026-04-25 ran vol/liq=12x with real buyers and printed
+                    # 2 real spikes; we missed it). Same threshold as the bounce gate.
                     vol_m5_lc = float((p.get("volume") or {}).get("m5") or 0)
                     if liq_usd > 0 and (vol_m5_lc / liq_usd) > LIFECYCLE_MAX_M5_VOL_LIQ:
-                        if on_watch:
-                            print(f"[monster-lifecycle] 🧼 {mint[:8]} wash-flagged "
-                                  f"vol_m5/liq={vol_m5_lc / liq_usd:.1f}x > {LIFECYCLE_MAX_M5_VOL_LIQ:.0f}x — drop watch")
-                            _lifecycle_deferred.pop(mint, None)
-                        cycle_rejects["wash"] += 1
-                        continue
+                        lc_txns_m5 = (p.get("txns") or {}).get("m5") or {}
+                        lc_m5_buys = int(lc_txns_m5.get("buys") or 0)
+                        if lc_m5_buys < BREAKOUT_WASH_OVERRIDE_BUYERS:
+                            if on_watch:
+                                print(f"[monster-lifecycle] 🧼 {mint[:8]} wash-flagged "
+                                      f"vol_m5/liq={vol_m5_lc / liq_usd:.1f}x > {LIFECYCLE_MAX_M5_VOL_LIQ:.0f}x "
+                                      f"buys={lc_m5_buys} — drop watch")
+                                _lifecycle_deferred.pop(mint, None)
+                            cycle_rejects["wash"] += 1
+                            continue
+                        print(f"[monster-lifecycle] 🌊 {mint[:8]} wash-override: "
+                              f"vol/liq={vol_m5_lc/liq_usd:.1f}x but m5_buys={lc_m5_buys} "
+                              f"≥ {BREAKOUT_WASH_OVERRIDE_BUYERS} — viral momentum, allow")
 
                     # ── Entry-shape gate (with bounce-watchlist) ─────────
                     # Instead of rejecting bad-shape tokens outright, defer
@@ -1589,6 +1599,10 @@ BREAKOUT_MIN_M5_VOL_USD      = 3_000
 BREAKOUT_MIN_H1_TXNS         = 30
 BREAKOUT_MIN_BUY_RATIO_PCT   = 65.0   # raised from 55 — ETF 2026-04-22 passed at 58.1% and exhausted
 BREAKOUT_MAX_M5_VOL_LIQ      = 3.0    # NEW: wash-trading cap (vol_m5/liq). MOONDOGE was 1.07x + +89% m5
+BREAKOUT_WASH_OVERRIDE_BUYERS = 20    # GOBLIN 2026-05-01: vol/liq=12x for hours but token did 2 real spikes (5d chart)
+                                      # — if m5_buys >= 20 unique, the high vol/liq is viral momentum not wash.
+                                      # Same threshold as the bounce-watchlist m5_buys gate; calibrated against
+                                      # CCP (m5_buys=11, lost) vs TRUTH (28, won) vs FOFAR (58, won) vs EVA (66, won).
 BREAKOUT_TOP1_MAX_PCT        = 12.0
 
 
@@ -1679,8 +1693,21 @@ async def breakout_candle_scout_loop(runtime: Any,
                     if vol_m5 < BREAKOUT_MIN_M5_VOL_USD:
                         continue
                     # Wash-trading cap: reject if 5-min volume churns more than Nx liquidity
+                    # WITH override: high vol/liq with high unique-buyer count is viral
+                    # momentum, not wash. GOBLIN 2026-04-25 ran vol/liq=12x for hours and
+                    # printed two real spikes — bot blocked every scan. The bounce-gate
+                    # m5_buys ≥ 20 threshold (validated against CCP/TRUTH/FOFAR/EVA)
+                    # discriminates real momentum from wash.
                     if liq_usd > 0 and (vol_m5 / liq_usd) > BREAKOUT_MAX_M5_VOL_LIQ:
-                        continue
+                        bc_txns_m5 = (p.get("txns") or {}).get("m5") or {}
+                        bc_m5_buys = int(bc_txns_m5.get("buys") or 0)
+                        if bc_m5_buys < BREAKOUT_WASH_OVERRIDE_BUYERS:
+                            continue
+                        # Override fires — log so we can audit how often the relaxed
+                        # path actually triggers and what its outcomes look like.
+                        print(f"[breakout-scout] 🌊 {mint[:8]} wash-override: "
+                              f"vol/liq={vol_m5/liq_usd:.1f}x but m5_buys={bc_m5_buys} "
+                              f"≥ {BREAKOUT_WASH_OVERRIDE_BUYERS} — viral momentum, allow")
                     txns_h1 = (p.get("txns") or {}).get("h1") or {}
                     buys = txns_h1.get("buys") or 0
                     sells = txns_h1.get("sells") or 0
