@@ -1229,6 +1229,9 @@ async def lifecycle_scout_loop(runtime: Any,
             cycle_added_to_watchlist = 0
             cycle_entered = 0
             cycle_fresh_grads = len(fresh_grad_pairs)
+            # Per-reason reject counters — emitted in cycle summary so
+            # we can see WHY passed_baseline is low without per-token logs.
+            cycle_rejects: dict[str, int] = defaultdict(int)
             for p in pairs:
                 try:
                     dex_id = (p.get("dexId") or "").lower()
@@ -1249,23 +1252,29 @@ async def lifecycle_scout_loop(runtime: Any,
                     if age_secs < LIFECYCLE_MIN_AGE_SECS or age_secs > age_max:
                         if on_watch and age_secs > age_max:
                             _lifecycle_deferred.pop(mint, None)  # aged out of watchlist
+                        cycle_rejects["age"] += 1
                         continue
                     cycle_in_age_window += 1
                     liq_usd = float((p.get("liquidity") or {}).get("usd") or 0)
                     if not (LIFECYCLE_MIN_LIQ_USD <= liq_usd <= LIFECYCLE_MAX_LIQ_USD):
+                        cycle_rejects["liq"] += 1
                         continue
                     mc_usd = float(p.get("marketCap") or p.get("fdv") or 0)
                     if not (LIFECYCLE_MIN_MC_USD <= mc_usd <= LIFECYCLE_MAX_MC_USD):
+                        cycle_rejects["mc"] += 1
                         continue
                     liq_mc = (liq_usd / mc_usd) if mc_usd > 0 else 0
                     if not (LIFECYCLE_MIN_LIQ_MC_RATIO <= liq_mc <= LIFECYCLE_MAX_LIQ_MC_RATIO):
+                        cycle_rejects["lmratio"] += 1
                         continue
                     pc = p.get("priceChange") or {}
                     h1_change = float(pc.get("h1") or 0)
                     m5_change = float(pc.get("m5") or 0)
                     if h1_change > LIFECYCLE_H1_CHANGE_MAX_PCT:
+                        cycle_rejects["h1_high"] += 1
                         continue  # ran too hard in the last hour — chase risk
                     if h1_change < LIFECYCLE_H1_CHANGE_MIN_PCT:
+                        cycle_rejects["h1_low"] += 1
                         continue  # falling knife — token is mid-fade, don't catch
 
                     # Wash-trading cap — vol_m5/liq > 3x is the same gate the
@@ -1276,6 +1285,7 @@ async def lifecycle_scout_loop(runtime: Any,
                             print(f"[monster-lifecycle] 🧼 {mint[:8]} wash-flagged "
                                   f"vol_m5/liq={vol_m5_lc / liq_usd:.1f}x > {LIFECYCLE_MAX_M5_VOL_LIQ:.0f}x — drop watch")
                             _lifecycle_deferred.pop(mint, None)
+                        cycle_rejects["wash"] += 1
                         continue
 
                     # ── Entry-shape gate (with bounce-watchlist) ─────────
@@ -1346,14 +1356,17 @@ async def lifecycle_scout_loop(runtime: Any,
                     sells = txns_h1.get("sells") or 0
                     total = buys + sells
                     if total < 30:  # too thin — skip
+                        cycle_rejects["txn_thin"] += 1
                         continue
                     br = (buys / total) * 100
                     if not (LIFECYCLE_BUY_RATIO_MIN <= br <= LIFECYCLE_BUY_RATIO_MAX):
+                        cycle_rejects["buy_ratio"] += 1
                         continue
                     base_info = (p.get("info") or {})
                     socials = base_info.get("socials") or []
                     websites = base_info.get("websites") or []
                     if not socials and not websites:
+                        cycle_rejects["no_socials"] += 1
                         continue
 
                     # Holder count floor — tokens with no organic buyer base look
@@ -1364,12 +1377,14 @@ async def lifecycle_scout_loop(runtime: Any,
                     except (ValueError, TypeError):
                         _lc_holders = None
                     if _lc_holders is not None and _lc_holders < MONSTER_MIN_UNIQUE_HOLDERS:
+                        cycle_rejects["holders"] += 1
                         continue
 
                     # Buy velocity — recent 1h vs prior 5h average. Skip
                     # decelerating tokens (entering as momentum dies).
                     _lc_velocity = _buy_velocity_ratio(p)
                     if _lc_velocity is not None and _lc_velocity < MONSTER_BUY_VELOCITY_MIN_RATIO:
+                        cycle_rejects["velocity"] += 1
                         continue
 
                     # Expensive last: top-1 + top-10 non-pool holders (one RPC call)
@@ -1377,8 +1392,10 @@ async def lifecycle_scout_loop(runtime: Any,
                     t1 = (_lc_dist or {}).get("top1_pct")
                     t10 = (_lc_dist or {}).get("top10_pct")
                     if t1 is None or t1 >= LIFECYCLE_TOP1_MAX_PCT:
+                        cycle_rejects["top1"] += 1
                         continue
                     if t10 is not None and t10 >= MONSTER_TOP10_MAX_PCT:
+                        cycle_rejects["top10"] += 1
                         continue  # TRADE-class: insiders hold >35% → dump liquidity
                     # Bounce-path tighter holder caps — winners had top10 ≤ 12.53%
                     # and top1 ≤ 1.74%. CCP entered at top10=15.95%, top1=1.625%
@@ -1487,6 +1504,7 @@ async def lifecycle_scout_loop(runtime: Any,
             # data source is starving; if in_age=0 the feed is stale; if
             # baseline=0 filters are too tight; if entered=0+watched>0 we're
             # patiently waiting for bounce confirmation.
+            rej_str = ",".join(f"{k}={v}" for k, v in sorted(cycle_rejects.items()) if v > 0)
             print(
                 f"[monster-lifecycle] cycle: candidates={cycle_seen} "
                 f"fresh_grads={cycle_fresh_grads} "
@@ -1495,6 +1513,7 @@ async def lifecycle_scout_loop(runtime: Any,
                 f"watchlisted={cycle_added_to_watchlist} "
                 f"deferred_total={len(_lifecycle_deferred)} "
                 f"entered={cycle_entered}"
+                + (f" rej[{rej_str}]" if rej_str else "")
             )
         except Exception as e:
             print(f"[monster-lifecycle] loop error: {e}")
