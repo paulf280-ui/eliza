@@ -64,3 +64,39 @@ export async function fetchReport() {
   if (!res.ok) throw new Error(`Report API error: ${res.status}`)
   return res.json()
 }
+
+export interface LifecycleRejectsResponse {
+  window_hours: number
+  cycles: number
+  candidates_total: number
+  entered_total: number
+  totals: Record<string, number>
+  per_cycle_avg: Record<string, number>
+  recent: Array<{
+    ts: number
+    candidates: number
+    fresh_grads: number
+    in_age: number
+    baseline: number
+    watchlisted: number
+    deferred_total: number
+    entered: number
+    rejects: Record<string, number>
+  }>
+}
+
+export async function fetchLifecycleRejects(): Promise<LifecycleRejectsResponse> {
+  const res = await fetch(`${API_BASE}/api/lifecycle/rejects`)
+  if (!res.ok) throw new Error(`Lifecycle rejects API error: ${res.status}`)
+  return res.json()
+}
+
+export async function patchConfig(updates: Record<string, unknown>) {
+  const res = await fetch(`${API_BASE}/api/config`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  })
+  if (!res.ok) throw new Error(`Patch config error: ${res.status}`)
+  return res.json()
+}

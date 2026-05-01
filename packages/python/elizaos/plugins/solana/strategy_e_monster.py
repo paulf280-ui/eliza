@@ -114,8 +114,26 @@ def open_positions() -> dict[str, dict]:
     return dict(_monster_positions)
 
 
+def get_max_concurrent() -> int:
+    """Live max concurrent positions — reads live_config first, falls back to module constant."""
+    try:
+        from elizaos.plugins.solana import live_config as _lc
+        return int(_lc.get("monster_max_concurrent", MONSTER_MAX_CONCURRENT))
+    except Exception:
+        return MONSTER_MAX_CONCURRENT
+
+
+def get_default_size_sol() -> float:
+    """Live trade size — reads live_config first, falls back to module constant."""
+    try:
+        from elizaos.plugins.solana import live_config as _lc
+        return float(_lc.get("monster_default_size_sol", MONSTER_DEFAULT_SIZE_SOL))
+    except Exception:
+        return MONSTER_DEFAULT_SIZE_SOL
+
+
 def can_open_new_position() -> bool:
-    return len(_monster_positions) < MONSTER_MAX_CONCURRENT
+    return len(_monster_positions) < get_max_concurrent()
 
 
 def _recent_loss_on_mint(mint: str) -> dict | None:
@@ -163,7 +181,7 @@ async def open_monster_position(
         print(f"[monster] already holding {mint[:8]} — skip")
         return False
     if not can_open_new_position():
-        print(f"[monster] slot pool full ({len(_monster_positions)}/{MONSTER_MAX_CONCURRENT}) — skip {token_name}")
+        print(f"[monster] slot pool full ({len(_monster_positions)}/{get_max_concurrent()}) — skip {token_name}")
         return False
 
     # Holder-guard entry check. Log-only by default (HOLDER_GUARD_ENFORCE=false);

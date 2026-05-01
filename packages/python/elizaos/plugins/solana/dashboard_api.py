@@ -1849,6 +1849,51 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
     app.router.add_get("/api/frost-mirror/stats", handle_frost_mirror_stats)
 
+    async def handle_lifecycle_rejects(request: web.Request) -> web.Response:
+        """24h aggregate of monster-lifecycle scout rejection reasons.
+
+        Returns:
+          window_hours: 24
+          cycles: total cycles in window
+          totals: {age: N, liq: N, ...}  — sum across the window
+          per_cycle_avg: {age: float, liq: float, ...}
+          recent: last 60 snapshots for time-series rendering
+        """
+        try:
+            import json as _json, os as _os, time as _time
+            from collections import defaultdict as _dd
+            path = _os.path.join(_os.path.dirname(__file__), "lifecycle_rejects_24h.json")
+            if not _os.path.exists(path):
+                return web.json_response({"window_hours": 24, "cycles": 0,
+                                          "totals": {}, "per_cycle_avg": {}, "recent": []})
+            with open(path) as f:
+                snapshots = _json.load(f) or []
+            cutoff = _time.time() - 24 * 3600
+            recent = [s for s in snapshots if (s.get("ts") or 0) >= cutoff]
+            totals: dict = _dd(int)
+            cands_total = 0
+            entered_total = 0
+            for s in recent:
+                cands_total += int(s.get("candidates") or 0)
+                entered_total += int(s.get("entered") or 0)
+                for k, v in (s.get("rejects") or {}).items():
+                    totals[k] += int(v)
+            n = max(len(recent), 1)
+            per_avg = {k: round(v / n, 2) for k, v in totals.items()}
+            return web.json_response({
+                "window_hours": 24,
+                "cycles": len(recent),
+                "candidates_total": cands_total,
+                "entered_total": entered_total,
+                "totals": dict(totals),
+                "per_cycle_avg": per_avg,
+                "recent": recent[-60:],
+            })
+        except Exception as exc:
+            return web.json_response({"error": str(exc)}, status=500)
+
+    app.router.add_get("/api/lifecycle/rejects", handle_lifecycle_rejects)
+
     async def handle_holder_guard_report(request: web.Request) -> web.Response:
         """Read-only diagnostic for holder_guard log-only performance.
 

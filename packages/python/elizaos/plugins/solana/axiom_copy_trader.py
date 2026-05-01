@@ -338,8 +338,8 @@ def get_paper_stats() -> dict:
     if _monster_live and not _copy_live:
         try:
             from elizaos.plugins.solana import strategy_e_monster as _mon
-            _trade_size = float(_mon.MONSTER_DEFAULT_SIZE_SOL)
-            _max_positions = int(_mon.MONSTER_MAX_CONCURRENT)
+            _trade_size = float(_mon.get_default_size_sol())
+            _max_positions = int(_mon.get_max_concurrent())
         except Exception:
             pass
 

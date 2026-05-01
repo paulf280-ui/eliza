@@ -12,6 +12,8 @@ import CopyTradeLiveCharts from './components/copytrade/CopyTradeLiveCharts'
 import CopyTradeHistoryTable from './components/copytrade/CopyTradeHistoryTable'
 import WalletPromotionPanel from './components/wallets/WalletPromotionPanel'
 import BrainPanel from './components/brains/BrainPanel'
+import LifecycleRejectsPanel from './components/diagnostics/LifecycleRejectsPanel'
+import PositionConfigPanel from './components/diagnostics/PositionConfigPanel'
 
 interface CopyTradeStats {
   balance: number
@@ -65,6 +67,7 @@ interface CopyTradeStats {
   }>
   watched_wallets: string[]
   signals_today: number
+  copy_trade_enabled?: boolean
 }
 
 function ZoneHeader({ label, hint }: { label: string; hint?: string }) {
@@ -83,6 +86,8 @@ function ZoneHeader({ label, hint }: { label: string; hint?: string }) {
 export default function App() {
   const { sendCommand } = useWebSocket()
   const { setInitialState } = useDashboardStore()
+  const wallet = useDashboardStore(s => s.wallet)
+  const config = useDashboardStore(s => s.config)
   const [dataLoaded, setDataLoaded] = useState(false)
   const [ctStats, setCtStats] = useState<CopyTradeStats | null>(null)
   const [pauseLoading, setPauseLoading] = useState(false)
@@ -149,6 +154,7 @@ export default function App() {
 
   const positions = ctStats?.open_positions ?? []
   const trades = ctStats?.recent_trades ?? []
+  const copyTradeEnabled = ctStats?.copy_trade_enabled ?? false
 
   return (
     <DashboardLayout>
@@ -254,12 +260,14 @@ export default function App() {
         <CopyTradeLiveCharts positions={positions} />
       </div>
 
-      <ZoneHeader label="Performance" hint="Wallet promotion · Trade history · Activity feed" />
+      <ZoneHeader label="Performance" hint={copyTradeEnabled ? "Wallet promotion · Trade history · Activity feed" : "Monster history · Activity feed"} />
 
-      {/* ── Row 3b: Wallet promotion board ───────────────────────────────── */}
-      <div className="col-span-12">
-        <WalletPromotionPanel />
-      </div>
+      {/* ── Row 3b: Wallet promotion board (copy-trade only) ─────────────── */}
+      {copyTradeEnabled && (
+        <div className="col-span-12">
+          <WalletPromotionPanel />
+        </div>
+      )}
 
       {/* ── Row 4: Trade history + Activity feed ─────────────────────────── */}
       <div className="col-span-12 lg:col-span-8 h-[420px]">
@@ -269,10 +277,26 @@ export default function App() {
           winRate={ctStats?.win_rate ?? 0}
           wins={ctStats?.wins ?? 0}
           total={ctStats?.trades ?? 0}
+          title={copyTradeEnabled ? "COPY TRADE HISTORY" : "MONSTER HISTORY"}
         />
       </div>
       <div className="col-span-12 lg:col-span-4 h-[420px] overflow-hidden">
         <ActivityFeed />
+      </div>
+
+      <ZoneHeader label="Diagnostics" hint="Scout reject reasons · live position-sizing controls" />
+
+      {/* ── Row 5: Lifecycle reject histogram + position config ──────────── */}
+      <div className="col-span-12 lg:col-span-7">
+        <LifecycleRejectsPanel />
+      </div>
+      <div className="col-span-12 lg:col-span-5">
+        <PositionConfigPanel
+          solBalance={wallet?.sol_balance ?? 0}
+          currentMaxConcurrent={Number(config?.monster_max_concurrent ?? 1)}
+          currentTradeSize={Number(config?.monster_default_size_sol ?? 0.45)}
+          onApplied={() => fetchStatus().then(setInitialState).catch(() => {})}
+        />
       </div>
 
     </DashboardLayout>

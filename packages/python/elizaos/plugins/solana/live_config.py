@@ -248,6 +248,13 @@ _config: dict = {
     "monster_scanner_max_vol_liq":    100.0,      # vol/liq ≤ 100× (wash-trade cap)
     "monster_scanner_min_buy_ratio":  52.0,       # buy ratio ≥ 52%
 
+    # ── Monster strategy sizing (dashboard-adjustable; defaults match strategy_e_monster) ──
+    # When the wallet grows we want to dial these up without restarting the bot.
+    # Reads from strategy_e_monster.py fall back to module constants if a key is
+    # absent, so removing these from live_config is a safe rollback.
+    "monster_max_concurrent":     1,        # number of simultaneous monster positions (1-5)
+    "monster_default_size_sol":   0.45,     # SOL per monster trade
+
     # ── Split-buy ("Harvester + Monster Hunter") dual position system ──────────
     # When enabled: each qualifying token opens TWO positions simultaneously.
     # Position A (HARVESTER):       split_buy_a_sol, TP = entry × split_buy_a_tp_mult (+60%)
@@ -430,6 +437,8 @@ def set_value(key: str, value, changed_by: str = "system", reason: str = "") -> 
         "monster_scanner_min_vol_liq":  (0.0, 200.0),
         "monster_scanner_max_vol_liq":  (0.0, 1000.0),
         "monster_scanner_min_buy_ratio": (0.0, 95.0),
+        "monster_max_concurrent":     (1, 5),       # cap 5 — wallet headroom check happens at trade time
+        "monster_default_size_sol":   (0.05, 2.0),  # 0.05 SOL floor, 2 SOL ceiling
         "split_buy_a_sol":         (0.001, 10.0),
         "split_buy_b_sol":         (0.001, 10.0),
         "split_buy_a_tp_mult":     (1.10, 20.0),

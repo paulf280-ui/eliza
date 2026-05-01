@@ -104,6 +104,8 @@ export interface BotConfig {
   max_hold_raydium_hours: number
   monitor_interval_secs: number
   paper_trading?: boolean
+  monster_max_concurrent?: number
+  monster_default_size_sol?: number
 }
 
 export interface StatusResponse {

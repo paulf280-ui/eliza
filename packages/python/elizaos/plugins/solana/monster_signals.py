@@ -23,7 +23,7 @@ import asyncio
 import json
 import os
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any
 
@@ -216,6 +216,32 @@ def drain_fresh_grad_queue() -> list[dict]:
 # rollover) and rugged in 27s. The chart later formed a higher low and ran
 # back up — that's the entry we should have caught.
 _lifecycle_deferred: dict[str, dict] = {}  # mint → {"first_seen": ts, "snapshots": [...]}
+
+# 24h rolling window of cycle-level reject counters — surfaced in the dashboard
+# as a histogram so we can see WHY the scout is rejecting candidates without
+# tailing logs. Each entry is {ts, candidates, in_age, baseline, watchlisted,
+# entered, rejects: {age:N, liq:N, ...}}. At 30s cadence, 24h = 2880 entries
+# ≈ 600KB on disk; deque trims oldest automatically.
+_REJECT_HISTORY_PATH = Path(__file__).parent / "lifecycle_rejects_24h.json"
+_reject_history: deque = deque(maxlen=2880)
+try:
+    if _REJECT_HISTORY_PATH.exists():
+        with open(_REJECT_HISTORY_PATH) as _f:
+            _loaded = json.load(_f)
+            if isinstance(_loaded, list):
+                _reject_history.extend(_loaded[-2880:])
+except Exception:
+    pass
+
+
+def _persist_reject_snapshot(snapshot: dict) -> None:
+    """Append a cycle snapshot to the rolling 24h window and flush to disk."""
+    _reject_history.append(snapshot)
+    try:
+        with open(_REJECT_HISTORY_PATH, "w") as f:
+            json.dump(list(_reject_history), f)
+    except Exception:
+        pass
 
 LIFECYCLE_WATCHLIST_TTL_SECS    = 180 * 60   # drop deferred mints after 3h
 LIFECYCLE_WATCHLIST_MAX_AGE_SECS = 180 * 60  # extend age cap for deferred mints (vs 90min normal)
@@ -842,7 +868,7 @@ async def cluster_confirm_scout_loop(runtime: Any,
                     mint=mint,
                     token_name=sym or mint[:8],
                     signal_source="cluster_confirm",
-                    sol_size=monster.MONSTER_DEFAULT_SIZE_SOL,
+                    sol_size=monster.get_default_size_sol(),
                     session=session,
                     runtime=runtime,
                     metadata={
@@ -1041,7 +1067,7 @@ async def _serial_after_graduation(runtime: Any, session: aiohttp.ClientSession,
         mint=mint,
         token_name=sym or mint[:8],
         signal_source="serial_deployer",
-        sol_size=monster.MONSTER_DEFAULT_SIZE_SOL,
+        sol_size=monster.get_default_size_sol(),
         session=session,
         runtime=runtime,
         metadata={"creator": creator, "venue": venue, "top1_pct": t1},
@@ -1482,7 +1508,7 @@ async def lifecycle_scout_loop(runtime: Any,
                         mint=mint,
                         token_name=sym,
                         signal_source=sig_src,
-                        sol_size=monster.MONSTER_DEFAULT_SIZE_SOL,
+                        sol_size=monster.get_default_size_sol(),
                         session=session,
                         runtime=runtime,
                         metadata={"age_min": round(age_secs / 60, 1),
@@ -1515,6 +1541,17 @@ async def lifecycle_scout_loop(runtime: Any,
                 f"entered={cycle_entered}"
                 + (f" rej[{rej_str}]" if rej_str else "")
             )
+            _persist_reject_snapshot({
+                "ts": time.time(),
+                "candidates": cycle_seen,
+                "fresh_grads": cycle_fresh_grads,
+                "in_age": cycle_in_age_window,
+                "baseline": cycle_passed_baseline,
+                "watchlisted": cycle_added_to_watchlist,
+                "deferred_total": len(_lifecycle_deferred),
+                "entered": cycle_entered,
+                "rejects": dict(cycle_rejects),
+            })
         except Exception as e:
             print(f"[monster-lifecycle] loop error: {e}")
         await asyncio.sleep(LIFECYCLE_POLL_SECS)
@@ -1717,7 +1754,7 @@ async def breakout_candle_scout_loop(runtime: Any,
                         mint=mint,
                         token_name=sym,
                         signal_source="breakout_candle",
-                        sol_size=monster.MONSTER_DEFAULT_SIZE_SOL,
+                        sol_size=monster.get_default_size_sol(),
                         session=session,
                         runtime=runtime,
                         metadata={
