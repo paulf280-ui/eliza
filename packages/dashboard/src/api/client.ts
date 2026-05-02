@@ -93,6 +93,86 @@ export async function fetchLifecycleRejects(): Promise<LifecycleRejectsResponse>
   return res.json()
 }
 
+export interface CreatorAlphaResponse {
+  recent: Array<{
+    kind: 'direct_create' | 'operator_fund' | 'operator_create' | 'graduated'
+    ts?: number
+    detected_ts?: number
+    creator?: string
+    parent?: string
+    parent_op?: string
+    child?: string
+    mint?: string
+    amount_sol?: number
+    source?: string
+    lag_secs?: number
+  }>
+  operators: Array<{
+    wallet: string
+    last_fund_ts: number
+    fund_count: number
+    create_count: number
+    graduated_count: number
+  }>
+  watched_children: Array<{
+    child: string
+    parent: string
+    amount_sol: number
+    funded_ts: number
+    ttl_remaining_secs: number
+  }>
+  pending_mints: Array<{
+    mint: string
+    source: string
+    creator: string
+    parent_op: string | null
+    detected_ts: number
+    age_secs: number
+    ttl_remaining_secs: number
+  }>
+  tracked_direct: number
+  tracked_operators: number
+  watched_count: number
+  pending_count: number
+  signal_count: number
+}
+
+export async function fetchCreatorAlpha(): Promise<CreatorAlphaResponse> {
+  const res = await fetch(`${API_BASE}/api/creator-alpha`)
+  if (!res.ok) throw new Error(`Creator-alpha API error: ${res.status}`)
+  return res.json()
+}
+
+export interface PerformanceBySourceResponse {
+  sources: Array<{
+    source: string
+    trades: number
+    wins: number
+    losses: number
+    flat: number
+    win_rate_pct: number
+    avg_pnl_pct: number
+    total_pnl_sol: number
+    best_pct: number
+    worst_pct: number
+    avg_peak_pct: number
+    recent_trades: Array<{ token: string; pnl_pct: number; peak_pct: number; ts_close: number }>
+  }>
+  totals: {
+    trades: number
+    wins: number
+    total_pnl_sol: number
+    window_hours: number
+    overall_wr_pct: number
+  }
+}
+
+export async function fetchPerformanceBySource(hours = 24): Promise<PerformanceBySourceResponse> {
+  const res = await fetch(`${API_BASE}/api/performance-by-source?hours=${hours}`)
+  if (!res.ok) throw new Error(`Performance API error: ${res.status}`)
+  return res.json()
+}
+
 export async function patchConfig(updates: Record<string, unknown>) {
   const res = await fetch(`${API_BASE}/api/config`, {
     method: 'PATCH',

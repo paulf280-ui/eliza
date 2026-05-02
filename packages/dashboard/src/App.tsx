@@ -14,6 +14,8 @@ import WalletPromotionPanel from './components/wallets/WalletPromotionPanel'
 import BrainPanel from './components/brains/BrainPanel'
 import LifecycleRejectsPanel from './components/diagnostics/LifecycleRejectsPanel'
 import PositionConfigPanel from './components/diagnostics/PositionConfigPanel'
+import CreatorAlphaPanel from './components/diagnostics/CreatorAlphaPanel'
+import PerformanceBySourcePanel from './components/diagnostics/PerformanceBySourcePanel'
 
 interface CopyTradeStats {
   balance: number
@@ -282,6 +284,18 @@ export default function App() {
       </div>
       <div className="col-span-12 lg:col-span-4 h-[420px] overflow-hidden">
         <ActivityFeed />
+      </div>
+
+      <ZoneHeader label="Creator-Alpha" hint="Operator + direct-creator wallet monitor — bonding-curve early-detection" />
+
+      {/* ── Creator-alpha live panel — full width ─────────────────────────── */}
+      <div className="col-span-12 h-[420px]">
+        <CreatorAlphaPanel />
+      </div>
+
+      {/* ── Performance-by-source — full width ────────────────────────────── */}
+      <div className="col-span-12 h-[420px]">
+        <PerformanceBySourcePanel />
       </div>
 
       <ZoneHeader label="Diagnostics" hint="Scout reject reasons · live position-sizing controls" />

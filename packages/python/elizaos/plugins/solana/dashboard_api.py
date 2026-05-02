@@ -1898,23 +1898,148 @@ When adjusting a filter, always explain your reasoning based on the data above."
     app.router.add_get("/api/lifecycle/rejects", handle_lifecycle_rejects)
 
     async def handle_creator_alpha(request: web.Request) -> web.Response:
-        """Recent creator-alpha scout activity — direct creates, operator
-        fundings, watched-child creates, and graduations."""
+        """Live creator-alpha scout activity for the dashboard panel.
+        Returns aggregated state + per-operator activity + recent signals."""
         try:
             from elizaos.plugins.solana import monster_signals as _ms
+            import time as _t
+            now = _t.time()
             recent = _ms.creator_alpha_recent_signals()
+            direct, operators = _ms._creator_alpha_tracked_wallets()
+            # Aggregate per-operator activity from recent signals
+            op_activity: dict = {}
+            for op in operators:
+                op_activity[op] = {"wallet": op, "last_fund_ts": 0, "fund_count": 0,
+                                    "create_count": 0, "graduated_count": 0}
+            for s in recent:
+                if s.get("kind") == "operator_fund":
+                    p = s.get("parent")
+                    if p in op_activity:
+                        op_activity[p]["fund_count"] += 1
+                        op_activity[p]["last_fund_ts"] = max(op_activity[p]["last_fund_ts"], s.get("ts") or 0)
+                elif s.get("kind") == "operator_create":
+                    p = s.get("parent_op")
+                    if p in op_activity:
+                        op_activity[p]["create_count"] += 1
+                elif s.get("kind") == "graduated":
+                    p = s.get("parent_op")
+                    if p in op_activity:
+                        op_activity[p]["graduated_count"] += 1
+            # Watched children with countdown
+            children: list[dict] = []
+            for child, info in (_ms._creator_alpha_watched_children or {}).items():
+                age_secs = now - (info.get("funded_ts") or now)
+                ttl_remaining = max(0, _ms._CREATOR_ALPHA_CHILD_TTL_SECS - age_secs)
+                children.append({
+                    "child": child, "parent": info.get("parent"),
+                    "amount_sol": info.get("amount_sol"),
+                    "funded_ts": info.get("funded_ts"),
+                    "ttl_remaining_secs": int(ttl_remaining),
+                })
+            # Pending mints with age
+            pending: list[dict] = []
+            for mint, pinfo in (_ms._creator_alpha_pending_mints or {}).items():
+                age_secs = now - (pinfo.get("detected_ts") or now)
+                ttl_remaining = max(0, _ms._CREATOR_ALPHA_MINT_TTL_SECS - age_secs)
+                pending.append({
+                    "mint": mint, "source": pinfo.get("source"),
+                    "creator": pinfo.get("creator"), "parent_op": pinfo.get("parent_op"),
+                    "detected_ts": pinfo.get("detected_ts"),
+                    "age_secs": int(age_secs),
+                    "ttl_remaining_secs": int(ttl_remaining),
+                })
             return web.json_response({
-                "recent": recent,
-                "count": len(recent),
-                "tracked_direct": len(_ms._creator_alpha_tracked_wallets()[0]),
-                "tracked_operators": len(_ms._creator_alpha_tracked_wallets()[1]),
-                "watched_children": len(_ms._creator_alpha_watched_children),
-                "pending_mints": len(_ms._creator_alpha_pending_mints),
+                "recent": recent[-30:],
+                "operators": list(op_activity.values()),
+                "watched_children": children,
+                "pending_mints": pending,
+                "tracked_direct": len(direct),
+                "tracked_operators": len(operators),
+                "watched_count": len(children),
+                "pending_count": len(pending),
+                "signal_count": len(recent),
             })
         except Exception as exc:
             return web.json_response({"error": str(exc)}, status=500)
 
     app.router.add_get("/api/creator-alpha", handle_creator_alpha)
+
+    async def handle_performance_by_source(request: web.Request) -> web.Response:
+        """Trade outcomes grouped by signal_source. Returns per-source WR,
+        avg pnl, total pnl_sol, count. Lets us see which strategy path
+        actually makes money."""
+        try:
+            import json as _json, os as _os, time as _t
+            path = _os.path.join(_os.path.dirname(__file__), "learning_outcomes.json")
+            if not _os.path.exists(path):
+                return web.json_response({"sources": [], "totals": {}})
+            with open(path) as f:
+                outcomes = _json.load(f) or []
+            # Window filter (default 24h, accept ?hours=N)
+            try:
+                hours = float(request.query.get("hours") or 24)
+            except (ValueError, TypeError):
+                hours = 24.0
+            cutoff = _t.time() - hours * 3600
+            recent = [o for o in outcomes if (o.get("ts_close") or 0) >= cutoff]
+            # Group by signal_source
+            from collections import defaultdict as _dd
+            buckets: dict = _dd(lambda: {"trades": 0, "wins": 0, "losses": 0,
+                                          "flat": 0, "total_pnl_pct": 0.0,
+                                          "total_pnl_sol": 0.0, "best_trade": 0.0,
+                                          "worst_trade": 0.0, "avg_peak_pct": 0.0,
+                                          "trades_data": []})
+            for o in recent:
+                src = o.get("signal_source") or "unknown"
+                b = buckets[src]
+                pnl = o.get("pnl_pct") or 0.0
+                pnl_sol = o.get("pnl_sol") or 0.0
+                peak = o.get("peak_pnl_pct") or 0.0
+                b["trades"] += 1
+                b["total_pnl_pct"] += pnl
+                b["total_pnl_sol"] += pnl_sol
+                b["avg_peak_pct"] += peak
+                if pnl >= 18: b["wins"] += 1
+                elif pnl <= -8: b["losses"] += 1
+                else: b["flat"] += 1
+                if pnl > b["best_trade"]: b["best_trade"] = pnl
+                if pnl < b["worst_trade"]: b["worst_trade"] = pnl
+                b["trades_data"].append({
+                    "token": o.get("token_name"),
+                    "pnl_pct": round(pnl, 1),
+                    "peak_pct": round(peak, 1),
+                    "ts_close": o.get("ts_close"),
+                })
+            sources_out: list[dict] = []
+            for src, b in buckets.items():
+                n = max(b["trades"], 1)
+                sources_out.append({
+                    "source": src,
+                    "trades": b["trades"],
+                    "wins": b["wins"],
+                    "losses": b["losses"],
+                    "flat": b["flat"],
+                    "win_rate_pct": round(b["wins"] / n * 100, 1),
+                    "avg_pnl_pct": round(b["total_pnl_pct"] / n, 1),
+                    "total_pnl_sol": round(b["total_pnl_sol"], 4),
+                    "best_pct": round(b["best_trade"], 1),
+                    "worst_pct": round(b["worst_trade"], 1),
+                    "avg_peak_pct": round(b["avg_peak_pct"] / n, 1),
+                    "recent_trades": sorted(b["trades_data"], key=lambda x: -(x.get("ts_close") or 0))[:5],
+                })
+            sources_out.sort(key=lambda s: -s["total_pnl_sol"])
+            totals = {
+                "trades": sum(b["trades"] for b in buckets.values()),
+                "wins": sum(b["wins"] for b in buckets.values()),
+                "total_pnl_sol": round(sum(b["total_pnl_sol"] for b in buckets.values()), 4),
+                "window_hours": hours,
+            }
+            totals["overall_wr_pct"] = round(totals["wins"] / max(totals["trades"], 1) * 100, 1)
+            return web.json_response({"sources": sources_out, "totals": totals})
+        except Exception as exc:
+            return web.json_response({"error": str(exc)}, status=500)
+
+    app.router.add_get("/api/performance-by-source", handle_performance_by_source)
 
     async def handle_holder_guard_report(request: web.Request) -> web.Response:
         """Read-only diagnostic for holder_guard log-only performance.
