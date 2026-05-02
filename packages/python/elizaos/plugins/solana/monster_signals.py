@@ -517,22 +517,17 @@ async def creator_alpha_scout_loop(runtime: Any, session: aiohttp.ClientSession)
                         _creator_alpha_watched_children[child] = {
                             "parent": op, "funded_ts": now, "amount_sol": amt,
                         }
-                        # CRITICAL: warm the sig cursor immediately so the next
-                        # poll only fires on creates AFTER funding. Without this,
-                        # if the child has pre-existing creates in their history
-                        # (e.g. operator funded an already-active wallet), we
-                        # would misfire entry on a stale historical create.
-                        # Bug discovered 2026-05-02: bought MOG 45min late
-                        # because GjLsSBfVuP had a 21:10 create in history when
-                        # operator funded them at 21:50.
-                        await _creator_alpha_poll_recent(session, child, limit=1)
+                        # NOTE: do NOT warm-cache the sig cursor here. If we did,
+                        # we'd suppress legitimate creates that happened within
+                        # seconds of (or even just before) the funding tx — the
+                        # exact race condition we WANT to catch. Stale-create
+                        # protection lives in the blockTime check below instead.
                         _creator_alpha_recent_signals.append({
                             "kind": "operator_fund", "parent": op, "child": child,
                             "amount_sol": amt, "ts": now,
                         })
                         print(f"[creator-alpha] 👁 OPERATOR-FUND parent={op[:10]} → child={child[:10]} "
-                              f"({amt:.2f} SOL) — watching {_CREATOR_ALPHA_CHILD_TTL_SECS//60}min "
-                              f"(sig cursor seeded — only NEW creates will fire)")
+                              f"({amt:.2f} SOL) — watching {_CREATOR_ALPHA_CHILD_TTL_SECS//60}min")
                 await asyncio.sleep(0.04)
 
             # 3. Watched children — check for creates
