@@ -30,6 +30,14 @@
       {"wallet": "6Foi4aj36N9SRQ1nNtFJkCR1cv1RrvSFngSVg9NaJFWk", "creates": 11, "graduated": 8, "rate": 73, "best_mc": 177535, "note": "high-frequency mid-tier; child of 5tzFkiKscXHK"},
       {"wallet": "9Q18hhGJxvy16VAa8Th8Lua4WUSxnW1E1mYmqS16aPFN", "creates": 12, "graduated": 6, "rate": 50, "best_mc": 202013, "note": "child of DwCp9GZw3 operator"},
       {"wallet": "EXFDkKcUY5R5F2UcaeGdFpaCbbpeqzaentnyR3SyVyHd", "creates": 4, "graduated": 3, "rate": 75, "best_mc": 330715, "note": "child of DwCp9GZw3 operator"}
+    ],
+    "tier_c": [
+      {"wallet": "3ifsnZfTfDN7rrKcASaTdRyhYqe1FayPR77R7kZB4rSh", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 829420},
+      {"wallet": "ATLw3hVRcyLHuZXqENMP9zyAi2YCkyZiZ3BnykQZiLze", "creates": 2, "graduated": 2, "rate": 100, "best_mc": 669210},
+      {"wallet": "DZwhiLMN5EWbvpdbHB8NmcR2mqyZCR2XPQLGvLJjb6ax", "creates": 2, "graduated": 2, "rate": 100, "best_mc": 429806},
+      {"wallet": "FUuQKV53fUcZ8PexyQ9jTMcBw9JLNoQqhfUzpDPs8n5X", "creates": 2, "graduated": 1, "rate": 50, "best_mc": 388263, "note": "child of E9vf42zJXFv8 operator"},
+      {"wallet": "6yhdUyVsgqQqMWXrPgxDBLACSxMWKN6DBtU3QDbteufh", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 332620},
+      {"wallet": "CfkigDD8ig77boQNw9pqXMYaBu14XekugqzgeupGoJU6", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 303835, "note": "child of 5tzFkiKscXHK operator"}
     ]
   },
   "operators": [
