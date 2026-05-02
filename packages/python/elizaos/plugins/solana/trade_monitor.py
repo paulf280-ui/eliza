@@ -1378,6 +1378,17 @@ def _build_context(mint: str, pos: dict, feed: DataFeed, age_secs: float,
             "meteora" if pos.get("dex") == "meteora"
             else (pos.get("strategy") or "copy_trade")
         ),
+        # Signal source — drives which TP/SL/exit rails the brain should
+        # reason about. "creator_alpha_*" sources use +100%/-75% rails
+        # with brain-managed moonbag; others use standard +20%/-25%.
+        "signal_source":     pos.get("signal_source") or "unknown",
+        "tp1_target_pct":    (
+            100.0 if str(pos.get("signal_source") or "").startswith("creator_alpha") else 20.0
+        ),
+        "floor_pct":         (
+            -75.0 if str(pos.get("signal_source") or "").startswith("creator_alpha") else -25.0
+        ),
+        "moonbag_managed":   str(pos.get("signal_source") or "").startswith("creator_alpha"),
     }
     # Merge whale-concentration probe (G7 WHALE_PATTERN gate). Optional —
     # when None, the fields are absent and brains skip the gate.
@@ -1483,7 +1494,27 @@ OUTPUT: Respond with valid JSON only — no prose. SELL only when the data shows
 
 _HOLD_SELL_PROMPT = """Decide HOLD / SELL / WATCH on this open Solana meme-coin position by evaluating six gates, then synthesizing.
 
-ENVIRONMENT (2026-04-26 hard-TP era): TP fires at +20% full-exit, catastrophic floor at -25% — you rule everything in between. A stalled-winner rule auto-banks if pnl camps in [+12%, +18%] for 10 min, so your high-PnL HOLD votes only matter when the move is actively progressing. You are the primary exit decider.
+ENVIRONMENT (read context.signal_source to know which rails apply):
+
+  • If signal_source starts with "creator_alpha"  →  CREATOR-ALPHA RAILS:
+      TP1 fires at +100% (sells 50% — locks principal+profit), then 50%
+      MOONBAG rides until YOU decide to exit. Catastrophic floor at -75%.
+      You rule the moonbag — runners can ride to +500% to +5000% on the
+      bonding-curve sniper strategy. Your job: distinguish a real distribution
+      (cut at +200% before it dies) from a normal whale-exit pullback (HOLD,
+      ride the recovery to +1000%+). Smaller position size (0.1 SOL) means
+      the asymmetric upside matters more than tight risk control.
+
+  • Else (lifecycle / breakout / etc.)  →  STANDARD HARD-TP RAILS:
+      TP fires at +20% full-exit, catastrophic floor at -25% — you rule
+      everything in between. A stalled-winner rule auto-banks if pnl camps
+      in [+12%, +18%] for 10 min, so your high-PnL HOLD votes only matter
+      when the move is actively progressing.
+
+You are the primary exit decider in your tier's band (Groq=0.75, Gemini=0.70,
+Claude=0.65 SELL conf). For creator_alpha positions, peak-protection raises
+non-Claude SELL threshold to 0.90 if peak >= +5% — the depth tier (Claude)
+is trusted to call exits on moonbags.
 
 EVALUATION GATES (assess each independently before deciding):
 
