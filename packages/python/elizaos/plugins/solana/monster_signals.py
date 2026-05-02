@@ -229,6 +229,43 @@ _creator_alpha_watched_children: dict[str, dict] = {}  # child → {parent, fund
 _creator_alpha_pending_mints: dict[str, dict] = {}   # mint → {detected_ts, source, creator, parent_op}
 _creator_alpha_recent_signals: deque = deque(maxlen=50)  # rolling activity feed for /api endpoint
 
+# Priority mints — when creator_alpha scout sees a graduation, the mint is added
+# here in addition to the fresh_grad_queue. The lifecycle scout consults this
+# set and applies RELAXED gates: liq floor $5k (vs $30k), age min 0 (vs 20min),
+# h1 max 600% (vs 100%). Hard safety gates (rugcheck, top10, top1, creator_burn)
+# still apply. Entries tagged with signal_source = "creator_alpha_*" so they
+# show up distinctly in the dashboard's per-source performance breakdown.
+_creator_alpha_priority_mints: dict[str, dict] = {}  # mint → {marked_ts, source, creator, parent_op}
+_CREATOR_ALPHA_PRIORITY_TTL_SECS = 15 * 60   # 15 min — token must enter via priority path within this window
+_CREATOR_ALPHA_PRIORITY_LIQ_MIN  = 5_000     # vs LIFECYCLE_MIN_LIQ_USD=30k
+_CREATOR_ALPHA_PRIORITY_AGE_MIN  = 0         # vs LIFECYCLE_MIN_AGE_SECS=1200
+_CREATOR_ALPHA_PRIORITY_H1_MAX   = 600       # vs LIFECYCLE_H1_CHANGE_MAX_PCT=100
+
+
+def mark_creator_alpha_priority(mint: str, source: str, creator: str | None,
+                                 parent_op: str | None) -> None:
+    """Called by creator_alpha_scout when pushing a graduated mint to the
+    fast-path queue. Adds the mint to the priority set so the lifecycle
+    scout applies relaxed gates."""
+    _creator_alpha_priority_mints[mint] = {
+        "marked_ts": time.time(),
+        "source": source,
+        "creator": creator,
+        "parent_op": parent_op,
+    }
+
+
+def _is_creator_alpha_priority(mint: str) -> dict | None:
+    """Returns the priority record for the mint if it's in the set AND fresh,
+    else None. Expired entries are cleaned up lazily."""
+    rec = _creator_alpha_priority_mints.get(mint)
+    if not rec:
+        return None
+    if time.time() - rec["marked_ts"] > _CREATOR_ALPHA_PRIORITY_TTL_SECS:
+        _creator_alpha_priority_mints.pop(mint, None)
+        return None
+    return rec
+
 
 def _load_creator_alpha_playbook() -> dict:
     global _creator_alpha_playbook
@@ -472,13 +509,22 @@ async def creator_alpha_scout_loop(runtime: Any, session: aiohttp.ClientSession)
                         pool = ps.get("pairAddress") or ""
                         on_chain_ts = (ps.get("pairCreatedAt") or 0) / 1000 if ps.get("pairCreatedAt") else None
                         push_fresh_grad(mint, pool, on_chain_ts=on_chain_ts)
+                        # ALSO mark as priority — lifecycle scout will use
+                        # relaxed gates for this mint on its next cycle.
+                        mark_creator_alpha_priority(
+                            mint=mint,
+                            source=pinfo["source"],
+                            creator=pinfo.get("creator"),
+                            parent_op=pinfo.get("parent_op"),
+                        )
                         _creator_alpha_recent_signals.append({
                             "kind": "graduated", "mint": mint, "source": pinfo["source"],
                             "creator": pinfo.get("creator"), "parent_op": pinfo.get("parent_op"),
                             "ts": now, "lag_secs": int(now - pinfo["detected_ts"]),
                         })
                         print(f"[creator-alpha] 🚀 GRADUATED mint={mint[:14]} pool={pool[:14]} "
-                              f"src={pinfo['source']} lag={int(now - pinfo['detected_ts'])}s — pushed to fast-path")
+                              f"src={pinfo['source']} lag={int(now - pinfo['detected_ts'])}s "
+                              f"— pushed to fast-path with PRIORITY (relaxed gates)")
                         stale_mints.append(mint)
                 except Exception:
                     pass
@@ -1585,6 +1631,14 @@ async def lifecycle_scout_loop(runtime: Any,
                     age_secs = (now_ms - float(pca)) / 1000
                     age_max = LIFECYCLE_WATCHLIST_MAX_AGE_SECS if on_watch else LIFECYCLE_MAX_AGE_SECS
 
+                    # Creator-alpha priority — if this mint was just graduated
+                    # by a tracked operator/creator, we trust the wallet signal
+                    # more than the standard "is this token mature" filters.
+                    # Use relaxed gates: liq $5k floor (vs $30k), age=0 (vs 20min),
+                    # h1 max 600% (vs 100%), wash cap effectively disabled.
+                    # Hard safety gates (top1, top10, rugcheck, creator_burn) STAY.
+                    priority_rec = _is_creator_alpha_priority(mint)
+
                     # Viral-momentum eligibility — checked once and reused at every
                     # soft-gate site below. Token must pass all of:
                     #   age >= 10min (vs normal 20min)
@@ -1606,7 +1660,12 @@ async def lifecycle_scout_loop(runtime: Any,
                         and _vir_h1 <= LIFECYCLE_VIRAL_H1_MAX_PCT
                     )
 
-                    age_floor = LIFECYCLE_VIRAL_AGE_MIN_SECS if viral_eligible else LIFECYCLE_MIN_AGE_SECS
+                    if priority_rec:
+                        age_floor = _CREATOR_ALPHA_PRIORITY_AGE_MIN
+                    elif viral_eligible:
+                        age_floor = LIFECYCLE_VIRAL_AGE_MIN_SECS
+                    else:
+                        age_floor = LIFECYCLE_MIN_AGE_SECS
                     if age_secs < age_floor or age_secs > age_max:
                         if on_watch and age_secs > age_max:
                             _lifecycle_deferred.pop(mint, None)  # aged out of watchlist
@@ -1614,7 +1673,8 @@ async def lifecycle_scout_loop(runtime: Any,
                         continue
                     cycle_in_age_window += 1
                     liq_usd = float((p.get("liquidity") or {}).get("usd") or 0)
-                    if not (LIFECYCLE_MIN_LIQ_USD <= liq_usd <= LIFECYCLE_MAX_LIQ_USD):
+                    liq_min = _CREATOR_ALPHA_PRIORITY_LIQ_MIN if priority_rec else LIFECYCLE_MIN_LIQ_USD
+                    if not (liq_min <= liq_usd <= LIFECYCLE_MAX_LIQ_USD):
                         cycle_rejects["liq"] += 1
                         continue
                     mc_usd = float(p.get("marketCap") or p.get("fdv") or 0)
@@ -1628,7 +1688,8 @@ async def lifecycle_scout_loop(runtime: Any,
                     pc = p.get("priceChange") or {}
                     h1_change = float(pc.get("h1") or 0)
                     m5_change = float(pc.get("m5") or 0)
-                    if h1_change > LIFECYCLE_H1_CHANGE_MAX_PCT:
+                    h1_max = _CREATOR_ALPHA_PRIORITY_H1_MAX if priority_rec else LIFECYCLE_H1_CHANGE_MAX_PCT
+                    if h1_change > h1_max:
                         # Viral override: catch early-pump fresh-grads that
                         # DexScreener reports with inflated h1 (since pair has
                         # < 1h of data). 5-token backtest showed CCP/FOFAR/EVA
@@ -1647,7 +1708,10 @@ async def lifecycle_scout_loop(runtime: Any,
                     # (GOBLIN 2026-04-25 ran vol/liq=12x with real buyers and printed
                     # 2 real spikes; we missed it). Same threshold as the bounce gate.
                     vol_m5_lc = float((p.get("volume") or {}).get("m5") or 0)
-                    if liq_usd > 0 and (vol_m5_lc / liq_usd) > LIFECYCLE_MAX_M5_VOL_LIQ:
+                    if not priority_rec and liq_usd > 0 and (vol_m5_lc / liq_usd) > LIFECYCLE_MAX_M5_VOL_LIQ:
+                        # Priority mints skip the wash-cap entirely — wash-during-launch
+                        # is normal for fresh graduations. Standard mints still get
+                        # the m5_buys override when wash is flagged.
                         lc_txns_m5 = (p.get("txns") or {}).get("m5") or {}
                         lc_m5_buys = int(lc_txns_m5.get("buys") or 0)
                         if lc_m5_buys < BREAKOUT_WASH_OVERRIDE_BUYERS:
@@ -1670,15 +1734,21 @@ async def lifecycle_scout_loop(runtime: Any,
                     cycle_passed_baseline += 1
                     price_native = float(p.get("priceNative") or p.get("priceUsd") or 0)
                     shape, shape_reason = _lifecycle_classify_entry_shape(m5_change, h1_change)
-                    if shape != "good" and not viral_eligible:
+                    if shape != "good" and not viral_eligible and not priority_rec:
                         # Viral override fast-paths through the shape gate — at the
                         # peak of a viral pump, m5 will read "overheated" (>+8%) but
                         # the buyer-flow signal tells us this IS the entry, not a
-                        # reason to defer. Still falls through to safety gates below.
+                        # reason to defer. Same for creator_alpha priority mints —
+                        # we trust the wallet signal more than the shape heuristic.
+                        # Still falls through to safety gates below.
                         _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
                         cycle_added_to_watchlist += 1
                         print(f"[monster-lifecycle] 👁 {mint[:8]} {shape} — {shape_reason} (watchlist)")
                         continue
+                    if priority_rec and shape != "good":
+                        print(f"[monster-lifecycle] ⭐ {mint[:8]} CREATOR-ALPHA-PRIORITY: "
+                              f"src={priority_rec['source']} bypassing shape={shape}, age={age_secs/60:.1f}min, "
+                              f"liq=${liq_usd:,.0f}, h1={h1_change:.0f}%")
                     if viral_eligible and shape != "good":
                         # Log the override fire so we can audit outcomes in real time.
                         print(f"[monster-lifecycle] 🚀 {mint[:8]} VIRAL-OVERRIDE: "
@@ -1841,7 +1911,15 @@ async def lifecycle_scout_loop(runtime: Any,
                         print(f"[monster-lifecycle] rugcheck import error: {_rc_err} — allowing")
 
                     _mark_signalled(mint)
-                    if viral_eligible and shape != "good":
+                    if priority_rec:
+                        # Creator-alpha priority entries get distinct source so
+                        # the dashboard's per-source breakdown shows their P&L
+                        # separately from generic lifecycle entries.
+                        sig_src = priority_rec.get("source") or "creator_alpha"
+                        # One-shot consumption — drop from priority set so we
+                        # don't double-tag a re-evaluation
+                        _creator_alpha_priority_mints.pop(mint, None)
+                    elif viral_eligible and shape != "good":
                         sig_src = "lifecycle_viral"
                     else:
                         sig_src = "lifecycle_bounce" if on_watch else "lifecycle"
