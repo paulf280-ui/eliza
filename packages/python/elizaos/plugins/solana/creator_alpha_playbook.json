@@ -11,6 +11,7 @@
   },
   "direct_creators": {
     "tier_a": [
+      {"wallet": "4euyaqBe45J5dniAcNARERUo7B1wG96riG21sEpNndfU", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "MOG dev — user-identified 2026-05-02. Heavy-trader wallet (30K+ sigs, 21 SOL, active since Jan 2026). NOT fresh — won't trigger fresh-wallet operator-fund detection. Watch this wallet directly for any pump.fun OR FLASHX launchpad creates."},
       {"wallet": "7YeCaAqhzhtRio1mddqaQzhvWRWXEsm4GSyfm4VwDsvL", "creates": 3, "graduated": 3, "rate": 100, "best_mc": 11238380, "note": "ELITE serial — 100% on 3 launches"},
       {"wallet": "EpEPwSwfR34Puadp7H2vTCWkFbpmMFfgbEsPwHrZuawk", "creates": 4, "graduated": 2, "rate": 50, "best_mc": 16118661, "note": "highest peak in dataset"},
       {"wallet": "9P9FiEf7EzAgXiH73wRNCHJWsuktj5gRKC2hJGSsnKNV", "creates": 2, "graduated": 2, "rate": 100, "best_mc": 2994264, "note": "perfect 2/2"},
@@ -41,7 +42,6 @@
     ]
   },
   "operators": [
-    {"wallet": "3zd5av5f3hxVhhgCDTbge7vrsmXA69wkMdaUcNHcCCSe", "children_count": 1, "combined_grads": 1, "best_mc": 34700, "note": "Discovered 2026-05-02 — TRUE operator behind MOG (5fctAP4J). Funded GjLsSBfVuP originally Oct 2025 + 0.02 SOL wake-up tx 28min before MOG creation. 5tzFkiKscX appeared LATER (post-launch top-up) — discriminator for real operator: wallet is fresh + funding precedes creation. NEEDS DEEPER CROSS-REF."},
     {"wallet": "5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9", "children_count": 7, "combined_grads": 12, "best_mc": 3982985, "note": "MEGA OPERATOR — Wave 3, 7 children, $3.98M peak via Dz8Sdxa7S; 4 fresh wallets pending launches"},
     {"wallet": "DwCp9GZw3ueoXPykHSPUkRZEwcTVbJH2i9Sf1cXYicWf", "children_count": 2, "combined_grads": 9, "best_mc": 330715, "note": "consistent mid-tier operator — high cadence"},
     {"wallet": "G5u7s6CNufkAvseFTpBbBk2qYg17hdRC1i2jasEgukBs", "children_count": 2, "combined_grads": 2, "best_mc": 3460112, "note": "Wave 1+2 — DWOGE ($3.46M) + TRUTH"},
