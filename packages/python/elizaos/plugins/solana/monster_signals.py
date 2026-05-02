@@ -558,13 +558,14 @@ LIFECYCLE_BOUNCE_M5_BUY_SELL_RATIO   = 1.5   # winners 1.66x to 9.3x; CCP 0.85x 
 # tokens (TRUTH, RC) never reach 50 unique buyers in 30min, so override
 # stays off and bounce path catches them later. Survivorship bias: we have
 # zero data on viral-fire-then-rug — the -25% SL is the backstop.
-LIFECYCLE_VIRAL_OVERRIDE_BUYERS = 50      # DexScreener m5.buys txn count threshold
-                                          # Dropped 80→50 (2026-05-01 DWOGE post-mortem):
-                                          # at 80 the override fired 4 min after the true
-                                          # inflection on DWOGE, putting us at the spike top
-                                          # (-5.8% loss). 50 fires at the inflection minute
-                                          # (15:29 UTC instead of 15:33), 4 min earlier in
-                                          # the same pump structure. -25% SL caps misfires.
+LIFECYCLE_VIRAL_ENABLED = False           # 2026-05-02 — DISABLED.
+                                          # 7-day data: 0 wins / 5 trades / -0.250 SOL.
+                                          # The override fires when m5_buys spikes — but
+                                          # that spike happens AT the FOMO top of these
+                                          # tokens (DWOGE/PETS/NKT/ROME post-mortems), not
+                                          # at the breakout. To re-enable, flip to True;
+                                          # consider raising threshold to 100+ first.
+LIFECYCLE_VIRAL_OVERRIDE_BUYERS = 50      # DexScreener m5.buys txn count threshold (when ENABLED)
 LIFECYCLE_VIRAL_BS_MIN          = 1.5     # buy-dominant pressure (m5_buys / m5_sells)
 LIFECYCLE_VIRAL_H1_MAX_PCT      = 600.0   # cap relaxation when override fires (vs normal 100)
 LIFECYCLE_VIRAL_AGE_MIN_SECS    = 10 * 60 # drop the 20-min age floor to 10 when viral
@@ -1598,7 +1599,8 @@ async def lifecycle_scout_loop(runtime: Any,
                     _vir_bs = (_vir_buys / _vir_sells) if _vir_sells > 0 else float("inf")
                     _vir_h1 = float((p.get("priceChange") or {}).get("h1") or 0)
                     viral_eligible = (
-                        age_secs >= LIFECYCLE_VIRAL_AGE_MIN_SECS
+                        LIFECYCLE_VIRAL_ENABLED
+                        and age_secs >= LIFECYCLE_VIRAL_AGE_MIN_SECS
                         and _vir_buys >= LIFECYCLE_VIRAL_OVERRIDE_BUYERS
                         and _vir_bs >= LIFECYCLE_VIRAL_BS_MIN
                         and _vir_h1 <= LIFECYCLE_VIRAL_H1_MAX_PCT
