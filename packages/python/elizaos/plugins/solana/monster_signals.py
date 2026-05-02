@@ -517,12 +517,22 @@ async def creator_alpha_scout_loop(runtime: Any, session: aiohttp.ClientSession)
                         _creator_alpha_watched_children[child] = {
                             "parent": op, "funded_ts": now, "amount_sol": amt,
                         }
+                        # CRITICAL: warm the sig cursor immediately so the next
+                        # poll only fires on creates AFTER funding. Without this,
+                        # if the child has pre-existing creates in their history
+                        # (e.g. operator funded an already-active wallet), we
+                        # would misfire entry on a stale historical create.
+                        # Bug discovered 2026-05-02: bought MOG 45min late
+                        # because GjLsSBfVuP had a 21:10 create in history when
+                        # operator funded them at 21:50.
+                        await _creator_alpha_poll_recent(session, child, limit=1)
                         _creator_alpha_recent_signals.append({
                             "kind": "operator_fund", "parent": op, "child": child,
                             "amount_sol": amt, "ts": now,
                         })
                         print(f"[creator-alpha] 👁 OPERATOR-FUND parent={op[:10]} → child={child[:10]} "
-                              f"({amt:.2f} SOL) — watching {_CREATOR_ALPHA_CHILD_TTL_SECS//60}min")
+                              f"({amt:.2f} SOL) — watching {_CREATOR_ALPHA_CHILD_TTL_SECS//60}min "
+                              f"(sig cursor seeded — only NEW creates will fire)")
                 await asyncio.sleep(0.04)
 
             # 3. Watched children — check for creates
@@ -533,6 +543,15 @@ async def creator_alpha_scout_loop(runtime: Any, session: aiohttp.ClientSession)
                     continue
                 new = await _creator_alpha_poll_recent(session, child)
                 for s in new:
+                    # Defense-in-depth: if this sig's blockTime predates our
+                    # funding event by > 60s, it's a stale historical sig that
+                    # slipped through — ignore (we don't want to enter on a
+                    # token created before we started watching).
+                    sig_ts = s.get("blockTime") or 0
+                    if sig_ts and sig_ts < (info["funded_ts"] - 60):
+                        print(f"[creator-alpha] ⏭ stale-create skip: sig from "
+                              f"{int(info['funded_ts'] - sig_ts)}s before funding")
+                        continue
                     mint = await _creator_alpha_detect_create(session, s["signature"], child)
                     if mint and mint not in _creator_alpha_pending_mints:
                         rec = {"detected_ts": now, "source": "creator_alpha_operator",

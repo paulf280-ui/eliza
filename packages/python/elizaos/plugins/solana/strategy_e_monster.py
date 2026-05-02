@@ -410,6 +410,26 @@ async def open_monster_position(
     except Exception:
         pass
 
+    # Bonding-curve fallback: when buying brand-new pump.fun tokens via
+    # PumpPortal pool="pump", DexScreener typically hasn't indexed yet so
+    # entry_price comes back 0. Derive it from actual on-chain fill:
+    # entry_price (SOL/token) = sol_spent / tokens_received.
+    # Without this fix, TP1/floor checks silently no-op forever because
+    # evaluate_exit guards on entry_price > 0. See 5fctAP4J 2026-05-02:
+    # bot caught BC entry correctly but missed +521% peak because no exit
+    # check could compute pnl_pct with entry_price=0.
+    if entry_price <= 0 and tokens_received_raw > 0:
+        # Bonding-curve safety net: pump.fun tokens use 6 decimals.
+        # entry_price (SOL/token) = sol_spent / tokens_received_ui.
+        try:
+            tokens_ui = float(tokens_received_raw) / 1_000_000.0
+            if tokens_ui > 0:
+                entry_price = float(sol_size) / tokens_ui
+                print(f"[monster] 💰 entry_price derived from fill: "
+                      f"{sol_size} SOL / {tokens_ui:,.0f} tokens = {entry_price:.3e} SOL/token")
+        except Exception as _ep_err:
+            print(f"[monster] ⚠️  entry-price derivation failed: {_ep_err}")
+
     _monster_positions[mint] = {
         "token_name":       token_name,
         "signal_source":    signal_source,
