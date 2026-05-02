@@ -255,6 +255,17 @@ _config: dict = {
     "monster_max_concurrent":     1,        # number of simultaneous monster positions (1-5)
     "monster_default_size_sol":   0.45,     # SOL per monster trade
 
+    # ── Creator-alpha strategy (operator/creator wallet sniper) ───────────────
+    # Different risk profile than lifecycle: smaller bets, wider stops, brain-
+    # driven exits. The thesis: most creator_alpha entries die or chop, but
+    # the rare DWOGE-class hit returns hundreds of x. Designed for asymmetric
+    # upside via lottery-ticket sizing.
+    "creator_alpha_size_sol":      0.10,    # 0.1 SOL per entry (vs 0.45 default)
+    "creator_alpha_max_concurrent": 3,       # 3 concurrent positions
+    "creator_alpha_floor_pct":    -75.0,    # catastrophic floor only — no tight SL
+    "creator_alpha_tp1_mult":      2.0,     # +100% partial exit
+    "creator_alpha_tp1_sell_frac": 0.5,     # sell 50% at TP1, keep 50% as moonbag (brain-managed)
+
     # ── Split-buy ("Harvester + Monster Hunter") dual position system ──────────
     # When enabled: each qualifying token opens TWO positions simultaneously.
     # Position A (HARVESTER):       split_buy_a_sol, TP = entry × split_buy_a_tp_mult (+60%)
@@ -439,6 +450,11 @@ def set_value(key: str, value, changed_by: str = "system", reason: str = "") -> 
         "monster_scanner_min_buy_ratio": (0.0, 95.0),
         "monster_max_concurrent":     (1, 5),       # cap 5 — wallet headroom check happens at trade time
         "monster_default_size_sol":   (0.05, 2.0),  # 0.05 SOL floor, 2 SOL ceiling
+        "creator_alpha_size_sol":     (0.05, 2.0),
+        "creator_alpha_max_concurrent": (1, 10),    # lottery-ticket — allow up to 10
+        "creator_alpha_floor_pct":    (-95.0, -10.0), # very wide floor, but never less than -10
+        "creator_alpha_tp1_mult":     (1.20, 20.0), # min +20% TP1, max +1900%
+        "creator_alpha_tp1_sell_frac": (0.0, 1.0),
         "split_buy_a_sol":         (0.001, 10.0),
         "split_buy_b_sol":         (0.001, 10.0),
         "split_buy_a_tp_mult":     (1.10, 20.0),

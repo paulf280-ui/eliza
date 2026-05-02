@@ -15,6 +15,7 @@ import BrainPanel from './components/brains/BrainPanel'
 import LifecycleRejectsPanel from './components/diagnostics/LifecycleRejectsPanel'
 import PositionConfigPanel from './components/diagnostics/PositionConfigPanel'
 import CreatorAlphaPanel from './components/diagnostics/CreatorAlphaPanel'
+import CreatorAlphaPnLPanel from './components/diagnostics/CreatorAlphaPnLPanel'
 import PerformanceBySourcePanel from './components/diagnostics/PerformanceBySourcePanel'
 
 interface CopyTradeStats {
@@ -286,14 +287,19 @@ export default function App() {
         <ActivityFeed />
       </div>
 
-      <ZoneHeader label="Creator-Alpha" hint="Operator + direct-creator wallet monitor — bonding-curve early-detection" />
+      <ZoneHeader label="Creator-Alpha" hint="ONLY active strategy · 0.1 SOL × 3 slots · bonding-curve direct entry · brain-driven exits" />
 
-      {/* ── Creator-alpha live panel — full width ─────────────────────────── */}
+      {/* ── Creator-alpha P&L hero panel — strategy-specific stats ──────── */}
+      <div className="col-span-12 h-[400px]">
+        <CreatorAlphaPnLPanel />
+      </div>
+
+      {/* ── Creator-alpha live panel — operator/child/pending feed ──────── */}
       <div className="col-span-12 h-[420px]">
         <CreatorAlphaPanel />
       </div>
 
-      {/* ── Performance-by-source — full width ────────────────────────────── */}
+      {/* ── Performance-by-source — all-strategy comparison ─────────────── */}
       <div className="col-span-12 h-[420px]">
         <PerformanceBySourcePanel />
       </div>

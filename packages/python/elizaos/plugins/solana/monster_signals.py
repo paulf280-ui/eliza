@@ -76,10 +76,13 @@ _MONSTER_SKIP_MINTS: set[str] = {
 def _env_on(key: str, default: str = "false") -> bool:
     return os.getenv(key, default).strip().lower() in ("1", "true", "yes", "on")
 
-CLUSTER_CONFIRM_ENABLED  = _env_on("MONSTER_CLUSTER_CONFIRM_ENABLED", "true")
-SERIAL_DEPLOYER_ENABLED  = _env_on("MONSTER_SERIAL_DEPLOYER_ENABLED", "true")
-LIFECYCLE_SCOUT_ENABLED  = _env_on("MONSTER_LIFECYCLE_ENABLED", "true")
-BREAKOUT_SCOUT_ENABLED   = _env_on("MONSTER_BREAKOUT_ENABLED", "true")
+# 2026-05-02 — CREATOR-ALPHA-ONLY mode. All other scouts disabled by default
+# while we validate the operator-tracking strategy in isolation. To re-enable
+# any of these, set the env var to "true" or flip the default below.
+CLUSTER_CONFIRM_ENABLED  = _env_on("MONSTER_CLUSTER_CONFIRM_ENABLED", "false")
+SERIAL_DEPLOYER_ENABLED  = _env_on("MONSTER_SERIAL_DEPLOYER_ENABLED", "false")
+LIFECYCLE_SCOUT_ENABLED  = _env_on("MONSTER_LIFECYCLE_ENABLED", "false")
+BREAKOUT_SCOUT_ENABLED   = _env_on("MONSTER_BREAKOUT_ENABLED", "false")
 
 # ─── Cadences ───────────────────────────────────────────────────────────
 CLUSTER_POLL_SECS         = 45     # poll cluster wallets every 45s
@@ -241,6 +244,11 @@ _CREATOR_ALPHA_PRIORITY_LIQ_MIN  = 5_000     # vs LIFECYCLE_MIN_LIQ_USD=30k
 _CREATOR_ALPHA_PRIORITY_AGE_MIN  = 0         # vs LIFECYCLE_MIN_AGE_SECS=1200
 _CREATOR_ALPHA_PRIORITY_H1_MAX   = 600       # vs LIFECYCLE_H1_CHANGE_MAX_PCT=100
 
+# Direct-entry mode — fire entry on token creation rather than waiting for
+# graduation. With this enabled the bot enters at $5-30k MC instead of
+# $50-100k+ MC. Uses pump.fun bonding-curve buy via PumpPortal pool="pump".
+CREATOR_ALPHA_DIRECT_ENTRY = True
+
 
 def mark_creator_alpha_priority(mint: str, source: str, creator: str | None,
                                  parent_op: str | None) -> None:
@@ -253,6 +261,51 @@ def mark_creator_alpha_priority(mint: str, source: str, creator: str | None,
         "creator": creator,
         "parent_op": parent_op,
     }
+
+
+async def _creator_alpha_direct_entry(runtime: Any, session: aiohttp.ClientSession,
+                                       mint: str, source: str, creator: str | None,
+                                       parent_op: str | None) -> None:
+    """Direct-entry path for creator_alpha — buy on the bonding curve immediately
+    after detecting a token creation from a tracked operator/creator. Bypasses
+    the wait-for-graduation flow. Uses PumpPortal pool='pump' for the buy."""
+    if not CREATOR_ALPHA_DIRECT_ENTRY:
+        return
+    # Slot check via source-aware capacity
+    if not monster.can_open_new_position(source):
+        print(f"[creator-alpha] ⏭ slot pool full — {mint[:14]} skipped (src={source})")
+        return
+    sol_size = monster.get_size_for_source(source)
+    token_name = mint[:8]  # we don't have a name yet — token's brand-new
+    metadata = {
+        "creator": creator,
+        "parent_op": parent_op,
+        "entry_path": "bonding_curve",
+        "detected_via": "creator_alpha_scout",
+    }
+    print(f"[creator-alpha] ⚡ DIRECT ENTRY {mint[:14]} src={source} size={sol_size} SOL pool=pump")
+    try:
+        ok = await monster.open_monster_position(
+            mint=mint,
+            token_name=token_name,
+            signal_source=source,
+            sol_size=sol_size,
+            session=session,
+            runtime=runtime,
+            metadata=metadata,
+            pool="pump",  # bonding curve — token is brand-new, not graduated
+        )
+        _creator_alpha_recent_signals.append({
+            "kind": "direct_entry", "mint": mint, "source": source,
+            "creator": creator, "parent_op": parent_op,
+            "sol_size": sol_size, "success": bool(ok), "ts": time.time(),
+        })
+    except Exception as exc:
+        print(f"[creator-alpha] direct-entry error on {mint[:14]}: {exc}")
+        _creator_alpha_recent_signals.append({
+            "kind": "direct_entry_error", "mint": mint, "source": source,
+            "error": str(exc)[:80], "ts": time.time(),
+        })
 
 
 def _is_creator_alpha_priority(mint: str) -> dict | None:
@@ -443,6 +496,12 @@ async def creator_alpha_scout_loop(runtime: Any, session: aiohttp.ClientSession)
                         _creator_alpha_pending_mints[mint] = rec
                         _creator_alpha_recent_signals.append({**rec, "kind": "direct_create"})
                         print(f"[creator-alpha] 🎯 DIRECT-CREATE creator={w[:10]} mint={mint[:14]}")
+                        # DIRECT-ENTRY path: fire bonding-curve buy NOW
+                        if CREATOR_ALPHA_DIRECT_ENTRY:
+                            asyncio.create_task(_creator_alpha_direct_entry(
+                                runtime, session, mint,
+                                "creator_alpha_direct", w, None,
+                            ))
                 await asyncio.sleep(0.04)
 
             # 2. Operators → spawn child watchers
@@ -483,6 +542,12 @@ async def creator_alpha_scout_loop(runtime: Any, session: aiohttp.ClientSession)
                         print(f"[creator-alpha] 🎯 OPERATOR-CREATE parent={info['parent'][:10]} "
                               f"creator={child[:10]} mint={mint[:14]}")
                         stale_children.append(child)
+                        # DIRECT-ENTRY path: fire bonding-curve buy NOW
+                        if CREATOR_ALPHA_DIRECT_ENTRY:
+                            asyncio.create_task(_creator_alpha_direct_entry(
+                                runtime, session, mint,
+                                "creator_alpha_operator", child, info["parent"],
+                            ))
                 await asyncio.sleep(0.04)
             for c in stale_children:
                 _creator_alpha_watched_children.pop(c, None)

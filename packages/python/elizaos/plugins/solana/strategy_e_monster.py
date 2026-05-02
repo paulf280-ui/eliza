@@ -132,8 +132,76 @@ def get_default_size_sol() -> float:
         return MONSTER_DEFAULT_SIZE_SOL
 
 
-def can_open_new_position() -> bool:
-    return len(_monster_positions) < get_max_concurrent()
+def _is_creator_alpha_source(source: str | None) -> bool:
+    return bool(source) and (source.startswith("creator_alpha"))
+
+
+def get_size_for_source(source: str | None) -> float:
+    """Return the trade size for a given signal_source — creator_alpha gets
+    its own (smaller) sizing; everything else uses the standard monster size."""
+    if _is_creator_alpha_source(source):
+        try:
+            from elizaos.plugins.solana import live_config as _lc
+            return float(_lc.get("creator_alpha_size_sol", 0.10))
+        except Exception:
+            return 0.10
+    return get_default_size_sol()
+
+
+def get_floor_for_source(source: str | None) -> float:
+    """Catastrophic floor (negative %) — creator_alpha gets a much wider floor
+    (-75% default) since monster runs often dip deeply before launching."""
+    if _is_creator_alpha_source(source):
+        try:
+            from elizaos.plugins.solana import live_config as _lc
+            return float(_lc.get("creator_alpha_floor_pct", -75.0))
+        except Exception:
+            return -75.0
+    return MONSTER_PRE_TP1_FLOOR_PCT
+
+
+def get_tp1_mult_for_source(source: str | None) -> float:
+    """TP1 trigger multiple — creator_alpha targets +100% by default vs +20% standard."""
+    if _is_creator_alpha_source(source):
+        try:
+            from elizaos.plugins.solana import live_config as _lc
+            return float(_lc.get("creator_alpha_tp1_mult", 2.0))
+        except Exception:
+            return 2.0
+    return 1.0 + (MONSTER_TP1_GAIN_PCT / 100.0)
+
+
+def get_tp1_sell_frac_for_source(source: str | None) -> float:
+    """Fraction sold at TP1 — creator_alpha sells half (moonbag), default sells all."""
+    if _is_creator_alpha_source(source):
+        try:
+            from elizaos.plugins.solana import live_config as _lc
+            return float(_lc.get("creator_alpha_tp1_sell_frac", 0.5))
+        except Exception:
+            return 0.5
+    return MONSTER_TP1_SELL_FRACTION
+
+
+def can_open_new_position(source: str | None = None) -> bool:
+    """Slot check — creator_alpha has its own slot pool (separate from lifecycle)
+    so the two strategies don't compete for the same slot."""
+    if _is_creator_alpha_source(source):
+        try:
+            from elizaos.plugins.solana import live_config as _lc
+            cap = int(_lc.get("creator_alpha_max_concurrent", 3))
+        except Exception:
+            cap = 3
+        ca_count = sum(
+            1 for pos in _monster_positions.values()
+            if _is_creator_alpha_source(pos.get("signal_source"))
+        )
+        return ca_count < cap
+    # Standard slot pool — count non-creator_alpha positions
+    other_count = sum(
+        1 for pos in _monster_positions.values()
+        if not _is_creator_alpha_source(pos.get("signal_source"))
+    )
+    return other_count < get_max_concurrent()
 
 
 def _recent_loss_on_mint(mint: str) -> dict | None:
@@ -155,11 +223,12 @@ def _recent_loss_on_mint(mint: str) -> dict | None:
 async def open_monster_position(
     mint: str,
     token_name: str,
-    signal_source: str,  # "cluster_confirm" | "serial_deployer" | "lifecycle"
+    signal_source: str,  # "cluster_confirm" | "serial_deployer" | "lifecycle" | "creator_alpha_*"
     sol_size: float,
     session: aiohttp.ClientSession,
     runtime: Any,
     metadata: dict | None = None,
+    pool: str | None = None,  # explicit pool override; None = auto-detect via DexScreener
 ) -> bool:
     """Open a new monster position. Returns True on success.
 
@@ -180,8 +249,14 @@ async def open_monster_position(
     if mint in _monster_positions:
         print(f"[monster] already holding {mint[:8]} — skip")
         return False
-    if not can_open_new_position():
-        print(f"[monster] slot pool full ({len(_monster_positions)}/{get_max_concurrent()}) — skip {token_name}")
+    if not can_open_new_position(signal_source):
+        ca = _is_creator_alpha_source(signal_source)
+        if ca:
+            from elizaos.plugins.solana import live_config as _lc
+            cap = int(_lc.get("creator_alpha_max_concurrent", 3))
+            print(f"[monster] creator-alpha slot pool full (cap={cap}) — skip {token_name}")
+        else:
+            print(f"[monster] slot pool full (cap={get_max_concurrent()}) — skip {token_name}")
         return False
 
     # Holder-guard entry check. Log-only by default (HOLDER_GUARD_ENFORCE=false);
@@ -208,24 +283,26 @@ async def open_monster_position(
     mode = "PAPER" if MONSTER_PAPER_ONLY else "LIVE"
     print(f"[monster] 🎯 OPENING ({mode}) {token_name} ({mint[:8]}) {sol_size:.3f} SOL — src={signal_source}")
 
-    # Determine pool (pump bonding curve vs pump-amm graduated)
-    pool = "pump-amm"
-    try:
-        async with session.get(
-            f"https://api.dexscreener.com/latest/dex/tokens/{mint}",
-            timeout=aiohttp.ClientTimeout(total=5),
-        ) as r:
-            if r.status == 200:
-                d = await r.json()
-                pairs = d.get("pairs") or []
-                for p in pairs:
-                    if p.get("dexId") in ("pump-amm", "pumpswap"):
-                        pool = "pump-amm"
-                        break
-                    if p.get("dexId") == "pumpfun":
-                        pool = "pump"
-    except Exception:
-        pass
+    # Determine pool: explicit override (e.g. creator_alpha bonding-curve buy)
+    # OR auto-detect via DexScreener.
+    if pool is None:
+        pool = "pump-amm"
+        try:
+            async with session.get(
+                f"https://api.dexscreener.com/latest/dex/tokens/{mint}",
+                timeout=aiohttp.ClientTimeout(total=5),
+            ) as r:
+                if r.status == 200:
+                    d = await r.json()
+                    pairs = d.get("pairs") or []
+                    for p in pairs:
+                        if p.get("dexId") in ("pump-amm", "pumpswap"):
+                            pool = "pump-amm"
+                            break
+                        if p.get("dexId") == "pumpfun":
+                            pool = "pump"
+        except Exception:
+            pass
 
     # Execute the buy via the pump service (skipped in paper mode)
     buy_sig: str | None = None
@@ -438,9 +515,18 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
     tp1_fired = pos.get("tp1_fired", False)
     now = time.time()
 
-    # ── Hard TP at +20% → full exit ──────────────────────────────────────
-    if not tp1_fired and pnl_pct >= MONSTER_TP1_GAIN_PCT:
-        return "tp_hard_20pct", MONSTER_TP1_SELL_FRACTION
+    # Source-aware TP/SL — creator_alpha gets +100% TP1 / -75% floor / 50% sell-frac
+    # while everything else uses the standard +20% TP / -25% floor / 100% sell.
+    src = pos.get("signal_source")
+    tp1_mult = get_tp1_mult_for_source(src)
+    tp1_gain_pct = (tp1_mult - 1.0) * 100.0
+    tp1_sell_frac = get_tp1_sell_frac_for_source(src)
+    floor_pct = get_floor_for_source(src)
+
+    # ── Hard TP1 → partial exit (creator_alpha=50%, default=full) ────────
+    if not tp1_fired and pnl_pct >= tp1_gain_pct:
+        tag = f"tp_hard_{int(tp1_gain_pct)}pct"
+        return tag, tp1_sell_frac
 
     # ── Stalled-winner exit: camped in [+12%, +18%] for 10min → bank ─────
     # User-requested 2026-04-26: if we're up ~+15% but the move stalls
@@ -459,8 +545,9 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
         else:
             pos["first_in_stalled_winner_ts"] = None
 
-    # ── Catastrophic floor: -25% → full exit (brains rule above this) ────
-    if not tp1_fired and pnl_pct <= MONSTER_PRE_TP1_FLOOR_PCT:
+    # ── Catastrophic floor → full exit (brains rule above this) ─────────
+    # creator_alpha uses -75% (wide), default uses -25%
+    if not tp1_fired and pnl_pct <= floor_pct:
         return f"pre_tp1_floor_{pnl_pct:.0f}pct", 1.0
 
     # ── Pre-TP flat gate: flat for 60min → full exit ────────────────────
