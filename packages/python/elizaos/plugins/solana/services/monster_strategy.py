@@ -93,6 +93,10 @@ class MonsterStrategyService(Service):
                 name="monster_breakout",
             ),
             asyncio.create_task(
+                monster_signals.creator_alpha_scout_loop(runtime, svc._session),
+                name="monster_creator_alpha",
+            ),
+            asyncio.create_task(
                 monster_social_monitor.monster_social_monitor_loop(runtime, svc._session),
                 name="monster_social_monitor",
             ),

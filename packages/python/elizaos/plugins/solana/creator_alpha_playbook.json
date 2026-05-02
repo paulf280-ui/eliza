@@ -1,0 +1,47 @@
+{
+  "_doc": "Curated alpha-creator and operator wallets — derived from on-chain analysis of 80 dev wallets across 3 waves of user-curated lists. These are the wallets the creator_alpha_scout monitors in real-time. When a direct_creator launches a token OR an operator funds a fresh wallet that then launches, the bot fires an entry signal with signal_source='creator_alpha'.",
+  "last_updated": "2026-05-02T13:00:00Z",
+  "playbook_version": 1,
+  "_legend": {
+    "tier_a": "Multi-hit + $1M+ peak — highest priority direct-track",
+    "tier_b": "One-shot $1M+ peak — direct-track if recently active",
+    "tier_c": "Proven mid-tier $250k-$1M peaks",
+    "high_hit": "High graduation rate (>=50%) with 3+ launches",
+    "operators": "Parent wallets that fund fresh creator wallets"
+  },
+  "direct_creators": {
+    "tier_a": [
+      {"wallet": "7YeCaAqhzhtRio1mddqaQzhvWRWXEsm4GSyfm4VwDsvL", "creates": 3, "graduated": 3, "rate": 100, "best_mc": 11238380, "note": "ELITE serial — 100% on 3 launches"},
+      {"wallet": "EpEPwSwfR34Puadp7H2vTCWkFbpmMFfgbEsPwHrZuawk", "creates": 4, "graduated": 2, "rate": 50, "best_mc": 16118661, "note": "highest peak in dataset"},
+      {"wallet": "9P9FiEf7EzAgXiH73wRNCHJWsuktj5gRKC2hJGSsnKNV", "creates": 2, "graduated": 2, "rate": 100, "best_mc": 2994264, "note": "perfect 2/2"},
+      {"wallet": "BXAWg4JbaeyvAHpiyYQ3Xr3bUh6FsyDHwwSkB5dmyGF", "creates": 97, "graduated": 2, "rate": 2, "best_mc": 4752829, "note": "high-volume; only catches if create burst happens"},
+      {"wallet": "6vXpuTHoFeiAoHjicCgkCHJfRxocWA5CaKAksFgAPSGb", "creates": 124, "graduated": 2, "rate": 2, "best_mc": 1234373, "note": "high-volume; same pattern as BXAWg4Jb"}
+    ],
+    "tier_b": [
+      {"wallet": "5pYBpTkovK2zyidKrJhCWCLU9AQfF3rSRjq6YCXWH8Yf", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 15381123, "note": "biggest one-shot in dataset"},
+      {"wallet": "FHcbifouatL7WFxwD8JjkRtfZhhuEUFpdtwkdXwFCYS5", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 7550555},
+      {"wallet": "Dz8Sdxa7S657coVupV6e7gjnMkRaHA9DJ8dxmZ4oz882", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 3982985, "note": "child of 5tzFkiKscXHK operator"},
+      {"wallet": "A3fCppLyKaCEXJkwenxEQ8h8j1K74fqgHTcTs9QaTzRW", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 3849455},
+      {"wallet": "J3k4T9XHhhAGrZ64ukcya19FApC8jf8xaTWwYJfjTR4p", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 3403299},
+      {"wallet": "AfxRMLKoc3Y6rGwG7Ry6DspGag6g6w8g5qTKrPSVZ7i2", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 2928398},
+      {"wallet": "5cyxY3VatbHrf6vr3ZQ4ucHbCwgc91uFMYa9dvc324Ad", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 2628929}
+    ],
+    "high_hit": [
+      {"wallet": "6Foi4aj36N9SRQ1nNtFJkCR1cv1RrvSFngSVg9NaJFWk", "creates": 11, "graduated": 8, "rate": 73, "best_mc": 177535, "note": "high-frequency mid-tier; child of 5tzFkiKscXHK"},
+      {"wallet": "9Q18hhGJxvy16VAa8Th8Lua4WUSxnW1E1mYmqS16aPFN", "creates": 12, "graduated": 6, "rate": 50, "best_mc": 202013, "note": "child of DwCp9GZw3 operator"},
+      {"wallet": "EXFDkKcUY5R5F2UcaeGdFpaCbbpeqzaentnyR3SyVyHd", "creates": 4, "graduated": 3, "rate": 75, "best_mc": 330715, "note": "child of DwCp9GZw3 operator"}
+    ]
+  },
+  "operators": [
+    {"wallet": "5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9", "children_count": 7, "combined_grads": 12, "best_mc": 3982985, "note": "MEGA OPERATOR — Wave 3, 7 children, $3.98M peak via Dz8Sdxa7S; 4 fresh wallets pending launches"},
+    {"wallet": "DwCp9GZw3ueoXPykHSPUkRZEwcTVbJH2i9Sf1cXYicWf", "children_count": 2, "combined_grads": 9, "best_mc": 330715, "note": "consistent mid-tier operator — high cadence"},
+    {"wallet": "G5u7s6CNufkAvseFTpBbBk2qYg17hdRC1i2jasEgukBs", "children_count": 2, "combined_grads": 2, "best_mc": 3460112, "note": "Wave 1+2 — DWOGE ($3.46M) + TRUTH"},
+    {"wallet": "E9vf42zJXFv8Ljop1cG68NAxLDat4ZEGEWDLfJVX38GF", "children_count": 2, "combined_grads": 2, "best_mc": 388263, "note": "smaller but proven"},
+    {"wallet": "8S4o7RitQkJ587waWwtyPF18Yyayehobt41QUjLjzi4Z", "children_count": 1, "combined_grads": 1, "best_mc": 1428995, "note": "Wave 1 — FOFAR creator's funder"},
+    {"wallet": "BY4StcU9Y2BpgH8quZzorg31EGE4L1rjomN8FNsCBEcx", "children_count": 1, "combined_grads": 1, "best_mc": 371850, "note": "Wave 1 — CCP creator's funder"}
+  ],
+  "filtered_out_noise": {
+    "churn_bots": ["8HeDT75s5g4CtCimH5B5nySqCiQhtWii8UnZhxBtFo38", "A8Z1ejQGk45EJibBPJviWnM3UvwKSuYun53nSCkWKM52", "Hza17rrRc5AHmjGBQkesrqsh3cZEe7g5uFhUjz6LejpJ", "D9gQ6RhKEpnobPBUdWY5bPQt2p3zGk3iVz6ChpUi2ArA", "8oZiaf74SwU9YufXNWHHZj6kih6RrqaZ3T38exYD27jw", "JDQKDrc1TQgBRvdFh56tkta5sYcDj1SoP52Eiu64rSrT", "FM1YCKED2KaqB8Uat8aB1nsffR1vezr7s6FAEieXJgke"],
+    "routers_services": ["3Ke5FsSYtdW2LVL3MT5SnVBcCyx2uR7yw8PLgJYG9YfK", "7ffk2QYgpBPp3eK3bZajfkcCkgMZbJgH2MeEV1uvfc7V", "9B6FJ6jZJukPwMrXeCntCJXqdzgKFPaTupsoqVct6Hhf", "9D361Ux48pWGs9A8xUHdoZ6aya2mM8Y54zisjgYJwsj8", "AV7PjXHL5JXZ1YoYRoN9Dsstg1x2UciBupMCXcJP8gUz", "GH9yk8vgFvHnAD8JZqXxr3hBN1Lr1mJ9NPzrP5mVqiJe", "GnfJHnQdjWkisWagLCDbrVuJJdFxHGArh7jp4ru2KdLu", "HVZXVsbsnvNJuHj5xBCUppm2c5i2gVuryFGMRpFRu165"]
+  }
+}

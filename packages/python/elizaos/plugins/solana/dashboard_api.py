@@ -1897,6 +1897,25 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
     app.router.add_get("/api/lifecycle/rejects", handle_lifecycle_rejects)
 
+    async def handle_creator_alpha(request: web.Request) -> web.Response:
+        """Recent creator-alpha scout activity — direct creates, operator
+        fundings, watched-child creates, and graduations."""
+        try:
+            from elizaos.plugins.solana import monster_signals as _ms
+            recent = _ms.creator_alpha_recent_signals()
+            return web.json_response({
+                "recent": recent,
+                "count": len(recent),
+                "tracked_direct": len(_ms._creator_alpha_tracked_wallets()[0]),
+                "tracked_operators": len(_ms._creator_alpha_tracked_wallets()[1]),
+                "watched_children": len(_ms._creator_alpha_watched_children),
+                "pending_mints": len(_ms._creator_alpha_pending_mints),
+            })
+        except Exception as exc:
+            return web.json_response({"error": str(exc)}, status=500)
+
+    app.router.add_get("/api/creator-alpha", handle_creator_alpha)
+
     async def handle_holder_guard_report(request: web.Request) -> web.Response:
         """Read-only diagnostic for holder_guard log-only performance.
 

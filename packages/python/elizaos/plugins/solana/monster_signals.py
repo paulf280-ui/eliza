@@ -207,6 +207,295 @@ def drain_fresh_grad_queue() -> list[dict]:
     return drained
 
 
+# ─── Creator-alpha scout — operator + direct-creator wallet monitoring ──
+# Polls a curated list of "alpha" wallets every 60s for new pump.fun token
+# creations. Two paths:
+#   1. DIRECT-CREATE: wallet emits a pump.fun Create instruction → we have the mint
+#   2. OPERATOR-FUND: parent operator sends 0.5-2.0 SOL to a fresh wallet →
+#      we watch that recipient for up to 90 min; if they create a token, fire
+# Detected mints are held in a pending-list until they graduate to pump-amm,
+# then pushed into _helius_fresh_grad_queue so the lifecycle scout sees them
+# on its very next cycle (within 30s of graduation).
+_CREATOR_ALPHA_PLAYBOOK_PATH = BASE / "creator_alpha_playbook.json"
+_CREATOR_ALPHA_CHILD_TTL_SECS = 90 * 60       # drop unwatched children
+_CREATOR_ALPHA_MINT_TTL_SECS  = 60 * 60       # drop pending mints if no graduation
+_CREATOR_ALPHA_POLL_SECS      = 60            # cycle cadence
+_CREATOR_ALPHA_MIN_FUND_SOL   = 0.5           # fresh-wallet fund pattern lower bound
+_CREATOR_ALPHA_MAX_FUND_SOL   = 2.0           # upper bound
+
+_creator_alpha_playbook: dict | None = None
+_creator_alpha_last_sigs: dict[str, str] = {}        # wallet → newest processed sig
+_creator_alpha_watched_children: dict[str, dict] = {}  # child → {parent, funded_ts, amount_sol}
+_creator_alpha_pending_mints: dict[str, dict] = {}   # mint → {detected_ts, source, creator, parent_op}
+_creator_alpha_recent_signals: deque = deque(maxlen=50)  # rolling activity feed for /api endpoint
+
+
+def _load_creator_alpha_playbook() -> dict:
+    global _creator_alpha_playbook
+    if _creator_alpha_playbook is not None:
+        return _creator_alpha_playbook
+    try:
+        with open(_CREATOR_ALPHA_PLAYBOOK_PATH) as f:
+            _creator_alpha_playbook = json.load(f)
+    except Exception:
+        _creator_alpha_playbook = {"direct_creators": {}, "operators": []}
+    return _creator_alpha_playbook
+
+
+def creator_alpha_recent_signals() -> list[dict]:
+    """Public accessor for the dashboard /api endpoint."""
+    return list(_creator_alpha_recent_signals)
+
+
+def _creator_alpha_tracked_wallets() -> tuple[list[str], list[str]]:
+    pb = _load_creator_alpha_playbook()
+    direct: list[str] = []
+    for tier_key in ("tier_a", "tier_b", "tier_c", "high_hit"):
+        for entry in (pb.get("direct_creators") or {}).get(tier_key, []):
+            w = entry.get("wallet")
+            if w and w not in direct:
+                direct.append(w)
+    operators = [op["wallet"] for op in (pb.get("operators") or []) if op.get("wallet")]
+    return direct, operators
+
+
+async def _creator_alpha_poll_recent(session: aiohttp.ClientSession, wallet: str, limit: int = 5) -> list[dict]:
+    """Fetch most-recent N sigs for wallet, return only NEW ones since last poll."""
+    last = _creator_alpha_last_sigs.get(wallet)
+    new_sigs: list[dict] = []
+    try:
+        async with session.post(HELIUS_RPC, json={
+            "jsonrpc": "2.0", "id": 1, "method": "getSignaturesForAddress",
+            "params": [wallet, {"limit": limit}],
+        }, timeout=aiohttp.ClientTimeout(total=10)) as r:
+            if r.status != 200:
+                return new_sigs
+            res = await r.json()
+        sigs = res.get("result") or []
+        if not sigs:
+            return new_sigs
+        for s in sigs:
+            if s.get("err"):
+                continue
+            if s["signature"] == last:
+                break
+            new_sigs.append(s)
+        _creator_alpha_last_sigs[wallet] = sigs[0]["signature"]
+    except Exception:
+        pass
+    return new_sigs
+
+
+async def _creator_alpha_detect_create(session: aiohttp.ClientSession, sig: str, signer: str) -> str | None:
+    """Parse a tx; return new pump.fun mint if signer created one, else None."""
+    try:
+        async with session.post(HELIUS_RPC, json={
+            "jsonrpc": "2.0", "id": 1, "method": "getTransaction",
+            "params": [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}],
+        }, timeout=aiohttp.ClientTimeout(total=10)) as r:
+            if r.status != 200:
+                return None
+            tx_res = await r.json()
+        tx = tx_res.get("result")
+        if not tx or not tx.get("meta") or tx["meta"].get("err"):
+            return None
+        msg = (tx.get("transaction") or {}).get("message") or {}
+        keys = msg.get("accountKeys") or []
+        if not keys:
+            return None
+        actual_signer = keys[0].get("pubkey") if isinstance(keys[0], dict) else keys[0]
+        if actual_signer != signer:
+            return None
+        acct_strs = [k.get("pubkey") if isinstance(k, dict) else k for k in keys]
+        la = (tx["meta"].get("loadedAddresses") or {})
+        acct_strs.extend(la.get("writable") or [])
+        acct_strs.extend(la.get("readonly") or [])
+        if PUMP_FUN_PROGRAM not in acct_strs:
+            return None
+        logs = tx["meta"].get("logMessages") or []
+        if not any("Instruction: Create" in l for l in logs):
+            return None
+        for a in acct_strs:
+            if isinstance(a, str) and a.endswith("pump"):
+                return a
+    except Exception:
+        pass
+    return None
+
+
+async def _creator_alpha_detect_funding(session: aiohttp.ClientSession, sig: str, operator: str) -> list[tuple[str, float]]:
+    """Parse a tx; return list of (recipient, amount_sol) for fresh-wallet
+    fundings in the configured SOL band where operator is signer."""
+    transfers: list[tuple[str, float]] = []
+    try:
+        async with session.post(HELIUS_RPC, json={
+            "jsonrpc": "2.0", "id": 1, "method": "getTransaction",
+            "params": [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}],
+        }, timeout=aiohttp.ClientTimeout(total=10)) as r:
+            if r.status != 200:
+                return transfers
+            tx_res = await r.json()
+        tx = tx_res.get("result")
+        if not tx or not tx.get("meta") or tx["meta"].get("err"):
+            return transfers
+        msg = (tx.get("transaction") or {}).get("message") or {}
+        keys = msg.get("accountKeys") or []
+        if not keys:
+            return transfers
+        signer = keys[0].get("pubkey") if isinstance(keys[0], dict) else keys[0]
+        if signer != operator:
+            return transfers
+        meta = tx["meta"]
+        pre = meta.get("preBalances") or []
+        post = meta.get("postBalances") or []
+        for i, k in enumerate(keys[1:], start=1):
+            addr = k.get("pubkey") if isinstance(k, dict) else k
+            if not isinstance(addr, str) or i >= len(pre):
+                continue
+            delta = (post[i] - pre[i]) / 1e9
+            if _CREATOR_ALPHA_MIN_FUND_SOL <= delta <= _CREATOR_ALPHA_MAX_FUND_SOL:
+                transfers.append((addr, delta))
+    except Exception:
+        pass
+    return transfers
+
+
+async def creator_alpha_scout_loop(runtime: Any, session: aiohttp.ClientSession) -> None:
+    """Poll direct-creator and operator wallets for early launch signals.
+
+    Each cycle (60s):
+      1. For each direct creator: fetch new sigs, detect pump.fun creates →
+         add mint to pending list
+      2. For each operator: fetch new sigs, detect 0.5-2.0 SOL outgoing
+         transfers → add recipient to watched_children (90min TTL)
+      3. For each watched child: poll for pump.fun creates → add mint to
+         pending list, stop watching
+      4. For each pending mint: query DexScreener; if pump-amm pair exists,
+         push to fresh_grad_queue (lifecycle scout enters on next cycle)
+
+    RPC budget: ~25k calls/day across all watched wallets at 60s cadence.
+    """
+    direct, operators = _creator_alpha_tracked_wallets()
+    if not direct and not operators:
+        print("[creator-alpha] playbook empty — scout idle")
+        return
+
+    print(f"[creator-alpha] starting · direct_creators={len(direct)} · operators={len(operators)} · "
+          f"poll={_CREATOR_ALPHA_POLL_SECS}s · child_ttl={_CREATOR_ALPHA_CHILD_TTL_SECS//60}min")
+
+    # Warm cache — set last_sig for each wallet so first cycle doesn't fire
+    # historical signals
+    for w in direct + operators:
+        await _creator_alpha_poll_recent(session, w, limit=1)
+        await asyncio.sleep(0.05)
+
+    cycle = 0
+    while True:
+        try:
+            cycle += 1
+            now = time.time()
+
+            # 1. Direct creators
+            for w in direct:
+                new = await _creator_alpha_poll_recent(session, w)
+                for s in new:
+                    mint = await _creator_alpha_detect_create(session, s["signature"], w)
+                    if mint and mint not in _creator_alpha_pending_mints:
+                        rec = {"detected_ts": now, "source": "creator_alpha_direct",
+                               "creator": w, "parent_op": None, "mint": mint}
+                        _creator_alpha_pending_mints[mint] = rec
+                        _creator_alpha_recent_signals.append({**rec, "kind": "direct_create"})
+                        print(f"[creator-alpha] 🎯 DIRECT-CREATE creator={w[:10]} mint={mint[:14]}")
+                await asyncio.sleep(0.04)
+
+            # 2. Operators → spawn child watchers
+            for op in operators:
+                new = await _creator_alpha_poll_recent(session, op)
+                for s in new:
+                    transfers = await _creator_alpha_detect_funding(session, s["signature"], op)
+                    for child, amt in transfers:
+                        if child in _creator_alpha_watched_children:
+                            continue
+                        if child in direct or child in operators:
+                            continue
+                        _creator_alpha_watched_children[child] = {
+                            "parent": op, "funded_ts": now, "amount_sol": amt,
+                        }
+                        _creator_alpha_recent_signals.append({
+                            "kind": "operator_fund", "parent": op, "child": child,
+                            "amount_sol": amt, "ts": now,
+                        })
+                        print(f"[creator-alpha] 👁 OPERATOR-FUND parent={op[:10]} → child={child[:10]} "
+                              f"({amt:.2f} SOL) — watching {_CREATOR_ALPHA_CHILD_TTL_SECS//60}min")
+                await asyncio.sleep(0.04)
+
+            # 3. Watched children — check for creates
+            stale_children: list[str] = []
+            for child, info in list(_creator_alpha_watched_children.items()):
+                if now - info["funded_ts"] > _CREATOR_ALPHA_CHILD_TTL_SECS:
+                    stale_children.append(child)
+                    continue
+                new = await _creator_alpha_poll_recent(session, child)
+                for s in new:
+                    mint = await _creator_alpha_detect_create(session, s["signature"], child)
+                    if mint and mint not in _creator_alpha_pending_mints:
+                        rec = {"detected_ts": now, "source": "creator_alpha_operator",
+                               "creator": child, "parent_op": info["parent"], "mint": mint}
+                        _creator_alpha_pending_mints[mint] = rec
+                        _creator_alpha_recent_signals.append({**rec, "kind": "operator_create"})
+                        print(f"[creator-alpha] 🎯 OPERATOR-CREATE parent={info['parent'][:10]} "
+                              f"creator={child[:10]} mint={mint[:14]}")
+                        stale_children.append(child)
+                await asyncio.sleep(0.04)
+            for c in stale_children:
+                _creator_alpha_watched_children.pop(c, None)
+
+            # 4. Pending mints → resolve graduation status
+            stale_mints: list[str] = []
+            for mint, pinfo in list(_creator_alpha_pending_mints.items()):
+                if now - pinfo["detected_ts"] > _CREATOR_ALPHA_MINT_TTL_SECS:
+                    print(f"[creator-alpha] ⏱ aged-out mint={mint[:14]} (no graduation in 60min)")
+                    stale_mints.append(mint)
+                    continue
+                try:
+                    async with session.get(
+                        f"https://api.dexscreener.com/latest/dex/tokens/{mint}",
+                        timeout=aiohttp.ClientTimeout(total=10),
+                    ) as r:
+                        if r.status != 200:
+                            continue
+                        d = await r.json()
+                    pairs = d.get("pairs") or []
+                    ps = next((p for p in pairs
+                               if (p.get("dexId") or "").lower() in ("pumpswap", "pump-amm")), None)
+                    if ps:
+                        pool = ps.get("pairAddress") or ""
+                        on_chain_ts = (ps.get("pairCreatedAt") or 0) / 1000 if ps.get("pairCreatedAt") else None
+                        push_fresh_grad(mint, pool, on_chain_ts=on_chain_ts)
+                        _creator_alpha_recent_signals.append({
+                            "kind": "graduated", "mint": mint, "source": pinfo["source"],
+                            "creator": pinfo.get("creator"), "parent_op": pinfo.get("parent_op"),
+                            "ts": now, "lag_secs": int(now - pinfo["detected_ts"]),
+                        })
+                        print(f"[creator-alpha] 🚀 GRADUATED mint={mint[:14]} pool={pool[:14]} "
+                              f"src={pinfo['source']} lag={int(now - pinfo['detected_ts'])}s — pushed to fast-path")
+                        stale_mints.append(mint)
+                except Exception:
+                    pass
+            for m in stale_mints:
+                _creator_alpha_pending_mints.pop(m, None)
+
+            # Summary every 5 cycles
+            if cycle % 5 == 0:
+                print(f"[creator-alpha] cycle {cycle}: tracked={len(direct)+len(operators)} "
+                      f"watched_children={len(_creator_alpha_watched_children)} "
+                      f"pending_mints={len(_creator_alpha_pending_mints)}")
+
+        except Exception as e:
+            print(f"[creator-alpha] loop error: {e}")
+        await asyncio.sleep(_CREATOR_ALPHA_POLL_SECS)
+
+
 # ─── Lifecycle bounce-watchlist ─────────────────────────────────────────
 # Mints that pass all baseline filters but have a bad entry shape (m5 deeply
 # negative, h1 high + rolling over, m5 overheated) are deferred here instead
