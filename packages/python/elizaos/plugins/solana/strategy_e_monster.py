@@ -789,6 +789,8 @@ async def _apply_exit(mint: str, reason: str, sell_fraction: float, runtime: Any
         final_pnl_sol = pos["locked_sol"] - pos["sol_spent"]
         _sol_spent = float(pos.get("sol_spent") or 0.0)
         final_pnl_pct = (final_pnl_sol / _sol_spent * 100.0) if _sol_spent > 0 else pnl_pct
+        # Extract entry metrics from metadata for performance analysis
+        _meta = pos.get("metadata") or {}
         close_rec = {
             **pos,
             "mint": mint,
@@ -798,6 +800,12 @@ async def _apply_exit(mint: str, reason: str, sell_fraction: float, runtime: Any
             "final_pnl_sol": final_pnl_sol,
             "final_pnl_pct": final_pnl_pct,
             "last_exit_pnl_pct": pnl_pct,  # preserve last-exit detail for forensics
+            # Entry quality signals (2026-05-03: holder-count correlation analysis)
+            "holders_at_entry": _meta.get("holders_at_entry"),
+            "mc_usd_at_entry": _meta.get("mc_usd") or _meta.get("mcap_usd"),
+            "liq_usd_at_entry": _meta.get("liq_usd"),
+            "top1_pct_at_entry": _meta.get("top1_pct"),
+            "top10_pct_at_entry": _meta.get("top10_pct"),
         }
         _monster_closed.append(close_rec)
 
