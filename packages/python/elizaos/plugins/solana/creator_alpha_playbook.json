@@ -11,7 +11,9 @@
   },
   "direct_creators": {
     "tier_a": [
-      {"wallet": "4euyaqBe45J5dniAcNARERUo7B1wG96riG21sEpNndfU", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "MOG dev — user-identified 2026-05-02. Heavy-trader wallet (30K+ sigs, 21 SOL, active since Jan 2026). NOT fresh — won't trigger fresh-wallet operator-fund detection. Watch this wallet directly for any pump.fun OR FLASHX launchpad creates."},
+      {"wallet": "4euyaqBe45J5dniAcNARERUo7B1wG96riG21sEpNndfU", "creates": 2, "graduated": 2, "rate": 100, "best_mc": 0, "note": "🔥 GOLDEN CREATOR — Milkers (+1380%) + MOG. Self-funded, heavy-trader (30K+ sigs). PRIORITY 1."},
+      {"wallet": "E2RtHD8NNict752mA6yDakZXn6utsVscRWJcumNBBNZs", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "🔥 GOLDEN CREATOR — Trump Coin. Funded by DWOGE. PRIORITY 1."},
+      {"wallet": "985wHVZXTkZKb9Lg5r8dQSexje3pzzKeSGs7UqPaDho9", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "🔥 GOLDEN CREATOR — CAMINO. Funded by MEGA OPERATOR. PRIORITY 1."},
       {"wallet": "7YeCaAqhzhtRio1mddqaQzhvWRWXEsm4GSyfm4VwDsvL", "creates": 3, "graduated": 3, "rate": 100, "best_mc": 11238380, "note": "ELITE serial — 100% on 3 launches"},
       {"wallet": "EpEPwSwfR34Puadp7H2vTCWkFbpmMFfgbEsPwHrZuawk", "creates": 4, "graduated": 2, "rate": 50, "best_mc": 16118661, "note": "highest peak in dataset"},
       {"wallet": "9P9FiEf7EzAgXiH73wRNCHJWsuktj5gRKC2hJGSsnKNV", "creates": 2, "graduated": 2, "rate": 100, "best_mc": 2994264, "note": "perfect 2/2"},
@@ -42,9 +44,9 @@
     ]
   },
   "operators": [
-    {"wallet": "5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9", "children_count": 7, "combined_grads": 12, "best_mc": 3982985, "note": "MEGA OPERATOR — Wave 3, 7 children, $3.98M peak via Dz8Sdxa7S; 4 fresh wallets pending launches"},
-    {"wallet": "DwCp9GZw3ueoXPykHSPUkRZEwcTVbJH2i9Sf1cXYicWf", "children_count": 2, "combined_grads": 9, "best_mc": 330715, "note": "consistent mid-tier operator — high cadence"},
-    {"wallet": "G5u7s6CNufkAvseFTpBbBk2qYg17hdRC1i2jasEgukBs", "children_count": 2, "combined_grads": 2, "best_mc": 3460112, "note": "Wave 1+2 — DWOGE ($3.46M) + TRUTH"},
+    {"wallet": "5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9", "children_count": 8, "combined_grads": 13, "best_mc": 3982985, "note": "🔥 MEGA OPERATOR — CONFIRMED child: 985wHVZX (CAMINO +profitable). 7 other children tracked."},
+    {"wallet": "DwCp9GZw3ueoXPykHSPUkRZEwcTVbJH2i9Sf1cXYicWf", "children_count": 2, "combined_grads": 9, "best_mc": 330715, "note": "mid-tier operator — high cadence"},
+    {"wallet": "G5u7s6CNufkAvseFTpBbBk2qYg17hdRC1i2jasEgukBs", "children_count": 3, "combined_grads": 3, "best_mc": 3460112, "note": "🔥 DWOGE — CONFIRMED child: E2RtHD8N (Trump Coin +profitable). Also TRUTH + 1 other."},
     {"wallet": "E9vf42zJXFv8Ljop1cG68NAxLDat4ZEGEWDLfJVX38GF", "children_count": 2, "combined_grads": 2, "best_mc": 388263, "note": "smaller but proven"},
     {"wallet": "8S4o7RitQkJ587waWwtyPF18Yyayehobt41QUjLjzi4Z", "children_count": 1, "combined_grads": 1, "best_mc": 1428995, "note": "Wave 1 — FOFAR creator's funder"},
     {"wallet": "BY4StcU9Y2BpgH8quZzorg31EGE4L1rjomN8FNsCBEcx", "children_count": 1, "combined_grads": 1, "best_mc": 371850, "note": "Wave 1 — CCP creator's funder"}
