@@ -2474,67 +2474,84 @@ When adjusting a filter, always explain your reasoning based on the data above."
             return web.json_response({"error": str(exc), "queued": 0})
 
     async def handle_helius_pumpfun_create(request: web.Request) -> web.Response:
-        """Webhook for pump.fun token creation events. Fires creator-alpha DIRECT ENTRY
-        immediately on token creation, before waiting for graduation or DexScreener.
-        Auth is optional since Helius webhooks come from Helius infrastructure."""
+        """Webhook for pump.fun token creation events. Helius sends real-time notification,
+        but enhanced format lacks mint details. We extract signature and query RPC for full data."""
         try:
             payload = await request.json()
             events = payload if isinstance(payload, list) else [payload]
             from elizaos.plugins.solana import monster_signals
-            import json as _json
 
             detected = 0
+            rpc_url = os.getenv("SOLANA_RPC_URL", "")
+            if not rpc_url:
+                return web.json_response({"error": "SOLANA_RPC_URL not set", "detected": 0})
+
             for ev in events:
                 if not isinstance(ev, dict):
                     continue
 
-                # Helius enhanced format has: accountData, events, fee, feePayer, description
-                # accountData = accounts touched in tx
-                # events = parsed instruction events (often empty for new token creation)
-                # feePayer = transaction signer
+                # Extract transaction signature from Helius webhook
+                # Format varies but usually has signature or hash field
+                sig = ev.get("signature") or ev.get("txHash") or ev.get("transactionHash")
 
-                mint = None
-                creator = None
+                # For Helius enhanced webhook, try to get sig from description or other field
+                if not sig and ev.get("description"):
+                    # Parse description if it contains the sig
+                    desc = ev.get("description", "")
+                    parts = desc.split()
+                    if len(parts) > 0 and len(parts[0]) > 40:  # Likely a base58 sig
+                        sig = parts[0]
 
-                # Strategy 1: Look in events array for create/initialize events
-                for evt in (ev.get("events") or []):
-                    if not isinstance(evt, dict):
-                        continue
-                    # Event might be: {"type": "create", "account": {...}, ...}
-                    if evt.get("type") in ("create", "initialize", "CreateMint", "InitializeMint"):
-                        # Account being created
-                        account = evt.get("account", {})
-                        if isinstance(account, dict):
-                            mint = account.get("address") or account.get("publicKey")
-                        creator = ev.get("feePayer")
-                        if mint:
+                if not sig:
+                    # Fallback: look in events array
+                    for evt in (ev.get("events") or []):
+                        if isinstance(evt, dict) and evt.get("signature"):
+                            sig = evt["signature"]
                             break
 
-                # Strategy 2: Look in accountData for newly created token accounts
-                if not mint:
-                    account_data = ev.get("accountData") or []
-                    for acc in account_data:
-                        if not isinstance(acc, dict):
-                            continue
-                        # New token account from pump.fun would have owner=pump.fun program
-                        # Check if this looks like a token mint
-                        owner = acc.get("owner", "")
-                        if owner == "TokenzQL339aYzdqakMMUQvzk6QKL7CKuzP2VgbAM":  # Token program
-                            mint = acc.get("address") or acc.get("pubkey")
-                            creator = ev.get("feePayer")
-                            if mint:
-                                break
+                if not sig:
+                    continue
 
-                # Strategy 3: Fallback - feePayer as creator (happens when webhook catches early)
-                if not creator:
-                    creator = ev.get("feePayer") or ""
+                # Async RPC query to get full transaction details
+                async def fetch_tx_details(signature: str) -> tuple[str, str] | None:
+                    """Query RPC for transaction details, extract mint and creator."""
+                    try:
+                        import aiohttp
+                        async with aiohttp.ClientSession() as session:
+                            payload = {
+                                "jsonrpc": "2.0",
+                                "id": 1,
+                                "method": "getTransaction",
+                                "params": [signature, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}]
+                            }
+                            async with session.post(rpc_url, json=payload, timeout=5) as resp:
+                                result = await resp.json()
+                                tx = result.get("result")
+                                if not tx:
+                                    return None
 
+                                # Extract mint from first token created or transferred
+                                if tx.get("meta", {}).get("tokenTransfers"):
+                                    for tt in tx["meta"]["tokenTransfers"]:
+                                        mint = tt.get("mint")
+                                        if mint and mint != "So11111111111111111111111111111111111111112":
+                                            creator = tx.get("transaction", {}).get("message", {}).get("accountKeys", [{}])[0].get("pubkey")
+                                            if not creator:
+                                                creator = ev.get("feePayer", "")
+                                            return (mint, creator)
+
+                                return None
+                    except Exception as e:
+                        print(f"[helius-webhook-create] RPC query failed: {e}")
+                        return None
+
+                # Fetch transaction details
+                result = await fetch_tx_details(sig)
+                if not result:
+                    continue
+
+                mint, creator = result
                 if not mint or not creator:
-                    # Log once per 100 events to avoid spam
-                    if detected % 100 == 0:
-                        print(f"[helius-webhook-create] ⚠️  No mint/creator found. Keys: {list(ev.keys())}")
-                        if ev.get("accountData"):
-                            print(f"[helius-webhook-create]   accountData[0]: {ev['accountData'][0] if ev['accountData'] else 'empty'}")
                     continue
 
                 # Queue immediate DIRECT ENTRY for this mint
