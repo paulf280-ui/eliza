@@ -232,8 +232,8 @@ async def open_monster_position(
 ) -> bool:
     """Open a new monster position. Returns True on success.
 
-    Does NOT consult traded_mints.json — monster strategy can re-enter any mint.
-    Respects its OWN concurrent-position cap only.
+    Golden rule: checks traded_mints.json — NEVER re-enters previously traded tokens.
+    Respects creator-alpha concurrent-position cap and holder-guard safety gates.
     """
     # Master pause check — respects dashboard pause button. Added 2026-04-24
     # after monster traded (AINI, TRADE) while user had the bot paused; the
@@ -258,6 +258,19 @@ async def open_monster_position(
         else:
             print(f"[monster] slot pool full (cap={get_max_concurrent()}) — skip {token_name}")
         return False
+
+    # Golden rule: never re-enter a token we've already traded
+    try:
+        import json as _json_traded
+        _traded_path = _BASE / "traded_mints.json"
+        if _traded_path.exists():
+            with open(_traded_path) as f:
+                _traded = _json_traded.load(f)
+                if mint in _traded:
+                    print(f"[monster] 🚫 GOLDEN RULE: {token_name} ({mint[:8]}) already traded — no re-entry")
+                    return False
+    except Exception:
+        pass
 
     # Holder-guard entry check. Log-only by default (HOLDER_GUARD_ENFORCE=false);
     # when enforcing, a hard-block decision returns False here and the scout's
