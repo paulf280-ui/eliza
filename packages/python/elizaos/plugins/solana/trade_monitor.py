@@ -658,8 +658,11 @@ class AICascade:
                 elif d.action == "HOLD" and not decision:
                     decision = d   # propagate HOLD for logging
 
-        # ── Tier 2: Gemini Flash (every 2min, age ≥ 60s) ────────────────────
-        if (now - self._last_gemini >= self.GEMINI_INTERVAL
+        # ── Tier 2: Gemini Flash — DISABLED (2026-05-03)
+        # Paused for fresh data gathering with Groq-only setup
+        # Re-enable by setting this to True when needed
+        GEMINI_ENABLED = False
+        if (GEMINI_ENABLED and now - self._last_gemini >= self.GEMINI_INTERVAL
                 and self._gemini_key and age_secs >= 60
                 and now >= self._gemini_skip_until):
             d = await self._call_gemini(ctx, session)
@@ -667,13 +670,13 @@ class AICascade:
                 self._last_gemini = now
                 self._record(d)
                 if d.action == "SELL" and d.confidence >= 0.70:
-                    decision = d  # Gemini exit — overrides any prior HOLD
+                    decision = d
 
-        # ── Tier 3: Claude Opus 4.7 quant depth (every 3min, age ≥ 60s) ─────
-        # Dropped age gate 180s → 60s so Opus engages on any trade that survives
-        # the first minute. 122-trade history: only 10 trades lived >3min, meaning
-        # the depth brain effectively never fired. Now it fires on ~30% of trades.
-        if (now - self._last_sonnet >= self.SONNET_INTERVAL
+        # ── Tier 3: Claude Sonnet — DISABLED (2026-05-03)
+        # Paused for fresh data gathering with Groq-only setup
+        # Re-enable by setting this to True when needed
+        CLAUDE_ENABLED = False
+        if (CLAUDE_ENABLED and now - self._last_sonnet >= self.SONNET_INTERVAL
                 and self._anthropic_key and age_secs >= 60
                 and now >= self._claude_skip_until):
             d = await self._call_claude(ctx, session, model="claude-opus-4-7", tier="sonnet")
@@ -683,14 +686,17 @@ class AICascade:
                 if d.action == "SELL" and d.confidence >= 0.65:
                     decision = d
 
-        # ── Tier 4: Claude Opus (emergency only) ─────────────────────────────
+        # ── Tier 4: Claude Opus (emergency) — DISABLED (2026-05-03)
+        # Paused for fresh data gathering with Groq-only setup
+        CLAUDE_EMERGENCY_ENABLED = False
         _drawdown = _calc_drawdown(pos)
         _is_emergency = (
             (_drawdown is not None and _drawdown <= -12.0) or
             self._pending_escalation
         ) and (now - self._last_opus >= 120)
 
-        if _is_emergency and self._anthropic_key and now >= self._claude_skip_until:
+        if (CLAUDE_EMERGENCY_ENABLED and _is_emergency and self._anthropic_key
+                and now >= self._claude_skip_until):
             d = await self._call_claude(ctx, session, model="claude-opus-4-7", tier="opus")
             if d:
                 self._last_opus = now
