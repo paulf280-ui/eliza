@@ -1967,14 +1967,38 @@ When adjusting a filter, always explain your reasoning based on the data above."
     async def handle_performance_by_source(request: web.Request) -> web.Response:
         """Trade outcomes grouped by signal_source. Returns per-source WR,
         avg pnl, total pnl_sol, count. Lets us see which strategy path
-        actually makes money."""
+        actually makes money. EXCLUDES ghost_purge closes (bot blacklist)."""
         try:
             import json as _json, os as _os, time as _t
-            path = _os.path.join(_os.path.dirname(__file__), "learning_outcomes.json")
-            if not _os.path.exists(path):
-                return web.json_response({"sources": [], "totals": {}})
-            with open(path) as f:
-                outcomes = _json.load(f) or []
+
+            # Try monster_closed_trades first (has close_reason), fall back to learning_outcomes
+            mt_path = _os.path.join(_os.path.dirname(__file__), "monster_closed_trades.json")
+            use_monster_trades = _os.path.exists(mt_path)
+
+            if use_monster_trades:
+                with open(mt_path) as f:
+                    trades = _json.load(f) or []
+                # Filter: exclude ghost_purge (bot blacklist enforcement), include everything else
+                outcomes = [
+                    {
+                        "signal_source": t.get("signal_source", "unknown"),
+                        "token_name": t.get("token_name"),
+                        "pnl_pct": t.get("final_pnl_pct", 0),
+                        "pnl_sol": t.get("final_pnl_sol", 0),
+                        "peak_pnl_pct": t.get("peak_pnl_pct", 0),
+                        "ts_close": t.get("close_ts", 0),
+                        "close_reason": t.get("close_reason", "unknown"),
+                    }
+                    for t in trades
+                    if t.get("close_reason") != "ghost_purge"  # EXCLUDE blacklist purges
+                ]
+            else:
+                path = _os.path.join(_os.path.dirname(__file__), "learning_outcomes.json")
+                if not _os.path.exists(path):
+                    return web.json_response({"sources": [], "totals": {}})
+                with open(path) as f:
+                    outcomes = _json.load(f) or []
+
             # Window filter (default 24h, accept ?hours=N)
             try:
                 hours = float(request.query.get("hours") or 24)
