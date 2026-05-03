@@ -222,7 +222,7 @@ def drain_fresh_grad_queue() -> list[dict]:
 _CREATOR_ALPHA_PLAYBOOK_PATH = BASE / "creator_alpha_playbook.json"
 _CREATOR_ALPHA_CHILD_TTL_SECS = 90 * 60       # drop unwatched children
 _CREATOR_ALPHA_MINT_TTL_SECS  = 60 * 60       # drop pending mints if no graduation
-_CREATOR_ALPHA_POLL_SECS      = 5             # cycle cadence — 5s for early BC entry on golden creators
+_CREATOR_ALPHA_POLL_SECS      = 1             # cycle cadence — 1s ultra-fast polling to catch token creation within seconds
 _CREATOR_ALPHA_MIN_FUND_SOL   = 0.5           # fresh-wallet fund pattern lower bound
 _CREATOR_ALPHA_MAX_FUND_SOL   = 2.0           # upper bound
 
