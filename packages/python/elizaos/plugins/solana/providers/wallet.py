@@ -47,7 +47,7 @@ async def _get_wallet_info(
             lines.append(f"Token Holdings: {len(token_balances)} token(s)")
             for tok in sorted(token_balances, key=lambda t: t["amount"], reverse=True)[:10]:
                 lines.append(
-                    f"  - {tok['mint'][:8]}...  {tok['amount']:.4f} (decimals: {tok['decimals']})"
+                    f"  - {tok['mint']}  {tok['amount']:.4f} (decimals: {tok['decimals']})"
                 )
         else:
             lines.append("Token Holdings: none")

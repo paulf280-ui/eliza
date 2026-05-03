@@ -1,0 +1,6 @@
+{
+  "_comment": "Add Solana wallet addresses to shadow-buy here. Wallets with high win rates (find via GMGN leaderboard). Bot buys any new token these wallets buy within 120s of their purchase.",
+  "wallets": [
+    "66T4v43X9yt6TRjBkLwhptt3SPxvdEUqJjiCkFWAqL2f"
+  ]
+}

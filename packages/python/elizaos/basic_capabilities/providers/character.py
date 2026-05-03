@@ -100,7 +100,14 @@ async def get_character_context(
 
     # Note: Protobuf ProviderResult.data is a Struct which has limited type support.
     # The text already contains all the information needed for the agent context.
-    return ProviderResult(text=context_text)
+    # Values are returned so {{agentName}} template variable resolves in prompts.
+    return ProviderResult(
+        text=context_text,
+        values={
+            "agentName": agent_name,
+            "hasCharacter": True,
+        },
+    )
 
 
 character_provider = Provider(

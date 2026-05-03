@@ -88,7 +88,7 @@ class TradeOutcome:
     # Identity
     mint:            str
     token_name:      str
-    wallet:          str           # whale wallet alias
+    wallet:          str           # whale wallet alias (or "monster" for strategy E)
     ts_open:         float         # epoch of position open
     ts_close:        float         # epoch of position close
     hold_mins:       float
@@ -126,6 +126,41 @@ class TradeOutcome:
 
     # Computed tags (filled at creation)
     exit_category:   str = ""         # "tp_win" | "sl_loss" | "trail_win" | "rug" | "other"
+
+    # ── Strategy segregation (added 2026-04-20) ───────────────────────────
+    # So the pattern analyzer can produce PER-STRATEGY rules instead of
+    # a single blended ruleset. "copy_trade" is the historical default.
+    strategy:        str = "copy_trade"     # "copy_trade" | "monster_lifecycle" | "monster_cluster" | "monster_serial" | "meteora" | "raydium" | "pumpswap"
+    signal_source:   str | None = None      # monster sub-source if strategy==monster_*
+
+    # ── Entry-timing fingerprint (added 2026-04-20) ───────────────────────
+    # Filled when we know them at entry. Used to learn whether we're
+    # chasing pumps or catching setups early.
+    h1_change_at_entry:   float | None = None   # % price change in h1 at entry time
+    m5_change_at_entry:   float | None = None   # % price change in m5 at entry time
+    age_hours_at_entry:   float | None = None   # token age (hours) at entry
+    buy_ratio_at_entry:   float | None = None   # h1 buy ratio % at entry
+    top1_pct_at_entry:    float | None = None   # top-1 holder % at entry
+    top10_pct_at_entry:   float | None = None   # top-10 aggregate % at entry (distribution proxy)
+
+    # ── Expanded entry fingerprint (added 2026-04-22) ─────────────────────
+    # So the pattern analyzer can correlate these with win/loss.
+    h6_change_at_entry:      float | None = None   # h6 priceChange at entry
+    h24_change_at_entry:     float | None = None   # h24 priceChange at entry
+    momentum_ratio_at_entry: float | None = None   # h6/h1 ratio at entry (>5 = dying)
+    mcap_velocity_at_entry:  float | None = None   # mcap USD / age minutes at entry
+    pct_off_peak_at_entry:   float | None = None   # current/60m_peak at entry (0-1)
+
+    # ── Catalyst snapshot at entry (social_monitor result) ────────────────
+    catalyst_active:     bool | None  = None        # Grok/Gemini buzz hit
+    catalyst_confidence: int  | None  = None        # 0-10 buzz score
+
+    # ── Moonbag lifecycle (post-TP1 25% bag) ──────────────────────────────
+    # Did the V-recovery arm the brains? How deep did the cooldown go?
+    # Lets us learn when ride-through paid vs. when we should have bailed earlier.
+    moonbag_armed:             bool | None  = None  # reached v_recovery >= 1.5
+    post_tp1_low_pnl_pct:      float | None = None  # deepest drawdown from entry post-TP1
+    v_recovery_max:            float | None = None  # max current/post_tp1_low ratio reached
 
 
 # ── Persistence ───────────────────────────────────────────────────────────────
@@ -223,6 +258,27 @@ def record_trade_exit(mint: str, close_record: dict) -> None:
         was_winner=was_winner,
         was_rug=was_rug,
         exit_category=exit_cat,
+        # ── Strategy segregation — so patterns are learned per-strategy ──
+        strategy=close_record.get("strategy", "copy_trade"),
+        signal_source=close_record.get("signal_source"),
+        # ── Entry-timing fingerprint (filled when caller has it) ──
+        h1_change_at_entry=close_record.get("h1_change_at_entry"),
+        m5_change_at_entry=close_record.get("m5_change_at_entry"),
+        age_hours_at_entry=close_record.get("age_hours_at_entry"),
+        buy_ratio_at_entry=close_record.get("buy_ratio_at_entry"),
+        top1_pct_at_entry=close_record.get("top1_pct_at_entry"),
+        top10_pct_at_entry=close_record.get("top10_pct_at_entry"),
+        # ── Expanded entry fingerprint (2026-04-22) ──
+        h6_change_at_entry=close_record.get("h6_change_at_entry"),
+        h24_change_at_entry=close_record.get("h24_change_at_entry"),
+        momentum_ratio_at_entry=close_record.get("momentum_ratio_at_entry"),
+        mcap_velocity_at_entry=close_record.get("mcap_velocity_at_entry"),
+        pct_off_peak_at_entry=close_record.get("pct_off_peak_at_entry"),
+        catalyst_active=close_record.get("catalyst_active"),
+        catalyst_confidence=close_record.get("catalyst_confidence"),
+        moonbag_armed=close_record.get("moonbag_armed"),
+        post_tp1_low_pnl_pct=close_record.get("post_tp1_low_pnl_pct"),
+        v_recovery_max=close_record.get("v_recovery_max"),
     )
 
     _outcomes.append(asdict(outcome))
@@ -366,32 +422,45 @@ async def run_pattern_analysis(session: aiohttp.ClientSession) -> str | None:
         return None
 
     summary = _build_outcome_summary()
-    prompt = f"""You are analysing Solana meme-coin trading results to extract actionable rules.
-PRIORITY: Extract specific rules for the METEORA DLMM strategy — this is our primary focus.
+    prompt = f"""You are analysing Solana meme-coin trading results to extract actionable rules
+PER STRATEGY. Each strategy (copy_trade, monster_lifecycle, monster_cluster_confirm,
+monster_serial_deployer, meteora, pumpswap, raydium) has its OWN entry model and exit
+profile — the brains need a distinct lesson for each lane, not a blended ruleset.
 
-TRADE OUTCOME DATA:
+TRADE OUTCOME DATA (already bucketed by strategy):
 {summary}
 
-Extract:
-1. METEORA-SPECIFIC rules: what entry conditions predict wins vs losses on Meteora pools?
-2. METEORA exit timing: are we exiting too early or too late? What hold time is optimal?
-3. General entry patterns that correlate with wins vs losses across all strategies
-4. Which exit reasons (SL, trail, AI, whale exit) performed best?
-5. One rule for each: when to hold longer vs when to exit fast
+For EVERY strategy that has ≥3 trades in the data above, extract AT LEAST ONE rule.
+Focus on what the ENTRY FINGERPRINT (h1%/m5%/age_hours at entry) tells you about
+winners vs losers inside that specific lane — we are trying to correct entry timing
+and hold duration per strategy.
+
+For each rule, prefix it with the strategy tag in ALL CAPS: e.g.
+"MONSTER_LIFECYCLE: skip when m5%@entry > +5 — all 3 losses had m5>10"
+"COPY_TRADE: Frost setups with h1<+20% won 3/4, above that 1/5"
+
+Also extract:
+- cross-strategy rules (apply to every lane) under prefix "GLOBAL:"
+- one exit-timing verdict per strategy (were we early / late / right)
 
 Respond with JSON only:
 {{
   "patterns": [
-    "METEORA: Rule 1...",
-    "METEORA: Rule 2...",
-    "COPY_TRADE: Rule 3...",
-    "EXIT: Rule 4...",
-    "EXIT: Rule 5..."
+    "MONSTER_LIFECYCLE: Rule ...",
+    "MONSTER_CLUSTER_CONFIRM: Rule ...",
+    "MONSTER_SERIAL_DEPLOYER: Rule ...",
+    "COPY_TRADE: Rule ...",
+    "GLOBAL: Rule ..."
   ],
-  "meteora_verdict": "one sentence on what makes Meteora trades win or lose",
+  "per_strategy_verdicts": {{
+    "copy_trade": "one sentence on what makes copy_trade win/lose",
+    "monster_lifecycle": "one sentence — or 'insufficient_data' if <3 trades",
+    "monster_cluster_confirm": "...",
+    "monster_serial_deployer": "..."
+  }},
   "win_drivers": ["...", "..."],
   "loss_drivers": ["...", "..."],
-  "exit_timing_verdict": "...",
+  "exit_timing_verdict": "one sentence — are we exiting early or late overall?",
   "analysis_ts": {time.time()}
 }}"""
 
@@ -408,10 +477,10 @@ Respond with JSON only:
                 },
                 json={
                     "model": "claude-opus-4-7",
-                    "max_tokens": 1024,
+                    "max_tokens": 4096,
                     "messages": [{"role": "user", "content": prompt}],
                 },
-                timeout=aiohttp.ClientTimeout(total=60),
+                timeout=aiohttp.ClientTimeout(total=120),
             ) as r:
                 if r.status == 200:
                     data = await r.json()
@@ -455,36 +524,121 @@ Respond with JSON only:
 
 
 def _save_pattern_analysis(raw: str, source: str) -> str | None:
-    """Parse and save a pattern analysis response. Returns raw text on success."""
+    """Parse and save a pattern analysis response. Returns raw text on success.
+
+    Salvage path: if JSON is truncated mid-string (common on token limit), try
+    to extract the "patterns" array via regex and save what we can rather than
+    losing the entire run.
+    """
     global _last_analysis_ts
+    text = raw.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
     try:
-        text = raw.strip()
-        if text.startswith("```"):
-            lines = text.split("\n")
-            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
         analysis = json.loads(text)
-        analysis["_source"] = source
-        with open(_PATTERNS_PATH, "w") as f:
-            json.dump(analysis, f, indent=2)
-        _last_analysis_ts = time.time()
-        patterns = analysis.get("patterns", [])
-        print(
-            f"[learning] ✅ Pattern analysis complete ({source}) — "
-            f"{len(patterns)} patterns from {len(_outcomes)} trades"
-        )
-        for p in patterns[:5]:
-            print(f"[learning]   • {p}")
-        return raw
     except Exception as exc:
-        print(f"[learning] Pattern parse error: {exc}")
-        return None
+        print(f"[learning] Pattern parse error: {exc} (raw len={len(raw)}) — attempting salvage")
+        import re
+        # Extract complete pattern strings (rules end at closing quote + comma/bracket)
+        pat_matches = re.findall(r'"([A-Z_]+:[^"\\]+?(?:\\.[^"\\]*)*)"', text)
+        patterns = [p for p in pat_matches if len(p) > 30]  # filter tiny fragments
+        if not patterns:
+            print(f"[learning] salvage found 0 patterns — giving up")
+            print(f"[learning] raw head: {raw[:300]}")
+            return None
+        analysis = {
+            "patterns": patterns,
+            "_salvaged": True,
+            "_parse_error": str(exc),
+            "analysis_ts": time.time(),
+        }
+        print(f"[learning] salvaged {len(patterns)} patterns from truncated response")
+
+    analysis["_source"] = source
+    with open(_PATTERNS_PATH, "w") as f:
+        json.dump(analysis, f, indent=2)
+    _last_analysis_ts = time.time()
+    patterns = analysis.get("patterns", [])
+    print(
+        f"[learning] ✅ Pattern analysis saved ({source}) — "
+        f"{len(patterns)} patterns from {len(_outcomes)} trades"
+    )
+    for p in patterns[:5]:
+        print(f"[learning]   • {p[:200]}")
+    return raw
+
+
+def _strategy_bucket(r: dict) -> str:
+    """Infer the strategy bucket for an outcome record.
+
+    Newer records carry `strategy` directly; older ones need to be inferred
+    from exit_reason / wallet / narrative so historic trades still bucket.
+    """
+    s = (r.get("strategy") or "").strip()
+    if s:
+        return s
+    er = (r.get("exit_reason") or "").lower()
+    wl = (r.get("wallet") or "").lower()
+    if wl == "monster":
+        src = (r.get("signal_source") or "").strip()
+        return f"monster_{src}" if src else "monster"
+    if "meteora" in er or wl in ("meteora", "strat_d"):
+        return "meteora"
+    if "pumpswap" in er or "pump-amm" in er:
+        return "pumpswap"
+    if "raydium" in er:
+        return "raydium"
+    return "copy_trade"
+
+
+def _bucket_stats(trades: list[dict]) -> dict:
+    """Compact win-rate / avg-pnl / hold / timing fingerprint for one bucket."""
+    if not trades:
+        return {}
+    wins = [t for t in trades if t.get("was_winner")]
+    rugs = [t for t in trades if t.get("was_rug")]
+    pnls = [float(t.get("pnl_pct", 0.0)) for t in trades]
+    holds = [float(t.get("hold_mins", 0.0)) for t in trades]
+    peaks = [float(t.get("peak_pnl_pct", 0.0)) for t in trades]
+    h1s   = [t.get("h1_change_at_entry") for t in trades if t.get("h1_change_at_entry") is not None]
+    m5s   = [t.get("m5_change_at_entry") for t in trades if t.get("m5_change_at_entry") is not None]
+    ages  = [t.get("age_hours_at_entry") for t in trades if t.get("age_hours_at_entry") is not None]
+    mrs   = [t.get("momentum_ratio_at_entry") for t in trades if t.get("momentum_ratio_at_entry") is not None]
+    vels  = [t.get("mcap_velocity_at_entry") for t in trades if t.get("mcap_velocity_at_entry") is not None]
+    t10s  = [t.get("top10_pct_at_entry") for t in trades if t.get("top10_pct_at_entry") is not None]
+    peaks_entry = [t.get("pct_off_peak_at_entry") for t in trades if t.get("pct_off_peak_at_entry") is not None]
+    cat_hits = [t for t in trades if t.get("catalyst_active") is True]
+    cat_conf = [t.get("catalyst_confidence") for t in trades if t.get("catalyst_confidence") is not None]
+    moon_armed = [t for t in trades if t.get("moonbag_armed") is True]
+    moon_rec = [t.get("v_recovery_max") for t in trades if t.get("v_recovery_max") is not None]
+    return {
+        "n":          len(trades),
+        "wr":         round(len(wins) / len(trades) * 100, 1),
+        "avg_pnl":    round(sum(pnls) / len(pnls), 1),
+        "avg_hold":   round(sum(holds) / len(holds), 1),
+        "avg_peak":   round(sum(peaks) / len(peaks), 1),
+        "rugs":       len(rugs),
+        "avg_h1_entry":       round(sum(h1s) / len(h1s), 1) if h1s else None,
+        "avg_m5_entry":       round(sum(m5s) / len(m5s), 1) if m5s else None,
+        "avg_age_hrs":        round(sum(ages) / len(ages), 1) if ages else None,
+        "avg_momentum_ratio": round(sum(mrs) / len(mrs), 2) if mrs else None,
+        "avg_mcap_velocity":  round(sum(vels) / len(vels), 0) if vels else None,
+        "avg_top10_pct":      round(sum(t10s) / len(t10s), 1) if t10s else None,
+        "avg_pct_off_peak":   round(sum(peaks_entry) / len(peaks_entry), 2) if peaks_entry else None,
+        "catalyst_hit_rate":  round(len(cat_hits) / len(trades) * 100, 1) if trades else 0,
+        "avg_catalyst_conf":  round(sum(cat_conf) / len(cat_conf), 1) if cat_conf else None,
+        "moonbag_armed_rate": round(len(moon_armed) / len(trades) * 100, 1) if trades else 0,
+        "avg_v_recovery_max": round(sum(moon_rec) / len(moon_rec), 2) if moon_rec else None,
+    }
 
 
 def _build_outcome_summary() -> str:
     """Build a compact summary of outcomes for pattern analysis.
 
-    Includes DEX-specific breakdown (Meteora highlighted as priority strategy)
-    and wallet performance. Used by both Opus and Groq fallback.
+    Buckets by STRATEGY so the analyzer can emit per-strategy rules
+    (copy_trade vs monster_lifecycle vs monster_cluster_confirm vs monster_serial_deployer).
+    Used by both Opus and Groq fallback.
     """
     _load_outcomes()
     recent = _outcomes[-200:]  # last 200 trades
@@ -511,32 +665,11 @@ def _build_outcome_summary() -> str:
         avg_pnl = sum(pnls) / len(pnls)
         wallet_summary[w] = {"n": len(pnls), "wr": round(win_pct, 1), "avg_pnl": round(avg_pnl, 1)}
 
-    # DEX breakdown (priority: Meteora is the focus strategy)
-    dex_perf: dict[str, list[float]] = {}
+    # Strategy bucket breakdown — the core of per-strategy learning
+    strategy_buckets: dict[str, list[dict]] = {}
     for r in recent:
-        dex = r.get("narrative", "?")  # narrative is closest proxy; use exit_reason for DEX
-        # Try to infer DEX from exit_reason or narrative
-        er = r.get("exit_reason", "")
-        if "meteora" in er.lower():
-            dex = "meteora"
-        elif "pumpswap" in er.lower() or "pump-amm" in er.lower():
-            dex = "pumpswap"
-        elif "raydium" in er.lower():
-            dex = "raydium"
-        else:
-            dex = r.get("narrative", "copy_trade")
-        dex_perf.setdefault(dex, []).append(r.get("pnl_pct", 0.0))
-
-    dex_summary = {}
-    for d, pnls in dex_perf.items():
-        win_pct = sum(1 for p in pnls if p > 0) / len(pnls) * 100
-        avg = sum(pnls) / len(pnls)
-        dex_summary[d] = {"n": len(pnls), "wr": round(win_pct, 1), "avg_pnl": round(avg, 1)}
-
-    # Meteora-specific deep dive
-    meteora_trades = [r for r in recent if "meteora" in r.get("exit_reason", "").lower()
-                      or r.get("wallet", "").lower() in ("meteora", "strat_d")]
-    meteora_wins   = [r for r in meteora_trades if r.get("was_winner")]
+        strategy_buckets.setdefault(_strategy_bucket(r), []).append(r)
+    strategy_summary = {s: _bucket_stats(ts) for s, ts in strategy_buckets.items()}
 
     # Post-exit timing quality
     early_exits = [r for r in recent if r.get("exit_was_early")]
@@ -556,39 +689,89 @@ def _build_outcome_summary() -> str:
     if avg_30m is not None:
         lines.append(f"Avg price change 30min after our exit: {avg_30m:+.1f}%")
 
-    # DEX breakdown
-    if dex_summary:
-        lines.append(f"\nDEX performance: {json.dumps(dex_summary)}")
+    # Per-strategy headline stats (ranked by trade count)
+    if strategy_summary:
+        lines.append(f"\nSTRATEGY BUCKETS: {json.dumps(strategy_summary)}")
 
-    # Meteora deep dive (priority strategy — focus analysis here)
-    if meteora_trades:
-        m_wr = len(meteora_wins) / len(meteora_trades) * 100
-        m_avg = sum(r.get("pnl_pct", 0) for r in meteora_trades) / len(meteora_trades)
-        m_holds = [r.get("hold_mins", 0) for r in meteora_trades]
+    # Per-strategy deep dives — the brains need their own lesson per lane
+    lines.append("\n=== PER-STRATEGY DEEP DIVE (learn one rule per lane) ===")
+    for strategy, trades in sorted(
+        strategy_buckets.items(), key=lambda kv: len(kv[1]), reverse=True
+    ):
+        if not trades:
+            continue
+        stats = _bucket_stats(trades)
+        wins_b = [t for t in trades if t.get("was_winner")]
         lines.append(
-            f"\n=== METEORA (PRIORITY STRATEGY) ===\n"
-            f"Trades: {len(meteora_trades)} | WR: {m_wr:.0f}% | Avg P&L: {m_avg:+.1f}%\n"
-            f"Avg hold: {sum(m_holds)/len(m_holds):.0f}min | "
-            f"Wins: {', '.join(r.get('token_name','?')[:10] for r in meteora_wins[:5])}"
+            f"\n--- {strategy.upper()} ({stats['n']} trades, WR={stats['wr']:.0f}%, "
+            f"avg_pnl={stats['avg_pnl']:+.1f}%, avg_hold={stats['avg_hold']:.0f}min, "
+            f"avg_peak={stats['avg_peak']:+.1f}%, rugs={stats['rugs']}) ---"
         )
-        lines.append("Meteora trade details:")
-        for r in meteora_trades[-10:]:
+        fp_bits = []
+        if stats.get("avg_h1_entry") is not None:
+            fp_bits.append(f"avg h1%@entry={stats['avg_h1_entry']:+.1f}")
+        if stats.get("avg_m5_entry") is not None:
+            fp_bits.append(f"avg m5%@entry={stats['avg_m5_entry']:+.1f}")
+        if stats.get("avg_age_hrs") is not None:
+            fp_bits.append(f"avg age@entry={stats['avg_age_hrs']:.1f}h")
+        if stats.get("avg_momentum_ratio") is not None:
+            fp_bits.append(f"avg momentum_ratio={stats['avg_momentum_ratio']:.2f}")
+        if stats.get("avg_mcap_velocity") is not None:
+            fp_bits.append(f"avg mcap_velocity=${stats['avg_mcap_velocity']:,.0f}/min")
+        if stats.get("avg_pct_off_peak") is not None:
+            fp_bits.append(f"avg pct_off_peak@entry={stats['avg_pct_off_peak']:.2f}")
+        if stats.get("avg_top10_pct") is not None:
+            fp_bits.append(f"avg top10%@entry={stats['avg_top10_pct']:.1f}%")
+        if fp_bits:
+            lines.append("  ENTRY FINGERPRINT: " + " | ".join(fp_bits))
+        mb_bits = []
+        if stats.get("catalyst_hit_rate"):
+            mb_bits.append(f"catalyst_hit={stats['catalyst_hit_rate']:.0f}%")
+        if stats.get("moonbag_armed_rate"):
+            mb_bits.append(f"moonbag_armed={stats['moonbag_armed_rate']:.0f}%")
+        if stats.get("avg_v_recovery_max") is not None:
+            mb_bits.append(f"avg v_recovery_max={stats['avg_v_recovery_max']:.2f}")
+        if mb_bits:
+            lines.append("  LIFECYCLE SIGNALS: " + " | ".join(mb_bits))
+        if wins_b:
             lines.append(
-                f"  {r.get('token_name','?')[:12]} P&L={r.get('pnl_pct',0):+.0f}% "
-                f"hold={r.get('hold_mins',0):.0f}min peak={r.get('peak_pnl_pct',0):+.0f}% "
-                f"reason={r.get('exit_reason','?')[:25]}"
+                f"  Recent wins: {', '.join(t.get('token_name','?')[:10] for t in wins_b[-5:])}"
+            )
+        # Up to 8 recent samples for this bucket
+        for t in trades[-8:]:
+            h1 = t.get("h1_change_at_entry")
+            m5 = t.get("m5_change_at_entry")
+            age = t.get("age_hours_at_entry")
+            entry_fp = []
+            if h1 is not None: entry_fp.append(f"h1={h1:+.0f}%")
+            if m5 is not None: entry_fp.append(f"m5={m5:+.0f}%")
+            if age is not None: entry_fp.append(f"age={age:.1f}h")
+            lines.append(
+                f"    {t.get('token_name','?')[:12]} P&L={t.get('pnl_pct',0):+.0f}% "
+                f"hold={t.get('hold_mins',0):.0f}min peak={t.get('peak_pnl_pct',0):+.0f}% "
+                f"reason={t.get('exit_reason','?')[:22]}"
+                + (f" | {' '.join(entry_fp)}" if entry_fp else "")
             )
 
     # Sample of recent trades (last 20)
     lines.append("\nRecent 20 trades (newest first):")
     for r in reversed(recent[-20:]):
         lines.append(
-            f"  {r.get('token_name','?')[:12]} | {r.get('wallet','?')} | "
+            f"  {r.get('token_name','?')[:12]} | {_strategy_bucket(r)} | "
             f"P&L={r.get('pnl_pct',0):+.0f}% | "
             f"hold={r.get('hold_mins',0):.0f}min | "
             f"reason={r.get('exit_reason','?')[:30]} | "
             f"cat={r.get('exit_category','?')}"
         )
+
+    # Scout-rejection performance — lets Opus recommend filter tuning per reason
+    try:
+        from elizaos.plugins.solana import rejection_tracker as _rt
+        rej_block = _rt.get_opus_summary(lookback_hours=14 * 24)
+        if rej_block:
+            lines.append(rej_block)
+    except Exception:
+        pass
 
     return "\n".join(lines)
 
@@ -707,6 +890,17 @@ async def run_learning_scheduler(session: aiohttp.ClientSession) -> None:
 
             # Post-exit price checks (in-memory — for AI cascade outcomes)
             await check_post_exit_due(session)
+
+            # Scout-rejection outcome checks — fills t+2h follow-up prices on
+            # every rejected token so brains see false-positive rate per filter.
+            try:
+                from elizaos.plugins.solana import rejection_tracker as _rt
+                _rt_res = await _rt.check_outcomes(min_age_hours=2.0)
+                if _rt_res.get("checked", 0):
+                    print(f"[learning] rejection_tracker: {_rt_res.get('checked')} checked, "
+                          f"{_rt_res.get('pumped', 0)} pumped / {_rt_res.get('rugged', 0)} rugged")
+            except Exception as _rt_err:
+                print(f"[learning] rejection_tracker check error: {_rt_err}")
 
             # File-based post-exit tracker (survives restart) — drain pending checkpoints.
             # Without this call, post_exit_tracker.json accumulated 114 done:false records

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import re
 from typing import TYPE_CHECKING
+
+PAPER_TRADING: bool = os.getenv("PAPER_TRADING", "false").lower() in ("true", "1", "yes")
 
 from elizaos.types import Action, ActionResult, ServiceTypeRegistry
 
@@ -54,7 +57,7 @@ def _extract_params(text: str) -> tuple[str, float, str, float]:
     elif "raydium" in text.lower() or "jupiter" in text.lower():
         dex = "raydium"
 
-    slippage = 0.01
+    slippage = 0.10  # 10% default — playbook §2.4 recommends 10-15% for sell exits
     slip_m = re.search(r"slippage[:\s]+(\d+(?:\.\d+)?)\s*%?", text, re.IGNORECASE)
     if slip_m:
         val = float(slip_m.group(1))
@@ -100,6 +103,7 @@ async def _handler(
     wallet_svc = runtime.get_service(ServiceTypeRegistry.WALLET)
     pump_svc = runtime.get_service(ServiceTypeRegistry.TOKEN_DATA)
     raydium_svc = runtime.get_service(ServiceTypeRegistry.LP_POOL)
+    pos_mgr = runtime.get_service("position_manager")
 
     # Get token balance to determine sell amount
     token_amount_raw = 0
@@ -121,36 +125,13 @@ async def _handler(
     route_used = ""
 
     try:
-        if dex == "auto":
-            if isinstance(pump_svc, PumpFunService):
-                bc = await pump_svc.get_bonding_curve(mint)
-                use_pump = bool(bc) and not bc.get("complete", True)
-            else:
-                use_pump = False
-
-            if use_pump and isinstance(pump_svc, PumpFunService):
-                signature = await pump_svc.sell(mint, token_amount_raw, slippage)
-                route_used = "pump.fun"
-            elif isinstance(raydium_svc, RaydiumService):
-                # Convert raw amount to float for Jupiter (need decimals)
-                if isinstance(wallet_svc, SolanaWalletService):
-                    balances = await wallet_svc.get_token_balances()
-                    decimals = next(
-                        (t["decimals"] for t in balances if t["mint"] == mint), 6
-                    )
-                else:
-                    decimals = 6
-                amount_float = token_amount_raw / (10**decimals)
-                signature = await raydium_svc.swap(mint, WSOL_MINT, amount_float, slippage)
-                route_used = "Jupiter/Raydium"
-            else:
-                return ActionResult(text="No DEX service available.", success=False)
-
-        elif dex == "pump_fun" and isinstance(pump_svc, PumpFunService):
-            signature = await pump_svc.sell(mint, token_amount_raw, slippage)
-            route_used = "pump.fun"
-
+        if PAPER_TRADING:
+            import uuid as _uuid
+            # Paper trading: simulate sell with real price data, no actual transaction
+            signature = f"PAPER_{_uuid.uuid4().hex[:12].upper()}"
+            route_used = "paper_trade"
         elif isinstance(raydium_svc, RaydiumService):
+            # All sells go through Jupiter — aggregates PumpSwap, Raydium, Meteora
             if isinstance(wallet_svc, SolanaWalletService):
                 balances = await wallet_svc.get_token_balances()
                 decimals = next(
@@ -159,10 +140,21 @@ async def _handler(
             else:
                 decimals = 6
             amount_float = token_amount_raw / (10**decimals)
-            signature = await raydium_svc.swap(mint, WSOL_MINT, amount_float, slippage)
-            route_used = "Jupiter/Raydium"
+            last_exc = None
+            for slip_bps in (3000, 5000, 8000):
+                try:
+                    signature = await raydium_svc.swap_jupiter_sell(
+                        mint, amount_float, token_decimals=decimals, slippage_bps=slip_bps
+                    )
+                    route_used = f"Jupiter ({slip_bps//100}% slip)"
+                    last_exc = None
+                    break
+                except Exception as _e:
+                    last_exc = _e
+            if last_exc is not None:
+                raise last_exc
         else:
-            return ActionResult(text="Requested DEX service not available.", success=False)
+            return ActionResult(text="No DEX service available.", success=False)
 
     except Exception as exc:
         error_msg = f"Sell transaction failed: {exc}"
@@ -170,6 +162,28 @@ async def _handler(
             from elizaos.types import Content
             await callback(Content(text=error_msg, actions=["SELL_TOKEN"]))
         return ActionResult(text=error_msg, success=False)
+
+    # Notify position manager so it can close/update position tracking
+    if pos_mgr is not None and mint in getattr(pos_mgr, "positions", {}):
+        try:
+            if percentage >= 100:
+                # Full close — get current exit price from bonding curve or use 0
+                exit_price = 0.0
+                if isinstance(pump_svc, PumpFunService):
+                    bc = await pump_svc.get_bonding_curve(mint)
+                    if bc:
+                        exit_price = bc.get("price_sol", 0.0)
+                pos_mgr.close_position(mint, exit_price, "manual_sell", signature)
+            else:
+                # Partial sell — notify with fraction
+                exit_price = 0.0
+                if isinstance(pump_svc, PumpFunService):
+                    bc = await pump_svc.get_bonding_curve(mint)
+                    if bc:
+                        exit_price = bc.get("price_sol", 0.0)
+                pos_mgr.notify_partial_sell(mint, percentage / 100, exit_price, signature)
+        except Exception:
+            pass  # position manager notification is non-fatal
 
     result_text = (
         f"Sold {percentage}% of {mint[:8]}... holdings via {route_used}.\n"

@@ -1,0 +1,884 @@
+{
+  "27UKscWHmkRf2T9dmgRFkUY4tV9DnTuEu3ozoPsw2ZSo": {
+    "wallet": "27UKscWHmkRf2T9dmgRFkUY4tV9DnTuEu3ozoPsw2ZSo",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1774022799.1880376,
+    "tokens_launched": [
+      "4w2NJeyQ1xS428HV6PiWUen9PoCqZ14kL77uppFUpump"
+    ],
+    "wins": 0,
+    "losses": 1,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1774022799.1880407
+  },
+  "7naFFwuEJWeWwWYQUkgAWHsxYKg3KctEuUj42JdAMidP": {
+    "wallet": "7naFFwuEJWeWwWYQUkgAWHsxYKg3KctEuUj42JdAMidP",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775157773.5373054,
+    "tokens_launched": [
+      "GQBUaoCYVSEA5avVKEWYoVaTdp16oi4Dn4rg88eQpump"
+    ],
+    "wins": 0,
+    "losses": 1,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775157773.5373838
+  },
+  "Epww1WQUees1GuwjG6TcqEN5zPYZDRKN4YUUQxgmS8w1": {
+    "wallet": "Epww1WQUees1GuwjG6TcqEN5zPYZDRKN4YUUQxgmS8w1",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775160310.3017185,
+    "tokens_launched": [
+      "F4SsUByf5YEE1x5mwfjKdowaxtFY2vfu5G2FLEiFpump"
+    ],
+    "wins": 0,
+    "losses": 1,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775160310.3017383
+  },
+  "Ao9D9xuKxhHfTGCd3ZeBPJ3aBRUAicKKnXZ3feH6uuGC": {
+    "wallet": "Ao9D9xuKxhHfTGCd3ZeBPJ3aBRUAicKKnXZ3feH6uuGC",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775198446.5578432,
+    "tokens_launched": [
+      "72LSsrmE6q5jdzHbaUPC9CFxBvxHS6cQktrcjecfpump"
+    ],
+    "wins": 0,
+    "losses": 1,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775198446.5578518
+  },
+  "AMVwUWQHduRubXZCZFHTxymBmU11pbkqQ54G1pAPmff4": {
+    "wallet": "AMVwUWQHduRubXZCZFHTxymBmU11pbkqQ54G1pAPmff4",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775225331.0528033,
+    "tokens_launched": [
+      "7ZfckgCxgrwj212afqfxVrb4fDe56e54NDnV2Bpapump"
+    ],
+    "wins": 0,
+    "losses": 1,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775225331.0528126
+  },
+  "6WM3V5hPSbbb7WNsLmo2QbbAc7vwJ6dumg1ypPXdv3cR": {
+    "wallet": "6WM3V5hPSbbb7WNsLmo2QbbAc7vwJ6dumg1ypPXdv3cR",
+    "status": "whitelisted",
+    "reason": "Auto-whitelisted: 1 win(s), 0 rugs",
+    "added_at": 1775227698.0260053,
+    "tokens_launched": [
+      "Cu7njg347gLNAUpjV1c2cegZm1dijTbXsy88BvPfpump"
+    ],
+    "wins": 1,
+    "losses": 0,
+    "rugs": 0,
+    "successful_launches": 1,
+    "last_seen": 1775227698.0261676
+  },
+  "6mg4EFKFfmxyhKwfgepupa3pcoKwwRA5DqxtdkxuNyCQ": {
+    "wallet": "6mg4EFKFfmxyhKwfgepupa3pcoKwwRA5DqxtdkxuNyCQ",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775229833.0473363,
+    "tokens_launched": [
+      "2H9sAayT5JHRekSHGNsv1P27xp48gXFV1Aq6LvPVpump"
+    ],
+    "wins": 0,
+    "losses": 1,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775229833.0488827
+  },
+  "GzPBYfkUcZF8WJeKYNTbYHKRVPJq84FdVwoDRaYwyzdM": {
+    "wallet": "GzPBYfkUcZF8WJeKYNTbYHKRVPJq84FdVwoDRaYwyzdM",
+    "status": "whitelisted",
+    "reason": "Auto-whitelisted: 1 win(s), 0 rugs",
+    "added_at": 1775234092.7057483,
+    "tokens_launched": [
+      "5HrkV93nWGoscatGoDFR474wHA3qribQpFqkjoStpump"
+    ],
+    "wins": 1,
+    "losses": 0,
+    "rugs": 0,
+    "successful_launches": 1,
+    "last_seen": 1775234092.7058437
+  },
+  "92cLih2cBc8UF1dkTbpQbMmAy4jLor3mpXGfbgPAv6Bw": {
+    "wallet": "92cLih2cBc8UF1dkTbpQbMmAy4jLor3mpXGfbgPAv6Bw",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775251092.1836417,
+    "tokens_launched": [
+      "GAzYRdz7ggZ97M7qEDLdoJugzdScSeoo43Q9ERaRpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775251092.3499033
+  },
+  "GXg8bJjjW6a5qwqhsfmZa2Bk1DFW12N5kRpEAGYVrUiS": {
+    "wallet": "GXg8bJjjW6a5qwqhsfmZa2Bk1DFW12N5kRpEAGYVrUiS",
+    "status": "proven",
+    "reason": "Auto-proven: 2 successful pump.fun/pumpswap launches, 0 rugs, 2 wins",
+    "added_at": 1775251951.7819576,
+    "tokens_launched": [
+      "6u631JGryxMf6yxHGvwBBdyLxihdGrt2vZthvgsmpump"
+    ],
+    "wins": 2,
+    "losses": 0,
+    "rugs": 0,
+    "successful_launches": 2,
+    "last_seen": 1775251951.9351342
+  },
+  "GEqnayyifA4yHdGFi5qBkAgG2QuBgisrKA4fkzegbb1y": {
+    "wallet": "GEqnayyifA4yHdGFi5qBkAgG2QuBgisrKA4fkzegbb1y",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775252337.0513542,
+    "tokens_launched": [
+      "FmcjiVMLv2QA9fVcfJc4iuWx8zzkXbrayBofgVevpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775252337.181345
+  },
+  "5NF1ceM2eVTTMeaQ5vukzFWxhaS7hbWxCK1BvnSiHXzh": {
+    "wallet": "5NF1ceM2eVTTMeaQ5vukzFWxhaS7hbWxCK1BvnSiHXzh",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775252350.7903266,
+    "tokens_launched": [
+      "3F2owQytBxJkQGduvy3c6sKYfTBg4nL4vGEDkT56pump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775252350.9631104
+  },
+  "BLLRLaABvGBWuThPaq78uGQVP3Bct6opsRHct5SxWYJA": {
+    "wallet": "BLLRLaABvGBWuThPaq78uGQVP3Bct6opsRHct5SxWYJA",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775254480.0666955,
+    "tokens_launched": [
+      "3B5qHZHoqeuuq96PuyNSF6wWWuYKQB6ergYC5y9xpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775254480.2487366
+  },
+  "GicGoc2dQwNmCJSuZPxdyL9xDSc55nxGAj6BdTGBvRnZ": {
+    "wallet": "GicGoc2dQwNmCJSuZPxdyL9xDSc55nxGAj6BdTGBvRnZ",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775256068.1620882,
+    "tokens_launched": [
+      "EEHk3DjnHF2RYBLen4c1gbYnW1B6sUsrTaJ9Xb8Qpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775256068.3092897
+  },
+  "9YdjZ5d7d4BjjYJuVBZF8Jww5N2LC9vHSjUG4q49bpeu": {
+    "wallet": "9YdjZ5d7d4BjjYJuVBZF8Jww5N2LC9vHSjUG4q49bpeu",
+    "status": "proven",
+    "reason": "Auto-proven: 2 successful pump.fun/pumpswap launches, 0 rugs, 2 wins",
+    "added_at": 1775256256.4922295,
+    "tokens_launched": [
+      "AwJucFNnaQntE8xBiTtgoeL6zozNkUPJmzSjVAWcpump"
+    ],
+    "wins": 2,
+    "losses": 0,
+    "rugs": 0,
+    "successful_launches": 2,
+    "last_seen": 1775256256.631196
+  },
+  "4DMPURuPbWWHRRZ9EJrQ9bpAQz1F8ho5Jv7kCtSUgzhX": {
+    "wallet": "4DMPURuPbWWHRRZ9EJrQ9bpAQz1F8ho5Jv7kCtSUgzhX",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775256641.0837376,
+    "tokens_launched": [
+      "2spu3uScA3wMVXisz3VH8J1BXjBYNQqV1hmTRSPKpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775256641.2059445
+  },
+  "DxSskDtDB3VT5tFeGUCENEfc6tviBBEAmKkr5WbsvAZG": {
+    "wallet": "DxSskDtDB3VT5tFeGUCENEfc6tviBBEAmKkr5WbsvAZG",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775257223.1536305,
+    "tokens_launched": [
+      "g2S2NWrrzKysKo6NFQ63fmU7E8VrLK98krj7UcNpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775257223.3366847
+  },
+  "ETHF7GzDmLBw4skiWJN3ym9TVBY7pZD2wPQv4vh1kzKc": {
+    "wallet": "ETHF7GzDmLBw4skiWJN3ym9TVBY7pZD2wPQv4vh1kzKc",
+    "status": "proven",
+    "reason": "Auto-proven: 2 successful pump.fun/pumpswap launches, 0 rugs, 2 wins",
+    "added_at": 1775257346.9129012,
+    "tokens_launched": [
+      "DZ1q76XPsBABcoCWLmagFh193xAEJCwkuUPgEKkMpump"
+    ],
+    "wins": 2,
+    "losses": 0,
+    "rugs": 0,
+    "successful_launches": 2,
+    "last_seen": 1775257347.043611
+  },
+  "4gf7onFXrN6mEyCwaAhTCpREHcyyppHprEqTQ7FZgn2i": {
+    "wallet": "4gf7onFXrN6mEyCwaAhTCpREHcyyppHprEqTQ7FZgn2i",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775257411.4645896,
+    "tokens_launched": [
+      "EKTJM1JojPPAytnnCos9fhz9FPqKKVR7ZtWn44xhpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775257411.6066046
+  },
+  "3J4nUZnGqGx3XSiQbJsFNRvSyDumb1HtB2NRasedUaHv": {
+    "wallet": "3J4nUZnGqGx3XSiQbJsFNRvSyDumb1HtB2NRasedUaHv",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775258170.976915,
+    "tokens_launched": [
+      "9SXAfyttedDcrKjwrY2bectf5XavAmkdDJLSZrWKpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775258171.1015775
+  },
+  "D5vHR2qP9TxBpPfcJd2ZcHXCtXazsp8o33pfCANBFuQ2": {
+    "wallet": "D5vHR2qP9TxBpPfcJd2ZcHXCtXazsp8o33pfCANBFuQ2",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775261146.5743833,
+    "tokens_launched": [
+      "Ck8M548F2hB2J5q2L1MYR9mut935L3hAmb1ep6w1pump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775261146.898331
+  },
+  "6k2rHFdMDEdrs1gS3xcQmRPfeeTing1ASo2vfrRFtakc": {
+    "wallet": "6k2rHFdMDEdrs1gS3xcQmRPfeeTing1ASo2vfrRFtakc",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775261209.0194144,
+    "tokens_launched": [
+      "8cJootCLAcCYFCinPrtbts4YEsZ5DE8t6GBcBsbppump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775261209.2409372
+  },
+  "8hD9E2XU8Bv9Ee5M66TyrBy7cDQqXKf7kc5ezL2ArRXH": {
+    "wallet": "8hD9E2XU8Bv9Ee5M66TyrBy7cDQqXKf7kc5ezL2ArRXH",
+    "status": "proven",
+    "reason": "Auto-proven: 2 successful pump.fun/pumpswap launches, 0 rugs, 2 wins",
+    "added_at": 1775261263.992829,
+    "tokens_launched": [
+      "96fLdZ3rQLbPnfiSxw914DKhTTcELibih2f5vV5Ppump"
+    ],
+    "wins": 2,
+    "losses": 0,
+    "rugs": 0,
+    "successful_launches": 2,
+    "last_seen": 1775261264.1219132
+  },
+  "7nnhrB4JMK9eqGMuDjY3nkyeG7Xus31k5qZSFpJHpFUn": {
+    "wallet": "7nnhrB4JMK9eqGMuDjY3nkyeG7Xus31k5qZSFpJHpFUn",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775261402.5674722,
+    "tokens_launched": [
+      "AYeRfJQb5YnqE6cu9D4rRt2BcFzdcscJzNz7NopJpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775261402.7665856
+  },
+  "DYnEcsfDtZuvSXAGsyJZRh5f4Dry9tSnLBoJU2VB4GBJ": {
+    "wallet": "DYnEcsfDtZuvSXAGsyJZRh5f4Dry9tSnLBoJU2VB4GBJ",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775261639.4072804,
+    "tokens_launched": [
+      "5D644L4cSNsFwoq66wSKFSPXBsjJaCV19ZF5hiBGpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775261639.5335028
+  },
+  "3nDUy1FSfeP2rwyRpWwLbxpvCsXi93Tn3iW5TrGpANcx": {
+    "wallet": "3nDUy1FSfeP2rwyRpWwLbxpvCsXi93Tn3iW5TrGpANcx",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775262332.9740138,
+    "tokens_launched": [
+      "5pk9tnVzhZ5SYUdKt2VuH58KwcwnWr1eUtL8ECAupump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775262333.1260133
+  },
+  "8V2e8V2vDjxAJsByzuuK79SUMq4ffkGM3fjjhFYAZUSM": {
+    "wallet": "8V2e8V2vDjxAJsByzuuK79SUMq4ffkGM3fjjhFYAZUSM",
+    "status": "proven",
+    "reason": "Auto-proven: 2 successful pump.fun/pumpswap launches, 0 rugs, 2 wins",
+    "added_at": 1775263083.6787832,
+    "tokens_launched": [
+      "oDXmPYdsw4V2f81PQjhwkS8AidNfDonC9dZkXrepump"
+    ],
+    "wins": 2,
+    "losses": 0,
+    "rugs": 0,
+    "successful_launches": 2,
+    "last_seen": 1775263083.8584037
+  },
+  "81b5CcNGzU8eJhz4VKqpmoZtmDj39ArctZd6LBuygYUX": {
+    "wallet": "81b5CcNGzU8eJhz4VKqpmoZtmDj39ArctZd6LBuygYUX",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775263700.8728528,
+    "tokens_launched": [
+      "BUFWxy69d2J9moJaYgxMNzgUKuVV5aJVPeHPKU63pump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775263701.0090234
+  },
+  "8KufGrk32u1643yHBLbUSKV2uHEGjscz89MxErDeqTku": {
+    "wallet": "8KufGrk32u1643yHBLbUSKV2uHEGjscz89MxErDeqTku",
+    "status": "proven",
+    "reason": "Auto-proven: 2 successful pump.fun/pumpswap launches, 0 rugs, 2 wins",
+    "added_at": 1775263976.6335216,
+    "tokens_launched": [
+      "CpY18XEuaYFzxt2aKYF46m9SQNfAN7fULjcvWVZupump"
+    ],
+    "wins": 2,
+    "losses": 0,
+    "rugs": 0,
+    "successful_launches": 2,
+    "last_seen": 1775263976.7767107
+  },
+  "EHY9Qh8L983ctSoXoQdorYdsGUeL4NySsRUBqKzpDWby": {
+    "wallet": "EHY9Qh8L983ctSoXoQdorYdsGUeL4NySsRUBqKzpDWby",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775264105.5537987,
+    "tokens_launched": [
+      "EL4ctjXzTbbewfQkdr4PzFK1oNfRT9V2qaFqwoRqpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775264105.7246883
+  },
+  "H7yZ9V2p95dYDCPhRBAQwm3oH3iXbQnffMp8BY9YFgpn": {
+    "wallet": "H7yZ9V2p95dYDCPhRBAQwm3oH3iXbQnffMp8BY9YFgpn",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775264475.2733874,
+    "tokens_launched": [
+      "3T9dKtFgJr1Fydn5Tr4TgGXQhKfYKTyfNbqNoN9Mpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775264475.418318
+  },
+  "4mXYRJQaUbRFDB25GXEtJ96ZGyyesnhfa55PUuWbHQvs": {
+    "wallet": "4mXYRJQaUbRFDB25GXEtJ96ZGyyesnhfa55PUuWbHQvs",
+    "status": "proven",
+    "reason": "Auto-proven: 2 successful pump.fun/pumpswap launches, 0 rugs, 2 wins",
+    "added_at": 1775265415.8962426,
+    "tokens_launched": [
+      "ECSiUWmqBwanp66UdHhaa7q3VZfJtVuzyx5w5t4hpump"
+    ],
+    "wins": 2,
+    "losses": 0,
+    "rugs": 0,
+    "successful_launches": 2,
+    "last_seen": 1775265416.0593085
+  },
+  "33yXyTxj2XUhHswoa2cWVfNsFF9AKisbFtE17m3yDGzD": {
+    "wallet": "33yXyTxj2XUhHswoa2cWVfNsFF9AKisbFtE17m3yDGzD",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775265507.028641,
+    "tokens_launched": [
+      "Ht3dHFYU4LmvDRt8SjPtRkbGREWccQaZ1tz1X9zkpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775265507.183014
+  },
+  "ENfYAXyYjn17cGv5RMJpZDFaPXD6CWBuS4uTVA3Lea4Q": {
+    "wallet": "ENfYAXyYjn17cGv5RMJpZDFaPXD6CWBuS4uTVA3Lea4Q",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775266224.70557,
+    "tokens_launched": [
+      "FtmGrgQwiR4oZchof5EsPmhiw3MUts2iFm6SuTNtpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775266224.8599577
+  },
+  "6adA6YENaRerUMjn1pYDHyExJTyWbvxwLK1zVYGFTD8g": {
+    "wallet": "6adA6YENaRerUMjn1pYDHyExJTyWbvxwLK1zVYGFTD8g",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775266585.3134284,
+    "tokens_launched": [
+      "3gRcG7kjVcfAGwcFhTfR3mL94Ktkm38XkhwQtKNjpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775266585.4536114
+  },
+  "EM3XCXknARaS2Nmo7zJMSJXPmCvRGfiPKpk9NUPWQuuy": {
+    "wallet": "EM3XCXknARaS2Nmo7zJMSJXPmCvRGfiPKpk9NUPWQuuy",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775267208.6257572,
+    "tokens_launched": [
+      "Gj61pF4En8uzsN1sgDzhSZo1b4CgXTV3ht1KpzgNpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775267208.7761443
+  },
+  "6njkAEY7zBVJXk4YtLt8qcJGZjwGipkFAvDv55ac5DjY": {
+    "wallet": "6njkAEY7zBVJXk4YtLt8qcJGZjwGipkFAvDv55ac5DjY",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775268210.8246102,
+    "tokens_launched": [
+      "7Xp2dxYsqdv7HRXNDsZS4iV6y8Riv1cSrKJaGabjpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775268210.9487696
+  },
+  "5WS4LfgTMSwD9mHZtCzPGqMqHWtRSg9WMe7nkv34Wa8n": {
+    "wallet": "5WS4LfgTMSwD9mHZtCzPGqMqHWtRSg9WMe7nkv34Wa8n",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775268295.7984402,
+    "tokens_launched": [
+      "CtEpahbHxPckqkHXhKReL7GHf9PU5nWpzuq98B2Wpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775268295.9469306
+  },
+  "ByPL5YhuZ4J7Zmox7ExfkWNxTZobqWgRKaWK5QsfujWx": {
+    "wallet": "ByPL5YhuZ4J7Zmox7ExfkWNxTZobqWgRKaWK5QsfujWx",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775269208.5647554,
+    "tokens_launched": [
+      "9jfaqeQP4dWwui53RBHAwuhS8rg8b2VUN1C4YLiKpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775269208.7391725
+  },
+  "4yWDmvn7TUVQuZvZRYcEcQuFijEWZ73FpnrtRnFb66aC": {
+    "wallet": "4yWDmvn7TUVQuZvZRYcEcQuFijEWZ73FpnrtRnFb66aC",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775269707.912037,
+    "tokens_launched": [
+      "FspJrPipyhBzK35obtp1M5fzWDavBojqBiEXJYaupump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775269708.0487344
+  },
+  "8SgvWPTYHUVkdgxZEYTAeRyznh32bh855h2p5rXjewSS": {
+    "wallet": "8SgvWPTYHUVkdgxZEYTAeRyznh32bh855h2p5rXjewSS",
+    "status": "proven",
+    "reason": "Auto-proven: 2 successful pump.fun/pumpswap launches, 0 rugs, 2 wins",
+    "added_at": 1775270275.129902,
+    "tokens_launched": [
+      "9dsRtKFMT3j8AxQqhA1QSbZJFGZom6XGaWwCnyu6pump"
+    ],
+    "wins": 2,
+    "losses": 0,
+    "rugs": 0,
+    "successful_launches": 2,
+    "last_seen": 1775270275.3024957
+  },
+  "FDPXvJ5QXUEo8EZnyohMVTGsjQwXt7Za8xtpTnLJ4F1U": {
+    "wallet": "FDPXvJ5QXUEo8EZnyohMVTGsjQwXt7Za8xtpTnLJ4F1U",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775270798.632774,
+    "tokens_launched": [
+      "BpbnbEXB1KVCLXXsBfnGN4fw2RMxTF3Lzodvpv14pump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775270798.8312144
+  },
+  "7PEbFoZ44gLVVjnuHEAH9HgRUUHstpyzYpKo1dWFHgyj": {
+    "wallet": "7PEbFoZ44gLVVjnuHEAH9HgRUUHstpyzYpKo1dWFHgyj",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775271229.5519862,
+    "tokens_launched": [
+      "9Mg7ms3h19sZsHMKguSdgyZGSc4jcEH6NhJPfNHwpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775271229.6985948
+  },
+  "EVZohbDcuK9fpoEYgdWJ5xeRv4kYdVFbN9kzDhupeeuz": {
+    "wallet": "EVZohbDcuK9fpoEYgdWJ5xeRv4kYdVFbN9kzDhupeeuz",
+    "status": "proven",
+    "reason": "Auto-proven: 2 successful pump.fun/pumpswap launches, 0 rugs, 2 wins",
+    "added_at": 1775271472.609993,
+    "tokens_launched": [
+      "7zJGHsH8hoQ9D7eBJbH7rAkykJgYAHPkmfrprxispump"
+    ],
+    "wins": 2,
+    "losses": 0,
+    "rugs": 0,
+    "successful_launches": 2,
+    "last_seen": 1775271472.7455728
+  },
+  "Bv5WkejNHkP6KACEWVFHAv6oSwYuDe53kvmrHJUyNE7i": {
+    "wallet": "Bv5WkejNHkP6KACEWVFHAv6oSwYuDe53kvmrHJUyNE7i",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775271561.1510813,
+    "tokens_launched": [
+      "5ntzT9z4tk6xs61rNYQKmKp3dgk1fk8q15EQ3Wx6pump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775271561.312705
+  },
+  "F9RjEmEEdRf4k33LD1qKSoinGgVymEw2RpzkKr11Ly9B": {
+    "wallet": "F9RjEmEEdRf4k33LD1qKSoinGgVymEw2RpzkKr11Ly9B",
+    "status": "proven",
+    "reason": "Auto-proven: 2 successful pump.fun/pumpswap launches, 0 rugs, 2 wins",
+    "added_at": 1775273462.5288403,
+    "tokens_launched": [
+      "AaZzDijd4K1mAHjAmyXbjV45mVCF8FYvcdTGJs7rpump"
+    ],
+    "wins": 2,
+    "losses": 0,
+    "rugs": 0,
+    "successful_launches": 2,
+    "last_seen": 1775273462.8198192
+  },
+  "6wfCyS9DFffr9dCdbMxZgYhPFqT5zwXjRFQUi6JmoogK": {
+    "wallet": "6wfCyS9DFffr9dCdbMxZgYhPFqT5zwXjRFQUi6JmoogK",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775273657.503879,
+    "tokens_launched": [
+      "D2ey1bFoMFm8MpSDrvJ4kgttzHqpsE6broK1C5jEpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775273657.6448417
+  },
+  "E6xmjz9jwAXGSGJFvBDoEW32jEFBMGvqoHsQd7pEqGcW": {
+    "wallet": "E6xmjz9jwAXGSGJFvBDoEW32jEFBMGvqoHsQd7pEqGcW",
+    "status": "proven",
+    "reason": "Auto-proven: 2 successful pump.fun/pumpswap launches, 0 rugs, 2 wins",
+    "added_at": 1775273856.1241379,
+    "tokens_launched": [
+      "GMFQFSRW5fdU6Not7cS7ZkAQELTgBb8pUcfNf6DFpump"
+    ],
+    "wins": 2,
+    "losses": 0,
+    "rugs": 0,
+    "successful_launches": 2,
+    "last_seen": 1775273856.2784855
+  },
+  "warowYRqEHKtHHUwQ4yeL8agfAdxvbapmxL4ihdryN6": {
+    "wallet": "warowYRqEHKtHHUwQ4yeL8agfAdxvbapmxL4ihdryN6",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775275502.4183626,
+    "tokens_launched": [
+      "8kMBxAidnKd4ZSSFgukAuRC1KCqCbdZp7yi6CnJxpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775275502.601973
+  },
+  "C7rZwohZi3YfQNPpUrvg3WsJ3zRFs5uSWmpigYJe7afX": {
+    "wallet": "C7rZwohZi3YfQNPpUrvg3WsJ3zRFs5uSWmpigYJe7afX",
+    "status": "whitelisted",
+    "reason": "Auto-whitelisted: 1 win(s), 0 rugs",
+    "added_at": 1775276212.434384,
+    "tokens_launched": [
+      "2iPPoadFYGQoLmHy93FPccjRKZcFvDuzFpgBRmhmpump"
+    ],
+    "wins": 1,
+    "losses": 0,
+    "rugs": 0,
+    "successful_launches": 1,
+    "last_seen": 1775276212.4344344
+  },
+  "DCU9PMah2h46XinsRTWEhvY5442jcf8dpD8Nh2Sg5BAB": {
+    "wallet": "DCU9PMah2h46XinsRTWEhvY5442jcf8dpD8Nh2Sg5BAB",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775276406.7976239,
+    "tokens_launched": [
+      "95yeaTqMyQyQcx37vUR4WsnLxfqMt7eqVvh8b5dpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775276406.9468234
+  },
+  "ALdpzEQpbpsuTurec1R9aFEPJb865c1zDsCqAp5iFWCr": {
+    "wallet": "ALdpzEQpbpsuTurec1R9aFEPJb865c1zDsCqAp5iFWCr",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775277651.891355,
+    "tokens_launched": [
+      "2v6YZBcskvEktqmF8X3sW2V382zBXSh2TTuFQT9Bpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775277652.072914
+  },
+  "DVdM29N9YP475pLUX8rPkQr3w5mZLyCJ7EfLABapHJ9p": {
+    "wallet": "DVdM29N9YP475pLUX8rPkQr3w5mZLyCJ7EfLABapHJ9p",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775279335.506541,
+    "tokens_launched": [
+      "7ncbKfj54dea17XMhjnBBKKTUtufZh4VGNr4Viejpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775279335.6867955
+  },
+  "332x1g52scFopn5ufoY98LpE5MmB1gt4SMp71TEMpXEZ": {
+    "wallet": "332x1g52scFopn5ufoY98LpE5MmB1gt4SMp71TEMpXEZ",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775279749.797701,
+    "tokens_launched": [
+      "5xu4MYrn8iDwWLuhZRvaGeEYBrGJidZeZwnYUzp6pump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775279753.0999467
+  },
+  "JD3vzvVsAhXui5WvaRm7T5iu8cCxy64EhNh8N6n7yx4T": {
+    "wallet": "JD3vzvVsAhXui5WvaRm7T5iu8cCxy64EhNh8N6n7yx4T",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775296087.5509958,
+    "tokens_launched": [
+      "8cW3mUwT7uEL4H2QBTYoV2m9rTrsLAesCeMCvSRqpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775296087.7147942
+  },
+  "7t8VjCiWmnLYZmb88UaetY9DJ1e8U5h8cnwXuDefqoun": {
+    "wallet": "7t8VjCiWmnLYZmb88UaetY9DJ1e8U5h8cnwXuDefqoun",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775296301.6230972,
+    "tokens_launched": [
+      "3CDwfCaLwJS8sh2L4NxcHjR9N14Qsg7uryHFT6xEpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775296301.8755956
+  },
+  "9tUkYguth2FkU43L9wjEg2Td7acKkV7HQY4JHRAZ8o8e": {
+    "wallet": "9tUkYguth2FkU43L9wjEg2Td7acKkV7HQY4JHRAZ8o8e",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775297700.867122,
+    "tokens_launched": [
+      "79MpxnrB9bu9gQPgJPvU5vzCihmGNpRySm4YeYqipump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775297701.017044
+  },
+  "8YFENwXppqXt6XAaLgm8t2YiZMU9c9yVxwmKiUpZYYBg": {
+    "wallet": "8YFENwXppqXt6XAaLgm8t2YiZMU9c9yVxwmKiUpZYYBg",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775297761.8527281,
+    "tokens_launched": [
+      "84tyaacmFh5euLhk2VGkXDd2s2U2MTN3bWToXgqJpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775297761.997277
+  },
+  "u4TYkGRdG4jMmXFygdk3oZbxoUe3kXxwPD4oYbbjbv4": {
+    "wallet": "u4TYkGRdG4jMmXFygdk3oZbxoUe3kXxwPD4oYbbjbv4",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775301310.45003,
+    "tokens_launched": [
+      "arn67kUuQTeGe5igRrRocnJ1H9z3GrDJKKtAEnFpump"
+    ],
+    "wins": 0,
+    "losses": 2,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775301310.608121
+  },
+  "GunyMSSDaLf5r2YJ5mjxTWqKLzU7GTPSC4rJYsXVrY1y": {
+    "wallet": "GunyMSSDaLf5r2YJ5mjxTWqKLzU7GTPSC4rJYsXVrY1y",
+    "status": "proven",
+    "reason": "Auto-proven: 2 successful pump.fun/pumpswap launches, 0 rugs, 2 wins",
+    "added_at": 1775303050.2045345,
+    "tokens_launched": [
+      "EzvJw44M9YU3JjasGxBdLSdUDJ6YFM6kqTTFTSzSpump"
+    ],
+    "wins": 2,
+    "losses": 0,
+    "rugs": 0,
+    "successful_launches": 2,
+    "last_seen": 1775303050.3585176
+  },
+  "DBju6FxD86JgvhH8MosFJCwgQJuqEq41YYKhKqhJTD1W": {
+    "wallet": "DBju6FxD86JgvhH8MosFJCwgQJuqEq41YYKhKqhJTD1W",
+    "status": "whitelisted",
+    "reason": "Auto-whitelisted: 1 win(s), 0 rugs",
+    "added_at": 1775359833.1837025,
+    "tokens_launched": [
+      "6zMtCxwgPQceSNJUm3Wvbyr1XJzEZSoVD7apsSutpump"
+    ],
+    "wins": 1,
+    "losses": 0,
+    "rugs": 0,
+    "successful_launches": 1,
+    "last_seen": 1775359833.1837182
+  },
+  "DZCtYmoQqRhQM4JvFj3bphqAni9pm65xgxtrCoJYixkD": {
+    "wallet": "DZCtYmoQqRhQM4JvFj3bphqAni9pm65xgxtrCoJYixkD",
+    "status": "unknown",
+    "reason": "",
+    "added_at": 1775363722.5375872,
+    "tokens_launched": [
+      "HrFH13e6uJTFXoEMJwpfzkP4QAGkp5kYcPmfdmQQpump"
+    ],
+    "wins": 0,
+    "losses": 1,
+    "rugs": 0,
+    "successful_launches": 0,
+    "last_seen": 1775363722.537598
+  },
+  "9u7tUyy1aBBMgdt3TTYTLSqafxrGPQM6nmn15cHuu5Gs": {
+    "wallet": "9u7tUyy1aBBMgdt3TTYTLSqafxrGPQM6nmn15cHuu5Gs",
+    "status": "whitelisted",
+    "reason": "Auto-whitelisted: 1 win(s), 0 rugs",
+    "added_at": 1775453774.149414,
+    "tokens_launched": [
+      "VpRP3m5wQBNkDRcDRn6J5syA2VJsiFBXU6V3wMQpump"
+    ],
+    "wins": 1,
+    "losses": 0,
+    "rugs": 0,
+    "successful_launches": 1,
+    "last_seen": 1775453774.1496005
+  }
+}

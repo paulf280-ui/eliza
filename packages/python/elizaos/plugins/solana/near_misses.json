@@ -1,0 +1,302 @@
+[
+  {
+    "mint": "DUhzK5tXNqfVjWzMBTB8aNSYChRqfCNFPXwjsNbppump",
+    "strategy": "pumpswap",
+    "gates_passed": [
+      "not_blacklisted",
+      "price_available",
+      "rugcheck",
+      "vol_liq_max",
+      "vol_liq_min",
+      "buy_ratio",
+      "score"
+    ],
+    "gates_passed_count": 7,
+    "failed_gate": "jarvis_quality",
+    "ts": 1774270697.3723147,
+    "check_1h_due_at": 1774274297.3723147,
+    "check_1h_done": false,
+    "check_1h_price_change_pct": null,
+    "check_2h_due_at": 1774277897.372315,
+    "check_2h_done": false,
+    "check_2h_price_change_pct": null,
+    "outcome": null,
+    "score": 21,
+    "extra": {
+      "verdict": "WEAK",
+      "liq_usd": 19536.24,
+      "vol_liq": 43.0,
+      "buy_ratio": 54.8
+    }
+  },
+  {
+    "mint": "CUs8789XDTQbFXGLPkhSa3dMK4oafrwvF1vv4dUVhpGz",
+    "strategy": "pumpswap",
+    "gates_passed": [
+      "not_blacklisted",
+      "price_available",
+      "rugcheck",
+      "vol_liq_max",
+      "vol_liq_min",
+      "buy_ratio",
+      "score"
+    ],
+    "gates_passed_count": 7,
+    "failed_gate": "jarvis_quality",
+    "ts": 1774270698.3766184,
+    "check_1h_due_at": 1774274298.3766184,
+    "check_1h_done": false,
+    "check_1h_price_change_pct": null,
+    "check_2h_due_at": 1774277898.3766189,
+    "check_2h_done": false,
+    "check_2h_price_change_pct": null,
+    "outcome": null,
+    "score": 20,
+    "extra": {
+      "verdict": "WEAK",
+      "liq_usd": 17365.07,
+      "vol_liq": 21.8,
+      "buy_ratio": 57.3
+    }
+  },
+  {
+    "mint": "84cAEWqiDsV5xXh6CB69Hi3HcnumBbdjH4THfyorpump",
+    "strategy": "pumpswap",
+    "gates_passed": [
+      "not_blacklisted",
+      "price_available",
+      "rugcheck",
+      "vol_liq_max",
+      "vol_liq_min",
+      "buy_ratio",
+      "score"
+    ],
+    "gates_passed_count": 7,
+    "failed_gate": "jarvis_quality",
+    "ts": 1774279232.8255746,
+    "check_1h_due_at": 1774282832.8255746,
+    "check_1h_done": false,
+    "check_1h_price_change_pct": null,
+    "check_2h_due_at": 1774286432.825575,
+    "check_2h_done": false,
+    "check_2h_price_change_pct": null,
+    "outcome": null,
+    "score": 17,
+    "extra": {
+      "verdict": "WEAK",
+      "liq_usd": 14781.44,
+      "vol_liq": 20.7,
+      "buy_ratio": 54.8
+    }
+  },
+  {
+    "mint": "CCPX1J1dNRC38jnWiptarmES4F7CRLA9iwmUx7VKpump",
+    "strategy": "pumpswap",
+    "gates_passed": [
+      "not_blacklisted",
+      "price_available",
+      "rugcheck",
+      "vol_liq_max",
+      "vol_liq_min",
+      "buy_ratio",
+      "score"
+    ],
+    "gates_passed_count": 7,
+    "failed_gate": "jarvis_quality",
+    "ts": 1774279398.0558603,
+    "check_1h_due_at": 1774282998.0558605,
+    "check_1h_done": false,
+    "check_1h_price_change_pct": null,
+    "check_2h_due_at": 1774286598.0558608,
+    "check_2h_done": false,
+    "check_2h_price_change_pct": null,
+    "outcome": null,
+    "score": 18,
+    "extra": {
+      "verdict": "WEAK",
+      "liq_usd": 23741.18,
+      "vol_liq": 5.1,
+      "buy_ratio": 86.5
+    }
+  },
+  {
+    "mint": "84cAEWqiDsV5xXh6CB69Hi3HcnumBbdjH4THfyorpump",
+    "strategy": "pumpswap",
+    "gates_passed": [
+      "not_blacklisted",
+      "price_available",
+      "rugcheck",
+      "vol_liq_max",
+      "vol_liq_min",
+      "buy_ratio",
+      "score"
+    ],
+    "gates_passed_count": 7,
+    "failed_gate": "jarvis_quality",
+    "ts": 1774281828.2209978,
+    "check_1h_due_at": 1774285428.2209978,
+    "check_1h_done": false,
+    "check_1h_price_change_pct": null,
+    "check_2h_due_at": 1774289028.220998,
+    "check_2h_done": false,
+    "check_2h_price_change_pct": null,
+    "outcome": null,
+    "score": 18,
+    "extra": {
+      "verdict": "WEAK",
+      "liq_usd": 31937.1,
+      "vol_liq": 10.5,
+      "buy_ratio": 53.8
+    }
+  },
+  {
+    "mint": "CCPX1J1dNRC38jnWiptarmES4F7CRLA9iwmUx7VKpump",
+    "strategy": "pumpswap",
+    "gates_passed": [
+      "not_blacklisted",
+      "price_available",
+      "rugcheck",
+      "vol_liq_max",
+      "vol_liq_min",
+      "buy_ratio",
+      "score"
+    ],
+    "gates_passed_count": 7,
+    "failed_gate": "jarvis_quality",
+    "ts": 1774281830.0113719,
+    "check_1h_due_at": 1774285430.0113719,
+    "check_1h_done": false,
+    "check_1h_price_change_pct": null,
+    "check_2h_due_at": 1774289030.0113726,
+    "check_2h_done": false,
+    "check_2h_price_change_pct": null,
+    "outcome": null,
+    "score": 18,
+    "extra": {
+      "verdict": "WEAK",
+      "liq_usd": 28272.89,
+      "vol_liq": 10.6,
+      "buy_ratio": 87.3
+    }
+  },
+  {
+    "mint": "B9eAAW8hGe2Pkg6LXBJGRdxYScLykCL6mYoZVSehpump",
+    "strategy": "pumpswap",
+    "gates_passed": [
+      "not_blacklisted",
+      "price_available",
+      "rugcheck",
+      "vol_liq_max",
+      "vol_liq_min",
+      "buy_ratio",
+      "score"
+    ],
+    "gates_passed_count": 7,
+    "failed_gate": "jarvis_quality",
+    "ts": 1774300805.4489148,
+    "check_1h_due_at": 1774304405.4489152,
+    "check_1h_done": false,
+    "check_1h_price_change_pct": null,
+    "check_2h_due_at": 1774308005.4489164,
+    "check_2h_done": false,
+    "check_2h_price_change_pct": null,
+    "outcome": null,
+    "score": 19,
+    "extra": {
+      "verdict": "WEAK",
+      "liq_usd": 27598.13,
+      "vol_liq": 14.7,
+      "buy_ratio": 81.4
+    }
+  },
+  {
+    "mint": "B9eAAW8hGe2Pkg6LXBJGRdxYScLykCL6mYoZVSehpump",
+    "strategy": "pumpswap",
+    "gates_passed": [
+      "not_blacklisted",
+      "price_available",
+      "rugcheck",
+      "vol_liq_max",
+      "vol_liq_min",
+      "buy_ratio",
+      "score"
+    ],
+    "gates_passed_count": 7,
+    "failed_gate": "jarvis_quality",
+    "ts": 1774303060.156533,
+    "check_1h_due_at": 1774306660.1565337,
+    "check_1h_done": false,
+    "check_1h_price_change_pct": null,
+    "check_2h_due_at": 1774310260.1565359,
+    "check_2h_done": false,
+    "check_2h_price_change_pct": null,
+    "outcome": null,
+    "score": 20,
+    "extra": {
+      "verdict": "WEAK",
+      "liq_usd": 32424.02,
+      "vol_liq": 12.5,
+      "buy_ratio": 68.6
+    }
+  },
+  {
+    "mint": "EM7eGtJmf7J27FEVt5WXYGG7wFafJynfasNknLmGpump",
+    "strategy": "pumpswap",
+    "gates_passed": [
+      "not_blacklisted",
+      "price_available",
+      "rugcheck",
+      "vol_liq_max",
+      "vol_liq_min",
+      "buy_ratio",
+      "score"
+    ],
+    "gates_passed_count": 7,
+    "failed_gate": "jarvis_quality",
+    "ts": 1775150148.6603985,
+    "check_1h_due_at": 1775153748.6603985,
+    "check_1h_done": false,
+    "check_1h_price_change_pct": null,
+    "check_2h_due_at": 1775157348.660399,
+    "check_2h_done": false,
+    "check_2h_price_change_pct": null,
+    "outcome": null,
+    "score": 23,
+    "extra": {
+      "verdict": "WEAK",
+      "liq_usd": 19923.64,
+      "vol_liq": 12.7,
+      "buy_ratio": 55.7
+    }
+  },
+  {
+    "mint": "C6iUsUEnvn9R7Ac9qP5VcgXSoLU3GP4UkCnN57Xdpump",
+    "strategy": "pumpswap",
+    "gates_passed": [
+      "not_blacklisted",
+      "price_available",
+      "rugcheck",
+      "vol_liq_max",
+      "vol_liq_min",
+      "buy_ratio",
+      "score"
+    ],
+    "gates_passed_count": 7,
+    "failed_gate": "jarvis_quality",
+    "ts": 1775300666.0713317,
+    "check_1h_due_at": 1775304266.0713317,
+    "check_1h_done": false,
+    "check_1h_price_change_pct": null,
+    "check_2h_due_at": 1775307866.071332,
+    "check_2h_done": false,
+    "check_2h_price_change_pct": null,
+    "outcome": null,
+    "score": 11,
+    "extra": {
+      "verdict": "WEAK",
+      "liq_usd": 14313.24,
+      "vol_liq": 1.2,
+      "buy_ratio": 61.3
+    }
+  }
+]

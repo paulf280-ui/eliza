@@ -1,0 +1,245 @@
+{
+  "_note": "Meme token playbook — pattern recognition guide for Jarvis. Updated from 32 confirmed monster trades. Use this to score narrative quality and predict pump sustainability.",
+  "_last_updated": "2026-04-05",
+  "_version": "2",
+
+  "entry_signals_ranked": [
+    {
+      "rank": 1,
+      "signal": "X community link",
+      "description": "Website field on DexScreener = x.com/i/communities/... means a dedicated persistent buying community EXISTS before the token launched. Not random buyers — organised group.",
+      "how_to_spot": "DexScreener info.socials[].url contains 'x.com/i/communities/'",
+      "evidence": "Pluto the Penguin (+297%), every X community token we've seen has been a strong mover",
+      "action": "Add +3 to score immediately. This is the strongest single non-price signal we have."
+    },
+    {
+      "rank": 2,
+      "signal": "Fast graduation (<30 min)",
+      "description": "Token graduated pump.fun bonding curve in under 30 minutes. Normal tokens take 2-72h. Sub-30min = entire 800M supply bought in a rush = massive coordinated interest.",
+      "evidence": "7x7=49 (29min, +1547%), Pluto (11min, +297%), BURNIE, milkers, Dunald all fast grads",
+      "action": "Strategy B should always attempt entry on sub-30min grads regardless of vol/liq on new pool."
+    },
+    {
+      "rank": 3,
+      "signal": "Copycat token flood",
+      "description": "Multiple similar tokens launching simultaneously ('Pluto is winning', 'PLUTO IS WINNING !!!') = a coordinated community is ACTIVELY promoting a narrative. The copycat launchers are trying to ride the wave of the original.",
+      "how_to_spot": "A2 BC sniper sees multiple tokens with similar names in rug-word filter in short window",
+      "evidence": "Pluto the Penguin — 6 copycat tokens blocked by A2 in same hour",
+      "action": "If 3+ copycat tokens appear in 30min window for same name/theme, the ORIGINAL is worth elevated attention."
+    },
+    {
+      "rank": 4,
+      "signal": "J7tracker bundler",
+      "description": "pump.fun description contains 'j7tracker.com' = professional launch coordination. Not random dev — organised group using launch tools.",
+      "evidence": "GSD (+20% on Meteora), ELUN (+1152%)",
+      "action": "Add +2 to score."
+    },
+    {
+      "rank": 5,
+      "signal": "KOL creator",
+      "description": "Token creator has verified real-world following (e.g. pippin creator yoheinakajima = BabyAGI founder, 1.8M Twitter). Every AI news event triggers a new wave.",
+      "evidence": "pippin — still active after 511 days, recurring waves on AI news",
+      "action": "Check creator Twitter before entry. 100k+ followers = premium signal."
+    },
+    {
+      "rank": 6,
+      "signal": "Axiom terminal launch",
+      "description": "Solscan shows 'Axiom' as social channel = token launched/promoted via Axiom trading terminal. Axiom has a dedicated degen community that pre-coordinates buys. Same tier as j7tracker.",
+      "how_to_spot": "Solscan token page social channels dropdown shows 'Axiom' at top",
+      "evidence": "Freg (+1513% h24, Apr 05 2026) — launched via Axiom, same-day monster",
+      "action": "Add +2 to score. Treat identically to j7tracker bundler signal."
+    },
+    {
+      "rank": 7,
+      "signal": "KOL tweet link in socials",
+      "description": "DexScreener/Solscan Twitter field contains a direct tweet URL (/status/) not just a profile. Means a known degen is actively promoting RIGHT NOW — the tweet is the catalyst.",
+      "how_to_spot": "socials[].url contains 'twitter.com' or 'x.com' AND contains '/status/' (direct tweet not profile)",
+      "evidence": "Freg — @JakTheDegen tweet = active KOL promotion at launch time",
+      "action": "Fetch tweet immediately. If tweeter has >10k followers: +2. >100k: +3."
+    },
+    {
+      "rank": 8,
+      "signal": "Dual narrative",
+      "description": "Token hits TWO narrative categories simultaneously = two separate degen audiences buying independently. Political + horror, AI + animal, finance + cultural all confirmed.",
+      "how_to_spot": "Token name/description references two distinct themes (check narrative_categories)",
+      "evidence": "Silk Road 2.0 / Cthulhu (+1053%): political freedom-fighter + chaos horror. BURNIE (+2214%): gambling + political burn.",
+      "action": "Add +1 for each narrative beyond the first. Silk Road / Ross Ulbricht = special: EVERY crypto holder knows the story = built-in community recognition."
+    }
+  ],
+
+  "narrative_categories": {
+    "humor_universal_math": {
+      "examples": ["7x7=49 (+1547%)", "LOL"],
+      "description": "Universally understood, requires zero cultural context. Anyone anywhere gets it instantly.",
+      "typical_pump_duration": "Short and violent — 12-24h. Pure viral momentum, no sustained narrative.",
+      "buy_ratio_at_entry": "50-60%",
+      "peak_timing": "Usually 1-3 waves in first 24h",
+      "exit_strategy": "Trailing stop 12%. Don't wait for narrative catalyst — there isn't one.",
+      "red_flags": "Multiple copycat tokens means you missed wave 1. Imitators dilute.",
+      "score_bonus": 0
+    },
+    "humor_animal_character": {
+      "examples": ["Pluto the Penguin (+297%)", "HACHI (+Meteora)", "Chicky (+207%)"],
+      "description": "Character with personality. Penguin/dog/hamster that is relatable, cute, or an underdog. Pluto = demoted planet OR Disney dog = instant empathy.",
+      "typical_pump_duration": "Medium — 12-48h if character has story depth",
+      "buy_ratio_at_entry": "55-63%",
+      "peak_timing": "Often has second wave 24-48h after initial pump as latecomers arrive",
+      "exit_strategy": "Trailing stop 12-15%. Character narratives can sustain longer than pure humor.",
+      "red_flags": "Generic 'cute animal' with no distinguishing personality. Thousands of dog coins exist.",
+      "score_bonus": 1
+    },
+    "political_meme": {
+      "examples": ["boden (+91%, 762 days)", "OPK/Obi PNut Kenobi (+191%)", "BURNIE (+2214%)"],
+      "description": "Political figure or event. Works best when it's counter-narrative (anti-establishment, underdog politician, protest meme).",
+      "typical_pump_duration": "Strongly correlated with news cycle. Can sustain days-weeks if tied to ongoing story.",
+      "buy_ratio_at_entry": "50-58% for established (boden-type), 55-65% for fresh launches",
+      "peak_timing": "Spikes on news events. boden revived every time Biden makes news.",
+      "exit_strategy": "Hold with trailing stop 15%. Political memes can have multiple wave catalysts.",
+      "red_flags": "If the political story is OVER (election done, politician gone), the narrative is dead.",
+      "score_bonus": 1,
+      "special_note": "Liberation Day cluster: 8+ monsters spiked within 72h of April 2 Trump tariff announcement. Market-wide macro events = political meme trigger."
+    },
+    "ai_agent_tech": {
+      "examples": ["pippin (+39% h24 but sustained 511d, $5M liq)", "NUERO (+122%)", "ELUN (+1152%)"],
+      "description": "AI agents, neural networks, tech founders. Works best when tied to real project or real person (KOL creator) with recurring catalysts.",
+      "typical_pump_duration": "Can be weeks-months if tied to real AI project. Pure AI meme = 24-48h.",
+      "buy_ratio_at_entry": "50-60%",
+      "peak_timing": "Waves on AI news events (ChatGPT releases, AI funding rounds, AI-related tweets from influencers)",
+      "exit_strategy": "If KOL creator: hold with wide trailing stop (15-20%). Pure AI meme: tighter 12%.",
+      "red_flags": "Generic 'AI' name with no project or person behind it. NUERO is borderline — no KOL.",
+      "score_bonus": 1
+    },
+    "gambling_finance": {
+      "examples": ["black (+204%)", "BURNIE (+2214%)", "GSD (Meteora)"],
+      "description": "Gambling, casino, money-printing themes. Extremely direct appeal — people ON Solana are already gambling. Meta-gambling resonates instantly.",
+      "typical_pump_duration": "Fast and violent. 6-24h. Pure casino energy.",
+      "buy_ratio_at_entry": "55-65%",
+      "peak_timing": "Usually single massive wave. No sustained narrative.",
+      "exit_strategy": "Trailing stop 12%. These run fast and end fast.",
+      "red_flags": "Low liq at entry (<$20k). Gambling tokens attract degens who exit fast.",
+      "score_bonus": 2,
+      "special_note": "BURNIE (the biggest monster at +2214%) is gambling/finance narrative. This category has the highest peak multipliers."
+    },
+    "productivity_work_ethic": {
+      "examples": ["fluide (+6845%)", "SpaceX (+11683%)"],
+      "description": "Hustle culture, productivity, elite companies. SpaceX = aspirational tech. fluide = flow state productivity.",
+      "typical_pump_duration": "SpaceX held for days. These can sustain if narrative is aspirational.",
+      "buy_ratio_at_entry": "50-55% (SpaceX 53.1%, fluide 51.5%)",
+      "peak_timing": "Can have very delayed peaks (SpaceX peaked days after entry on Raydium)",
+      "exit_strategy": "Wide trailing stop 15-20%. These are marathon not sprint.",
+      "red_flags": "Company-named tokens need careful rugcheck — IP risk if actual company objects.",
+      "score_bonus": 1
+    },
+    "emotional_loyalty_cultural": {
+      "examples": ["HACHI (+Meteora)", "pippin (+511d sustained)", "Hamster"],
+      "description": "Loyalty, emotional attachment, cultural icons. HACHI = loyal dog from Japanese film. pippin = BabyAGI creator's dog. Deep emotional resonance = stickier holders.",
+      "typical_pump_duration": "These have the longest hold times in our dataset. Sticky community.",
+      "buy_ratio_at_entry": "51-58%",
+      "peak_timing": "Multiple waves over days-weeks. Community holds through dips.",
+      "exit_strategy": "Trailing stop 15-20%. Give room for sustained moves.",
+      "score_bonus": 2,
+      "special_note": "If token has personal emotional story from real person (creator's pet, personal connection) = exceptional stickiness."
+    }
+  },
+
+  "coordinated_launch_signals": {
+    "x_community": {
+      "signal": "DexScreener website = x.com/i/communities/...",
+      "meaning": "Dedicated buying group with history pre-launch",
+      "score_action": "+3",
+      "confirmed_examples": ["Pluto the Penguin"]
+    },
+    "j7tracker_bundler": {
+      "signal": "pump.fun description contains 'j7tracker.com'",
+      "meaning": "Professional coordinated launch with bundled buys",
+      "score_action": "+2",
+      "confirmed_examples": ["GSD", "ELUN"]
+    },
+    "axiom_terminal": {
+      "signal": "CORRECTION — Solscan 'Social Channels' showing Axiom is NOT a valid token-specific signal",
+      "meaning": "INVALID SIGNAL: The Axiom entry in Solscan's Social Channels dropdown is a UNIVERSAL navigation element that appears on ALL Solana token pages. It simply offers a link to open the token on Axiom's terminal. It does NOT indicate the token was launched via Axiom. DexScreener sweep of 29 monsters confirmed zero have axiom.trade in their actual social URLs.",
+      "what_axiom_vision_actually_is": "Axiom.trade/vision is a premium market scanning terminal (YC-backed) showing new token launches and trending tokens in real-time. It is a TOOL for discovery, not a launch signal. Requires login.",
+      "score_action": "0 — do not score based on Solscan showing Axiom",
+      "note": "Removed from entry signals ranked list — false pattern. See kol_tweet_link for the real signal from the Freg screenshot."
+    },
+    "kol_tweet_link": {
+      "signal": "DexScreener/Solscan Twitter field links to a specific tweet (not a profile) from a known degen/KOL",
+      "meaning": "A specific influencer is actively promoting this token in real-time. The tweet IS the catalyst.",
+      "how_to_spot": "socials[].url contains '/status/' — a direct tweet link, not just a profile",
+      "score_action": "+2 if tweeter has 10k+ followers; +3 if >100k followers",
+      "confirmed_examples": ["Freg — @JakTheDegen tweet link"],
+      "note": "A tweet link in the social field means the dev/launcher WANTS you to see this specific promotion. Check the tweeter's follower count immediately."
+    },
+    "copycat_flood": {
+      "signal": "3+ tokens with same name/theme in A2 filter within 30min",
+      "meaning": "Community is actively promoting a narrative — original token is the target",
+      "score_action": "Flag original token for elevated monitoring"
+    },
+    "kol_creator": {
+      "signal": "Creator wallet matches known KOL Twitter account",
+      "meaning": "Every tweet from that person = new wave catalyst",
+      "score_action": "+3 + PROVEN CREATOR tier",
+      "confirmed_examples": ["pippin (yoheinakajima, BabyAGI, 1.8M followers)"]
+    },
+    "dual_narrative": {
+      "signal": "Token name/description hits TWO distinct narrative categories simultaneously",
+      "meaning": "Two separate audiences can pump the same token independently. Political + horror, AI + finance, animal + KOL all proven.",
+      "examples": ["Silk Road 2.0 / Cthulhu (+1053%): political counter-establishment + chaos/horror culture", "BURNIE (+2214%): gambling/finance + political burn narrative", "OPK/Obi PNut Kenobi (+191%): political (PNut squirrel) + Star Wars cultural"],
+      "score_action": "+1 per additional narrative category beyond the first (max +2)",
+      "note": "The Silk Road narrative is uniquely powerful in crypto — Ross Ulbricht story resonates with EVERY crypto holder. Any token referencing Silk Road/Ross/dark web freedom has built-in community recognition."
+    }
+  },
+
+  "wave_patterns": {
+    "description": "Meme tokens typically have 2-3 waves. Our entry strategy targets Wave 1. If we miss Wave 1, wait for Wave 2 setup — never enter during Wave 1 peak.",
+    "wave_1": {
+      "characteristics": "h1: 0-80%, m5: -5% to +15%, buy_ratio: 52-62%, vol/liq: 2-5x",
+      "this_is_our_target": true,
+      "action": "ENTER — this is monster DNA entry conditions"
+    },
+    "wave_1_peak": {
+      "characteristics": "h1: 80-400%+, m5: +15-50%, buy_ratio: 60-70%",
+      "action": "DO NOT ENTER — we have missed wave 1. Wait or skip."
+    },
+    "correction": {
+      "characteristics": "h1 coming down from 200%+ to 50-80%, m5 negative, buy_ratio 45-55%",
+      "action": "DANGER ZONE — could be dead cat or wave 2 setup. Wait for buy_ratio to stabilise above 55%."
+    },
+    "wave_2_setup": {
+      "characteristics": "h1 reset to 50-100% after correction, m5: 0-10%, buy_ratio: 55-62%, vol still active",
+      "action": "POSSIBLE entry — use 12% trailing stop, accept that this is higher risk than wave 1"
+    }
+  },
+
+  "red_flags_never_enter": [
+    "Buy ratio h1 > 70% — euphoric top buyers, exits will be brutal (FML=69.9% rugged, apple=79.8% rugged)",
+    "m5 > 15% — already running, we're late (our #1 loss driver)",
+    "h1 > 80% on first wave — pump exhausted, exit liquidity risk",
+    "Liq < $10k — micro-cap, rug risk extreme",
+    "Vol/liq > 8x — wash trading or post-peak frenzy",
+    "Token has freeze authority AND no socials — silent rug",
+    "Name contains 'test', 'scam', 'rug', 'honeypot' — obvious",
+    "Multiple identical tokens flooding A2 WITH DIFFERENT MINTS for same name — competing rugs, not coordination"
+  ],
+
+  "macro_event_boost": {
+    "description": "Macro market events act as catalysts for political meme tokens especially. 8 of 32 monsters spiked within 72h of April 2 2026 Liberation Day tariff announcement.",
+    "confirmed_catalysts": [
+      "Liberation Day tariffs (April 2 2026) — triggered political meme wave",
+      "Biden/Trump news events — boden revival pattern",
+      "AI model releases — pippin, ELUN, NUERO wave triggers",
+      "Any viral animal story — HACHI, Hamster, PNut/OPK pattern"
+    ],
+    "action": "When macro_event_mode=true, raise score threshold for political/AI narrative tokens by -2 (easier entry). Normal tokens unchanged."
+  },
+
+  "exit_by_narrative": {
+    "pure_humor": "Trailing stop 12%. These are sprints. Don't overstay.",
+    "animal_character": "Trailing stop 12-15%. Can have wave 2, but don't count on it.",
+    "political_meme": "Trailing stop 15%. News cycle can extend. But if story ends, so does the trade.",
+    "ai_tech": "Trailing stop 15-20% if KOL creator, 12% if no KOL.",
+    "gambling_finance": "Trailing stop 12%. Fast in, fast out.",
+    "emotional_loyalty": "Trailing stop 15-20%. These are marathon tokens. Give them room.",
+    "productivity_aspirational": "Trailing stop 20%. SpaceX/fluide showed these can run for days."
+  }
+}

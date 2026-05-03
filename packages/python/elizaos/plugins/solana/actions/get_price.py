@@ -46,16 +46,21 @@ async def _handler(
     from elizaos.plugins.solana.services.pump_fun import PumpFunService
     from elizaos.plugins.solana.services.raydium import RaydiumService
 
-    # Extract mint from message text (simple heuristic)
-    text = (message.content.text if message.content else "") or ""
-    words = text.split()
-    # Look for a base58-ish token address (32-44 chars, alphanumeric)
+    # Try parsed action params first (from XML <mint> element), then fall back to text
     mint = ""
-    for word in words:
-        cleaned = word.strip(".,;:")
-        if 32 <= len(cleaned) <= 44 and cleaned.isalnum():
-            mint = cleaned
-            break
+    if options and hasattr(options, "parameters") and options.parameters:
+        mint = str(options.parameters.get("mint", "")).strip()
+
+    if not mint:
+        text = (message.content.text if message.content else "") or ""
+        words = text.split()
+        # Look for a base58-ish token address (32-44 chars, alphanumeric)
+        for word in words:
+            import re as _re
+            cleaned = _re.sub(r"[^A-Za-z0-9]", "", word)
+            if 32 <= len(cleaned) <= 44:
+                mint = cleaned
+                break
 
     if not mint:
         result_text = "Please provide a token mint address."

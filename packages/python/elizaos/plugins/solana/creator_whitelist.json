@@ -1,0 +1,385 @@
+{
+  "generated_at": "2026-03-08",
+  "description": "Creator whitelist derived from 55 pump.fun tokens (53 from input list + 2 special lookups). Creator wallets decoded on-chain from bonding curve PDAs. Only creators whose tokens achieved >$10k mcap are included (15 creators). Launch history scanned from 300 txs per wallet.",
+  "methodology": "Bonding curve PDA derived as findProgramAddress(['bonding-curve', mint_bytes], 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P). Creator decoded at byte offset 49 of the account data. Launch history scanned via wallet tx history checking pump.fun create instruction discriminator d6904cec5f8b31b4.",
+  "scoring_rules": {
+    "graduation": "+1 per graduated token",
+    "mcap_10k_50k": "+1 per token with $10k-$50k mcap",
+    "mcap_50k_200k": "+2 per token with $50k-$200k mcap",
+    "mcap_200k_500k": "+3 per token with $200k-$500k mcap",
+    "mcap_500k_plus": "+4 per token with $500k+ mcap",
+    "serial_bonus": "x1.5 multiplier if 2+ successful (>$10k) launches",
+    "tiers": {"S": ">=10", "A": "7-9", "B": "5-6", "C": "3-4", "D": "<3"}
+  },
+  "notes": {
+    "api_issue": "frontend-api.pump.fun is Cloudflare-blocked from WSL2 (error 1016). All data fetched on-chain via Helius RPC + DexScreener.",
+    "mcap_caveat": "Market caps are live snapshots at time of generation (2026-03-08). Tokens may have moved significantly.",
+    "history_caveat": "Launch history limited to 300 most recent txs per creator wallet. Creators who launched tokens long ago may show fewer results than reality.",
+    "cama_note": "CAMAVINGA #6 mcap shown as $1,740 — this is the live mcap at time of scan, token peaked at $3M earlier. Creator score reflects current state."
+  },
+  "whitelist": [
+    {
+      "creator_wallet": "2HXRb5z45Wtmq3zGvgY4ADDmtrE1XV3QdNduz3HVpXf3",
+      "reputation_score": 5,
+      "tier": "B",
+      "total_launches_known": 1,
+      "successful_launches": 1,
+      "graduated_launches": 1,
+      "peak_token_mcap_usd": 732954,
+      "tokens_launched": [
+        {
+          "mint": "AukyjhMSmN5VEGjQ9npeu6Eu9X21feL1qCbZSPeJpump",
+          "name": "Doom Neuron",
+          "symbol": "Doom",
+          "market_cap_usd": 732954,
+          "graduated": true,
+          "dex": "pumpswap",
+          "created_at": null
+        }
+      ]
+    },
+    {
+      "creator_wallet": "9Jj8g3NcSi73mv8BnmeBzhVh1ptPhgmjMRLVZPBRS9Wn",
+      "reputation_score": 5,
+      "tier": "B",
+      "total_launches_known": 1,
+      "successful_launches": 1,
+      "graduated_launches": 1,
+      "peak_token_mcap_usd": 698934,
+      "tokens_launched": [
+        {
+          "mint": "26HijyQRPisA96er6xWLh32TSMAHLvivTnmcmu7bpump",
+          "name": "PetroDollar",
+          "symbol": "XPD",
+          "market_cap_usd": 698934,
+          "graduated": true,
+          "dex": "pumpswap",
+          "created_at": null
+        }
+      ]
+    },
+    {
+      "creator_wallet": "2FWMpthyEJ3AGsq61TogQevJT5S5sU8bTngsDtgwBwBV",
+      "reputation_score": 4,
+      "tier": "C",
+      "total_launches_known": 1,
+      "successful_launches": 1,
+      "graduated_launches": 1,
+      "peak_token_mcap_usd": 300442,
+      "tokens_launched": [
+        {
+          "mint": "BWJ7zJauzatao4FsBnGdVsqdBi3k5NbgSY62noZApump",
+          "name": "NANA",
+          "symbol": "Nana",
+          "market_cap_usd": 300442,
+          "graduated": true,
+          "dex": "pumpswap",
+          "created_at": null
+        }
+      ]
+    },
+    {
+      "creator_wallet": "4fGv8tra7pUsu2F655pGCM3pGk3gMbSkQY6ny7TePKwT",
+      "reputation_score": 4,
+      "tier": "C",
+      "total_launches_known": 1,
+      "successful_launches": 1,
+      "graduated_launches": 1,
+      "peak_token_mcap_usd": 290481,
+      "tokens_launched": [
+        {
+          "mint": "GFSeaid3PrKr3agHd9dQt3qFEG4Rxosr7U8aLSsEpump",
+          "name": "NeuroMechFly",
+          "symbol": "NMF",
+          "market_cap_usd": 290481,
+          "graduated": true,
+          "dex": "pumpswap",
+          "created_at": null
+        }
+      ]
+    },
+    {
+      "creator_wallet": "FWZLZdP2S6shShD1q9a2Udo6YNLnKuYiQWLxV6xrXh4S",
+      "reputation_score": 4,
+      "tier": "C",
+      "total_launches_known": 1,
+      "successful_launches": 1,
+      "graduated_launches": 1,
+      "peak_token_mcap_usd": 251055,
+      "tokens_launched": [
+        {
+          "mint": "CBm95ojTDKF6T18iMVjo3u2NhwdrCRTs6tVt63kxpump",
+          "name": "Tehran Forecast",
+          "symbol": "NUKE",
+          "market_cap_usd": 251055,
+          "graduated": true,
+          "dex": "pumpswap",
+          "created_at": 1773003149
+        }
+      ]
+    },
+    {
+      "creator_wallet": "3DZkSo9wf5vb86UsxWL5qiNNFvMuY7gL2whLUgzz8EFM",
+      "reputation_score": 4,
+      "tier": "C",
+      "total_launches_known": 1,
+      "successful_launches": 1,
+      "graduated_launches": 1,
+      "peak_token_mcap_usd": 219333,
+      "tokens_launched": [
+        {
+          "mint": "EZL4EgKCLBucequGf4ZyoozcjSmZy4imVwnd6Qwspump",
+          "name": "Moyu (摸鱼)",
+          "symbol": "Moyu",
+          "market_cap_usd": 219333,
+          "graduated": true,
+          "dex": "pumpswap",
+          "created_at": 1772996090
+        }
+      ]
+    },
+    {
+      "creator_wallet": "9Ln4EfdfS2qAZ53i2nzU5W7WgnudbjSemcuipaejZuRk",
+      "reputation_score": 3,
+      "tier": "C",
+      "total_launches_known": 1,
+      "successful_launches": 1,
+      "graduated_launches": 1,
+      "peak_token_mcap_usd": 140068,
+      "tokens_launched": [
+        {
+          "mint": "2SRku5mrTM51MFzVNUwaTEDDjWYidgFY98kgoyFSpump",
+          "name": "Whole-Brain Emulation",
+          "symbol": "WBE",
+          "market_cap_usd": 140068,
+          "graduated": true,
+          "dex": "pumpswap",
+          "created_at": null
+        }
+      ]
+    },
+    {
+      "creator_wallet": "CE95BBjZ77HJspCGQeZtYxNjCNq7hdRHXuEeQNjaJ2Hh",
+      "reputation_score": 3,
+      "tier": "C",
+      "total_launches_known": 1,
+      "successful_launches": 1,
+      "graduated_launches": 1,
+      "peak_token_mcap_usd": 95168,
+      "tokens_launched": [
+        {
+          "mint": "ELVMu5EpezUEvz6umZbie9CKGMYmH3vpDk8L1fLbpump",
+          "name": "OLIO",
+          "symbol": "OIL",
+          "market_cap_usd": 95168,
+          "graduated": true,
+          "dex": "pumpswap",
+          "created_at": 1772991677
+        }
+      ]
+    },
+    {
+      "creator_wallet": "ActgfbQSBZyKoAnrnMs3nmiZddqCMKzzKHKEx1xCS5vZ",
+      "reputation_score": 3,
+      "tier": "C",
+      "total_launches_known": 1,
+      "successful_launches": 1,
+      "graduated_launches": 1,
+      "peak_token_mcap_usd": 75122,
+      "tokens_launched": [
+        {
+          "mint": "DMiSNV1nkBUDeJa3AH6WaixM1yU81vgdHXsro23dpump",
+          "name": "Organoid Intelligence",
+          "symbol": "OI",
+          "market_cap_usd": 75122,
+          "graduated": true,
+          "dex": "pumpswap",
+          "created_at": null
+        }
+      ]
+    },
+    {
+      "creator_wallet": "4yR4qci2xn7Mvrmzk3E3A7GGD9pk4FbcWbwBoyPsN3fU",
+      "reputation_score": 3,
+      "tier": "C",
+      "total_launches_known": 1,
+      "successful_launches": 1,
+      "graduated_launches": 1,
+      "peak_token_mcap_usd": 71712,
+      "tokens_launched": [
+        {
+          "mint": "CGcajCM54hqgiWLKoio4gyBc7PMN1Sm7uw7MG17Ppump",
+          "name": "Koa'e Kea",
+          "symbol": "Messenger",
+          "market_cap_usd": 71712,
+          "graduated": true,
+          "dex": "pumpswap",
+          "created_at": null
+        }
+      ]
+    },
+    {
+      "creator_wallet": "9WdLcgLPbT1vSUDrs6tKPuKeeHwiXCFLgiSMMbopLmon",
+      "reputation_score": 2,
+      "tier": "D",
+      "total_launches_known": 1,
+      "successful_launches": 1,
+      "graduated_launches": 1,
+      "peak_token_mcap_usd": 42338,
+      "tokens_launched": [
+        {
+          "mint": "4GhHe9ZndKQmjLkzcgsnLa7ZNCxguPZFEJAUgJ4opump",
+          "name": "CyberShrimp",
+          "symbol": "CS",
+          "market_cap_usd": 42338,
+          "graduated": true,
+          "dex": "pumpswap",
+          "created_at": 1772923863
+        }
+      ]
+    },
+    {
+      "creator_wallet": "aExvXsLRXRiVtGyzW4DG53LsonwrGYLhc8ojznHwaj1",
+      "reputation_score": 2,
+      "tier": "D",
+      "total_launches_known": 1,
+      "successful_launches": 1,
+      "graduated_launches": 1,
+      "peak_token_mcap_usd": 31517,
+      "tokens_launched": [
+        {
+          "mint": "GtAHbD7JD7xQJW9ai1fxdxKG65cKsbuCTukTNjRkpump",
+          "name": "Moltghost",
+          "symbol": "MOLTG",
+          "market_cap_usd": 31517,
+          "graduated": true,
+          "dex": "pumpswap",
+          "created_at": 1772914408
+        }
+      ]
+    },
+    {
+      "creator_wallet": "7zrfWFJrjPkqUEPs7dH65a9ys9iBZCQreBoazDaqzgvv",
+      "reputation_score": 2,
+      "tier": "D",
+      "total_launches_known": 8,
+      "successful_launches": 1,
+      "graduated_launches": 1,
+      "peak_token_mcap_usd": 26661,
+      "tokens_launched": [
+        {
+          "mint": "1Zfan3ERZ81hzQhEeJAa5ML8APG6V6sfLqCXzzApump",
+          "name": "Cyborg Swarms",
+          "symbol": "Swarm",
+          "market_cap_usd": 26661,
+          "graduated": true,
+          "dex": "pumpswap",
+          "created_at": 1772992133
+        },
+        {
+          "mint": "77FC262cuvPiQRXnthCcfBBiBDxuhEhyzB8T9xxupump",
+          "name": "Cyborg Swarms v2",
+          "symbol": "SWARM",
+          "market_cap_usd": 2606,
+          "graduated": false,
+          "dex": "pumpfun",
+          "created_at": 1772981687
+        },
+        {
+          "mint": "DwDsxSbiSR8aJgqa29mXoTPUEz25pLgDfFQ2ituPpump",
+          "name": "Death Gap (デスギャップ)",
+          "symbol": "Gap",
+          "market_cap_usd": 2302,
+          "graduated": false,
+          "dex": "pumpfun",
+          "created_at": 1772980328
+        },
+        {
+          "mint": "5tBeXUnSHs7kDtt7jtJ1SgxrxTttik7hbCgYz2CMpump",
+          "name": "Flat Eric",
+          "symbol": "ERIC",
+          "market_cap_usd": 2300,
+          "graduated": false,
+          "dex": "pumpfun",
+          "created_at": 1772979816
+        },
+        {
+          "mint": "941UAnDdHezKatEs9U8dxWELZUzGBNJH5qAWURqKpump",
+          "name": "Flying Shooting Soldier",
+          "symbol": "Aladin",
+          "market_cap_usd": 2300,
+          "graduated": false,
+          "dex": "pumpfun",
+          "created_at": 1772978968
+        },
+        {
+          "mint": "g7SeKCSLx37xpEa5XtkFworZzE4rWE2EER8sGHxpump",
+          "name": "Walter White Jr.",
+          "symbol": "WalterWhite",
+          "market_cap_usd": 2321,
+          "graduated": false,
+          "dex": "pumpfun",
+          "created_at": 1772916350
+        },
+        {
+          "mint": "Ah81UdHrGVEMa6ajdare1pAHeWyN6wXXmgUTxWZrpump",
+          "name": "Unknown",
+          "symbol": "?",
+          "market_cap_usd": 0,
+          "graduated": false,
+          "dex": "?",
+          "created_at": 1772916625
+        },
+        {
+          "mint": "4Ewg8vGc26DrfXEi5mj4jCvxNw4J1vNG7hjNvefNpump",
+          "name": "Unknown",
+          "symbol": "?",
+          "market_cap_usd": 0,
+          "graduated": false,
+          "dex": "?",
+          "created_at": 1772916517
+        }
+      ]
+    },
+    {
+      "creator_wallet": "k1XAT9ueYMpNAFsyTDbMxvQ99AStw9uJnXFqRhSBKtW",
+      "reputation_score": 2,
+      "tier": "D",
+      "total_launches_known": 1,
+      "successful_launches": 1,
+      "graduated_launches": 1,
+      "peak_token_mcap_usd": 21705,
+      "tokens_launched": [
+        {
+          "mint": "4ABh1rwjgehriEnoXmK5UVwnpFb5vAXkEdw8ZfQ8pump",
+          "name": "Cashback FM",
+          "symbol": "CASHFM",
+          "market_cap_usd": 21705,
+          "graduated": true,
+          "dex": "pumpswap",
+          "created_at": null
+        }
+      ]
+    },
+    {
+      "creator_wallet": "6DWsxhTeBTW9u6G1K1uSj8z1JLsnPaW7uKSJUMSYGZy7",
+      "reputation_score": 1,
+      "tier": "D",
+      "total_launches_known": 1,
+      "successful_launches": 0,
+      "graduated_launches": 1,
+      "peak_token_mcap_usd": 1740,
+      "tokens_launched": [
+        {
+          "mint": "9aMZ9xTsRmCLCxr4Jtc9bfBrF7mtfgiUSRiYXBfvpump",
+          "name": "CAMAVINGA #6",
+          "symbol": "CAMA",
+          "market_cap_usd": 1740,
+          "graduated": true,
+          "dex": "pumpswap",
+          "created_at": 1772998980
+        }
+      ]
+    }
+  ]
+}

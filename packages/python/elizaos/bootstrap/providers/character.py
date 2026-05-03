@@ -103,19 +103,15 @@ async def get_character_context(
 
     context_text = "\n".join(sections)
 
-    # Use variables retrieved via getattr above to avoid AttributeError
-    # if these optional attributes are missing from the character object
+    # Note: Protobuf ProviderResult.data is a Struct which cannot handle
+    # RepeatedScalarContainer values (e.g. character.bio, character.topics).
+    # The text already contains all character information for the agent context;
+    # data is intentionally omitted to avoid ValueError on Struct construction.
     return ProviderResult(
         text=context_text,
         values={
             "agentName": character.name,
             "hasCharacter": True,
-        },
-        data={
-            "name": character.name,
-            "bio": bio,
-            "adjectives": adjectives,
-            "topics": topics,
         },
     )
 

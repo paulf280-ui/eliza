@@ -1,0 +1,770 @@
+{
+  "session": "pre_improvements_20260313_170404",
+  "description": "Paper trading session BEFORE all safety rail improvements. Settings: SL=-12%, min_score_raydium=0, min_score_meteora=0, no LP lock check, crash velocity -35%.",
+  "settings_at_time": {
+    "stop_loss_pct": 0.12,
+    "early_stop_loss_pct": 0.07,
+    "strategy_c_min_score": 0,
+    "strategy_d_min_score": 0,
+    "crash_velocity_threshold": 0.65,
+    "raydium_stall_secs": 900,
+    "lp_lock_check": false
+  },
+  "total_closed_trades": 62,
+  "by_dex": {
+    "pumpswap": {
+      "trades": 39,
+      "wins": 13,
+      "losses": 26,
+      "win_rate_pct": 33.3,
+      "avg_win_pct": 55.7,
+      "avg_loss_pct": -20.6,
+      "net_sol": 0.0937,
+      "rugs_gt_30pct_loss": 5,
+      "exit_reasons": {
+        "stop_loss": 16,
+        "tp_full_exit": 12,
+        "early_stop_loss": 5,
+        "rug_stop_loss": 4,
+        "stall_exit": 1,
+        "manual_close": 1
+      },
+      "trades_list": [
+        {
+          "mint": "J2mL1hwVCx1yoaVPpWVeYMiQeWVnp9Eq7qqeFKbxpump",
+          "dex": "pumpswap",
+          "score": 17,
+          "sol_spent": 0.05,
+          "pnl_pct": -52.9,
+          "pnl_sol": -0.026449,
+          "reason": "rug_stop_loss",
+          "hold_secs": 169.23202872276306,
+          "timestamp": 1773399674.055096
+        },
+        {
+          "mint": "ANbQXd4vamMPFWPzzf56woQMQRd6ZavDAtcpmBkrpump",
+          "dex": "pumpswap",
+          "score": 16,
+          "sol_spent": 0.05,
+          "pnl_pct": -38.48,
+          "pnl_sol": -0.019242,
+          "reason": "rug_stop_loss",
+          "hold_secs": 362.13049364089966,
+          "timestamp": 1773405541.676186
+        },
+        {
+          "mint": "8WiuQxc5Pt19VfyKsHRYLniqvkQe9YmaCb2G3w5Upump",
+          "dex": "pumpswap",
+          "score": 19,
+          "sol_spent": 0.05,
+          "pnl_pct": -33.45,
+          "pnl_sol": -0.016723,
+          "reason": "early_stop_loss",
+          "hold_secs": 165.44466066360474,
+          "timestamp": 1773407572.3257284
+        },
+        {
+          "mint": "FkPaD7pTvFBwtoR1vZkiQcChcCDqSMhMyDGvHd7spump",
+          "dex": "pumpswap",
+          "score": 16,
+          "sol_spent": 0.05,
+          "pnl_pct": -31.6,
+          "pnl_sol": -0.015802,
+          "reason": "early_stop_loss",
+          "hold_secs": 99.55176138877869,
+          "timestamp": 1773393152.7576544
+        },
+        {
+          "mint": "BHZxYtRLzyUgRnEtRNCP4ADioRR6QwGauGHumJQqpump",
+          "dex": "pumpswap",
+          "score": 19,
+          "sol_spent": 0.05,
+          "pnl_pct": -30.14,
+          "pnl_sol": -0.01507,
+          "reason": "rug_stop_loss",
+          "hold_secs": 27.458043575286865,
+          "timestamp": 1773417508.750255
+        },
+        {
+          "mint": "C33rcJRXRPgiQMz1d7Dj4TPi7UJ9EyG2nxdWYYTipump",
+          "dex": "pumpswap",
+          "score": 17,
+          "sol_spent": 0.05,
+          "pnl_pct": -26.05,
+          "pnl_sol": -0.013023,
+          "reason": "stop_loss",
+          "hold_secs": 285.47044944763184,
+          "timestamp": 1773390889.7308187
+        },
+        {
+          "mint": "FFUUZTmZp88GW3tq7uv8dX2Minbuq5Vabc6eBBYgpump",
+          "dex": "pumpswap",
+          "score": 17,
+          "sol_spent": 0.05,
+          "pnl_pct": -25.41,
+          "pnl_sol": -0.012706,
+          "reason": "stop_loss",
+          "hold_secs": 770.1941349506378,
+          "timestamp": 1773396269.1991925
+        },
+        {
+          "mint": "G7GAxTcbCcTVC66N2wCXji5s5ds9s4JVQkSQoKrApump",
+          "dex": "pumpswap",
+          "score": 17,
+          "sol_spent": 0.05,
+          "pnl_pct": -24.26,
+          "pnl_sol": -0.012129,
+          "reason": "stop_loss",
+          "hold_secs": 602.530796289444,
+          "timestamp": 1773401558.20661
+        },
+        {
+          "mint": "9K2ptCYis8SUX7yaArci9WxADTQU37DyJCKLXrT8pump",
+          "dex": "pumpswap",
+          "score": 19,
+          "sol_spent": 0.05,
+          "pnl_pct": -23.86,
+          "pnl_sol": -0.011932,
+          "reason": "rug_stop_loss",
+          "hold_secs": 88.30703020095825,
+          "timestamp": 1773415247.1976533
+        },
+        {
+          "mint": "7dT1P4rDDs2DXHErBnw3MpXEMmjsaW3zfL7X6o8Hpump",
+          "dex": "pumpswap",
+          "score": 16,
+          "sol_spent": 0.05,
+          "pnl_pct": -21.07,
+          "pnl_sol": -0.010533,
+          "reason": "stop_loss",
+          "hold_secs": 420.72430777549744,
+          "timestamp": 1773390858.1749876
+        },
+        {
+          "mint": "FXNEMcQH3cq71nQAjpzR1zr4cYo646fXJyg9o6yLpump",
+          "dex": "pumpswap",
+          "score": 17,
+          "sol_spent": 0.05,
+          "pnl_pct": -20.18,
+          "pnl_sol": -0.01009,
+          "reason": "stop_loss",
+          "hold_secs": 636.9765472412109,
+          "timestamp": 1773392298.9232762
+        },
+        {
+          "mint": "HdvD7Lh1AGzLzb7vUPPm1SDw8Ldv4yukTZRPgcZipump",
+          "dex": "pumpswap",
+          "score": 21,
+          "sol_spent": 0.05,
+          "pnl_pct": -16.69,
+          "pnl_sol": -0.008344,
+          "reason": "stop_loss",
+          "hold_secs": 727.6034278869629,
+          "timestamp": 1773410770.3632765
+        },
+        {
+          "mint": "6Giawsis5fsV2wkZErsQX6wv1u6d2rscz2mtKyGBpump",
+          "dex": "pumpswap",
+          "score": 19,
+          "sol_spent": 0.05,
+          "pnl_pct": -16.48,
+          "pnl_sol": -0.00824,
+          "reason": "stop_loss",
+          "hold_secs": 45.97445511817932,
+          "timestamp": 1773399953.902485
+        },
+        {
+          "mint": "ARmTBQb915okypd2iodx2fxEmzF5NPAq465fx5S4pump",
+          "dex": "pumpswap",
+          "score": 19,
+          "sol_spent": 0.05,
+          "pnl_pct": -16.18,
+          "pnl_sol": -0.00809,
+          "reason": "stop_loss",
+          "hold_secs": 225.88981914520264,
+          "timestamp": 1773412198.7803123
+        },
+        {
+          "mint": "Ec8w8C6ih21zhmFC4Qu1pD1UcAqgNuacGPoHNoM2pump",
+          "dex": "pumpswap",
+          "score": 17,
+          "sol_spent": 0.05,
+          "pnl_pct": -16.11,
+          "pnl_sol": -0.008053,
+          "reason": "stop_loss",
+          "hold_secs": 248.4397690296173,
+          "timestamp": 1773420785.699248
+        },
+        {
+          "mint": "GoYvpCm8FNN1M1xySbDGygP71M2o92qX5cRTdMhdpump",
+          "dex": "pumpswap",
+          "score": 17,
+          "sol_spent": 0.05,
+          "pnl_pct": -16.1,
+          "pnl_sol": -0.008049,
+          "reason": "early_stop_loss",
+          "hold_secs": 142.3082492351532,
+          "timestamp": 1773392936.0283904
+        },
+        {
+          "mint": "DdRoX16yoE9azQAfLy9T1tyRYLZnoAvz6cQg6f97pump",
+          "dex": "pumpswap",
+          "score": 17,
+          "sol_spent": 0.05,
+          "pnl_pct": -15.69,
+          "pnl_sol": -0.007843,
+          "reason": "stop_loss",
+          "hold_secs": 58.221794843673706,
+          "timestamp": 1773409770.1881447
+        },
+        {
+          "mint": "8MYmFvkGgUgfw43DnNpVhrSFdjwc1TcdyQij7GRDpump",
+          "dex": "pumpswap",
+          "score": 17,
+          "sol_spent": 0.05,
+          "pnl_pct": -15.52,
+          "pnl_sol": -0.007758,
+          "reason": "early_stop_loss",
+          "hold_secs": 173.22972178459167,
+          "timestamp": 1773402455.1716232
+        },
+        {
+          "mint": "BVcVb7RwkyTnuCrYEchXiHhDFuiDZbYAfb15b2fMpump",
+          "dex": "pumpswap",
+          "score": 18,
+          "sol_spent": 0.05,
+          "pnl_pct": -14.24,
+          "pnl_sol": -0.007122,
+          "reason": "stop_loss",
+          "hold_secs": 58.151164054870605,
+          "timestamp": 1773395716.6438546
+        },
+        {
+          "mint": "6iuZuPbcTwqJEp7dQjL8313uBrQjHNk1EptcEfpDpump",
+          "dex": "pumpswap",
+          "score": 13,
+          "sol_spent": 0.05,
+          "pnl_pct": -13.94,
+          "pnl_sol": -0.006968,
+          "reason": "stop_loss",
+          "hold_secs": 11.685603618621826,
+          "timestamp": 1773413047.6183646
+        },
+        {
+          "mint": "qrUGwvbz4HcKJN3ZJMVtEUBkt88BtCFdh5Wmnvzpump",
+          "dex": "pumpswap",
+          "score": 16,
+          "sol_spent": 0.05,
+          "pnl_pct": -13.84,
+          "pnl_sol": -0.006921,
+          "reason": "stop_loss",
+          "hold_secs": 611.1625351905823,
+          "timestamp": 1773404328.2401276
+        },
+        {
+          "mint": "HkvnrA6nxT5cai7WnR1bU5MMi4Sxt993P5n728jKpump",
+          "dex": "pumpswap",
+          "score": 19,
+          "sol_spent": 0.05,
+          "pnl_pct": -13.64,
+          "pnl_sol": -0.00682,
+          "reason": "stop_loss",
+          "hold_secs": 370.81018233299255,
+          "timestamp": 1773396581.0293603
+        },
+        {
+          "mint": "uphcYhzNzLBQQcQdpsbQXTFSNApMuh1Y4Jp6KTYpump",
+          "dex": "pumpswap",
+          "score": 17,
+          "sol_spent": 0.05,
+          "pnl_pct": -13.3,
+          "pnl_sol": -0.006648,
+          "reason": "stop_loss",
+          "hold_secs": 279.9989900588989,
+          "timestamp": 1773411072.1313431
+        },
+        {
+          "mint": "DhcDjmQ2tEziUjQ2q1imSvgZoY8VBeUtnf1pGcAxpump",
+          "dex": "pumpswap",
+          "score": 18,
+          "sol_spent": 0.05,
+          "pnl_pct": -12.88,
+          "pnl_sol": -0.006441,
+          "reason": "stop_loss",
+          "hold_secs": 284.06165289878845,
+          "timestamp": 1773417547.6473844
+        },
+        {
+          "mint": "6AsxA3uvapVVwhsby3kKnmtVpg8EqAYjGT2niRKkpump",
+          "dex": "pumpswap",
+          "score": 18,
+          "sol_spent": 0.05,
+          "pnl_pct": -12.66,
+          "pnl_sol": -0.006332,
+          "reason": "early_stop_loss",
+          "hold_secs": 95.34477138519287,
+          "timestamp": 1773391974.5155253
+        },
+        {
+          "mint": "h5zonRoHtiipAwPTcUNTGWKzpayLRJTdv1eNT5Zpump",
+          "dex": "pumpswap",
+          "score": 16,
+          "sol_spent": 0.05,
+          "pnl_pct": -1.59,
+          "pnl_sol": -0.000795,
+          "reason": "manual_close",
+          "hold_secs": 558.1625366210938,
+          "timestamp": 1773402486.3611233
+        },
+        {
+          "mint": "HVjK8sAKfbWLy3AQs19WNbig1vBwMmKBVDSS6528pump",
+          "dex": "pumpswap",
+          "score": 19,
+          "sol_spent": 0.05,
+          "pnl_pct": 1.38,
+          "pnl_sol": 0.000691,
+          "reason": "stall_exit",
+          "hold_secs": 900.5376698970795,
+          "timestamp": 1773392267.2642555
+        },
+        {
+          "mint": "DzMw8nmA5rnoRTTXGHCZaRp9EkMwG2anqY99XxiXpump",
+          "dex": "pumpswap",
+          "score": 19,
+          "sol_spent": 0.05,
+          "pnl_pct": 50.49,
+          "pnl_sol": 0.025246,
+          "reason": "tp_full_exit",
+          "hold_secs": 1048.7521834373474,
+          "timestamp": 1773404996.7176297
+        },
+        {
+          "mint": "63nb8TihiGToYCMxdKrbMyJ8qshZtxx2Q1pgaqM9pump",
+          "dex": "pumpswap",
+          "score": 19,
+          "sol_spent": 0.05,
+          "pnl_pct": 51.69,
+          "pnl_sol": 0.025846,
+          "reason": "tp_full_exit",
+          "hold_secs": 57.85239768028259,
+          "timestamp": 1773404025.2066154
+        },
+        {
+          "mint": "BJbofdpmdwnsxVZjsMLsTybGeewuBgA33WKhZ8GSpump",
+          "dex": "pumpswap",
+          "score": 18,
+          "sol_spent": 0.05,
+          "pnl_pct": 52.99,
+          "pnl_sol": 0.026495,
+          "reason": "tp_full_exit",
+          "hold_secs": 2434.6562988758087,
+          "timestamp": 1773409205.6888874
+        },
+        {
+          "mint": "5dfHpiBxagAKGUMLpCM246qHb8i8gADE3xdpVnDKpump",
+          "dex": "pumpswap",
+          "score": 19,
+          "sol_spent": 0.05,
+          "pnl_pct": 53.24,
+          "pnl_sol": 0.026618,
+          "reason": "tp_full_exit",
+          "hold_secs": 380.1990189552307,
+          "timestamp": 1773405995.9398594
+        },
+        {
+          "mint": "54bSzjRbaHpUzmQTSZMGeTmroFBADagCPmr7B85pump",
+          "dex": "pumpswap",
+          "score": 19,
+          "sol_spent": 0.05,
+          "pnl_pct": 53.34,
+          "pnl_sol": 0.026672,
+          "reason": "tp_full_exit",
+          "hold_secs": 450.0073752403259,
+          "timestamp": 1773404480.9410489
+        },
+        {
+          "mint": "HUoqy79HMZhRt2gkwmPXMaqPJfy4ffaCEVzcig7kpump",
+          "dex": "pumpswap",
+          "score": 19,
+          "sol_spent": 0.05,
+          "pnl_pct": 54.88,
+          "pnl_sol": 0.02744,
+          "reason": "tp_full_exit",
+          "hold_secs": 287.6584303379059,
+          "timestamp": 1773406723.694143
+        },
+        {
+          "mint": "2Tt7WH2WVmNqoYxGTKYajipcmgZsY37ivKLTxTuBpump",
+          "dex": "pumpswap",
+          "score": 21,
+          "sol_spent": 0.05,
+          "pnl_pct": 60.74,
+          "pnl_sol": 0.030371,
+          "reason": "tp_full_exit",
+          "hold_secs": 129.68896794319153,
+          "timestamp": 1773417178.532062
+        },
+        {
+          "mint": "DJXntg7SsT68sJ7ZhFayeUc9e2hjYMtDX9UMjZe3pump",
+          "dex": "pumpswap",
+          "score": 17,
+          "sol_spent": 0.05,
+          "pnl_pct": 60.8,
+          "pnl_sol": 0.030401,
+          "reason": "tp_full_exit",
+          "hold_secs": 619.5103788375854,
+          "timestamp": 1773406026.7577884
+        },
+        {
+          "mint": "8VNbivqjMrzeAWXGUVtg8HbwrtiAaxx4UQAKrcTgpump",
+          "dex": "pumpswap",
+          "score": 18,
+          "sol_spent": 0.05,
+          "pnl_pct": 61.24,
+          "pnl_sol": 0.030618,
+          "reason": "tp_full_exit",
+          "hold_secs": 237.7231502532959,
+          "timestamp": 1773392223.1389804
+        },
+        {
+          "mint": "RHP1SsTVTtLRU1pkfJ8rTXyAuL61i23FWbGbr2zpump",
+          "dex": "pumpswap",
+          "score": 19,
+          "sol_spent": 0.05,
+          "pnl_pct": 62.83,
+          "pnl_sol": 0.031416,
+          "reason": "tp_full_exit",
+          "hold_secs": 260.4851019382477,
+          "timestamp": 1773413242.1030917
+        },
+        {
+          "mint": "13sTkwzXMtfZ7dbGF4TGPqvpuskAgKKbm1GFdvxYpump",
+          "dex": "pumpswap",
+          "score": 19,
+          "sol_spent": 0.05,
+          "pnl_pct": 78.35,
+          "pnl_sol": 0.039177,
+          "reason": "tp_full_exit",
+          "hold_secs": 165.65828466415405,
+          "timestamp": 1773420255.2554703
+        },
+        {
+          "mint": "9e1wtawpbkrJGq3vLbPGBvpQFLfsPFtjai4D9eo9pump",
+          "dex": "pumpswap",
+          "score": 20,
+          "sol_spent": 0.05,
+          "pnl_pct": 81.76,
+          "pnl_sol": 0.040879,
+          "reason": "tp_full_exit",
+          "hold_secs": 366.61892580986023,
+          "timestamp": 1773419059.358641
+        }
+      ]
+    },
+    "meteora": {
+      "trades": 15,
+      "wins": 5,
+      "losses": 10,
+      "win_rate_pct": 33.3,
+      "avg_win_pct": 131.4,
+      "avg_loss_pct": -41.6,
+      "net_sol": 0.0036,
+      "rugs_gt_30pct_loss": 4,
+      "exit_reasons": {
+        "stall_exit": 7,
+        "stop_loss": 5,
+        "tp_full_exit": 2,
+        "manual_close": 1
+      },
+      "trades_list": [
+        {
+          "mint": "KMNo3nJsBXfcpJTVhZcXLW7RmTwTt4GVFE7suUBo9sS",
+          "dex": "meteora",
+          "score": 12,
+          "sol_spent": 0.05,
+          "pnl_pct": -100.0,
+          "pnl_sol": -0.05,
+          "reason": "stop_loss",
+          "hold_secs": 11.519909143447876,
+          "timestamp": 1773412462.3072133
+        },
+        {
+          "mint": "7XdCaKpqLmKE2K7yr9xaeWB1H2CVZ1oGwxB6hmd9pump",
+          "dex": "meteora",
+          "score": 5,
+          "sol_spent": 0.05,
+          "pnl_pct": -99.51,
+          "pnl_sol": -0.049756,
+          "reason": "stop_loss",
+          "hold_secs": 11.173099279403687,
+          "timestamp": 1773412154.950262
+        },
+        {
+          "mint": "BFgdzMkTPdKKJeTipv2njtDEwhKxkgFueJQfJGt1jups",
+          "dex": "meteora",
+          "score": 10,
+          "sol_spent": 0.05,
+          "pnl_pct": -98.88,
+          "pnl_sol": -0.049439,
+          "reason": "stop_loss",
+          "hold_secs": 11.492046117782593,
+          "timestamp": 1773420330.129847
+        },
+        {
+          "mint": "GM9fN6X2izkr7NjF5esWfMtViJ6aqDKvJRTgfoAGpump",
+          "dex": "meteora",
+          "score": 5,
+          "sol_spent": 0.05,
+          "pnl_pct": -83.96,
+          "pnl_sol": -0.041981,
+          "reason": "stop_loss",
+          "hold_secs": 10.453344106674194,
+          "timestamp": 1773411254.3152068
+        },
+        {
+          "mint": "DVZMdNkcET3852usHEi1e6WB9ShffZsxbkbW55eEpump",
+          "dex": "meteora",
+          "score": 8,
+          "sol_spent": 0.05,
+          "pnl_pct": -25.22,
+          "pnl_sol": -0.012608,
+          "reason": "stop_loss",
+          "hold_secs": 11.446962118148804,
+          "timestamp": 1773415035.8949041
+        },
+        {
+          "mint": "5oq4zKetRkUMMrFtkWH7r1Q6HZJMsTjgCeU6isgYpump",
+          "dex": "meteora",
+          "score": 9,
+          "sol_spent": 0.05,
+          "pnl_pct": -8.23,
+          "pnl_sol": -0.004114,
+          "reason": "stall_exit",
+          "hold_secs": 900.9220051765442,
+          "timestamp": 1773410169.1744597
+        },
+        {
+          "mint": "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
+          "dex": "meteora",
+          "score": 6,
+          "sol_spent": 0.05,
+          "pnl_pct": -0.35,
+          "pnl_sol": -0.000176,
+          "reason": "stall_exit",
+          "hold_secs": 901.0523676872253,
+          "timestamp": 1773410169.1992583
+        },
+        {
+          "mint": "ChTbMXMnBKGyqAWmYBytNtgwueK4gYCsCBCXDBQWSSWX",
+          "dex": "meteora",
+          "score": 9,
+          "sol_spent": 0.05,
+          "pnl_pct": -0.25,
+          "pnl_sol": -0.000126,
+          "reason": "stall_exit",
+          "hold_secs": 901.2682576179504,
+          "timestamp": 1773409861.4256485
+        },
+        {
+          "mint": "hy1oXYgrBW6PVcJ4s6s2FKavRdwgWTXdfE69AxT7kPT",
+          "dex": "meteora",
+          "score": 4,
+          "sol_spent": 0.05,
+          "pnl_pct": 0.0,
+          "pnl_sol": 0.0,
+          "reason": "stall_exit",
+          "hold_secs": 901.6501019001007,
+          "timestamp": 1773413070.2579625
+        },
+        {
+          "mint": "EPuZ1X6pPzac3ELPsT59LStmgaSr4kBJvaAbL15Fpump",
+          "dex": "meteora",
+          "score": 10,
+          "sol_spent": 0.05,
+          "pnl_pct": 0.0,
+          "pnl_sol": 0.0,
+          "reason": "stall_exit",
+          "hold_secs": 901.6304309368134,
+          "timestamp": 1773418459.6063123
+        },
+        {
+          "mint": "RNGRtJMbCveqCp7AC6U95KmrdKecFckaJZiWbPGmeta",
+          "dex": "meteora",
+          "score": 4,
+          "sol_spent": 0.05,
+          "pnl_pct": 2.01,
+          "pnl_sol": 0.001006,
+          "reason": "stall_exit",
+          "hold_secs": 901.718742609024,
+          "timestamp": 1773413070.295085
+        },
+        {
+          "mint": "ABspLjF8nR1r6wYdZkYmJbDYFjStjWq7STZvx8Ehpump",
+          "dex": "meteora",
+          "score": 11,
+          "sol_spent": 0.05,
+          "pnl_pct": 7.43,
+          "pnl_sol": 0.003717,
+          "reason": "stall_exit",
+          "hold_secs": 901.3572828769684,
+          "timestamp": 1773419081.8683643
+        },
+        {
+          "mint": "4D9jZY6nkXnm3ofmWWJVcJrvtXDMfE5Zwy8rZMy5pump",
+          "dex": "meteora",
+          "score": 6,
+          "sol_spent": 0.05,
+          "pnl_pct": 14.22,
+          "pnl_sol": 0.00711,
+          "reason": "manual_close",
+          "hold_secs": 3078.4065330028534,
+          "timestamp": 1773411559.4583855
+        },
+        {
+          "mint": "C4yDhKwkikpVGCQWD9BT2SJyHAtRFFnKPDM9Nyshpump",
+          "dex": "meteora",
+          "score": 10,
+          "sol_spent": 0.05,
+          "pnl_pct": 215.87,
+          "pnl_sol": 0.1,
+          "reason": "tp_full_exit",
+          "hold_secs": 11.69697618484497,
+          "timestamp": 1773409861.4703784
+        },
+        {
+          "mint": "AZCyNKNLoEn4NCVr3NEReUFqTFjvC9ZgK6jk2SRnpump",
+          "dex": "meteora",
+          "score": 9,
+          "sol_spent": 0.05,
+          "pnl_pct": 417.55,
+          "pnl_sol": 0.1,
+          "reason": "tp_full_exit",
+          "hold_secs": 11.623066902160645,
+          "timestamp": 1773409861.4473388
+        }
+      ]
+    },
+    "raydium": {
+      "trades": 4,
+      "wins": 2,
+      "losses": 2,
+      "win_rate_pct": 50.0,
+      "avg_win_pct": 7.1,
+      "avg_loss_pct": -0.5,
+      "net_sol": 0.0067,
+      "rugs_gt_30pct_loss": 0,
+      "exit_reasons": {
+        "stall_exit": 2,
+        "rug_stop_loss": 1,
+        "manual_close": 1
+      },
+      "trades_list": [
+        {
+          "mint": "GkCugSwHBf2LqYMmZSNwQXGvZAc6CYTQaB4FwrKutKK1",
+          "dex": "raydium",
+          "score": 14,
+          "sol_spent": 0.05,
+          "pnl_pct": -0.95,
+          "pnl_sol": -0.000474,
+          "reason": "stall_exit",
+          "hold_secs": 901.7061104774475,
+          "timestamp": 1773412098.6333828
+        },
+        {
+          "mint": "3ifRojmrkjDfLvEChU7jRDJo6Cwax8UHeRYwdRjYy5Cm",
+          "dex": "raydium",
+          "score": 13,
+          "sol_spent": 0.05,
+          "pnl_pct": 0.0,
+          "pnl_sol": 0.0,
+          "reason": "rug_stop_loss",
+          "hold_secs": 65.74302077293396,
+          "timestamp": 1773413516.9437864
+        },
+        {
+          "mint": "wwzqJcBxRUDfSZQQv3R4WckkNzpSFjNHkRuzZFcJJZt",
+          "dex": "raydium",
+          "score": 11,
+          "sol_spent": 0.05,
+          "pnl_pct": 3.71,
+          "pnl_sol": 0.001854,
+          "reason": "stall_exit",
+          "hold_secs": 912.3906493186951,
+          "timestamp": 1773412065.5201395
+        },
+        {
+          "mint": "5Sm9kpNjFo6sAUXLEPc1fTDrCVW8CLaoTaxQ3QnXpump",
+          "dex": "raydium",
+          "score": 13,
+          "sol_spent": 0.05,
+          "pnl_pct": 10.55,
+          "pnl_sol": 0.005276,
+          "reason": "manual_close",
+          "hold_secs": 474.0181405544281,
+          "timestamp": 1773414167.935255
+        }
+      ]
+    },
+    "pump_fun": {
+      "trades": 4,
+      "wins": 0,
+      "losses": 4,
+      "win_rate_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": -26.4,
+      "net_sol": -0.0443,
+      "rugs_gt_30pct_loss": 1,
+      "exit_reasons": {
+        "rug_stop_loss": 2,
+        "manual_close": 1,
+        "stop_loss": 1
+      },
+      "trades_list": [
+        {
+          "mint": "69M5XUU9R4A31fsTTx4zQJwmNkNfRnmV1PA3syH7pump",
+          "dex": "pump_fun",
+          "score": 0,
+          "sol_spent": 0.05,
+          "pnl_pct": -32.59,
+          "pnl_sol": -0.016297,
+          "reason": "rug_stop_loss",
+          "hold_secs": 52.88616132736206,
+          "timestamp": 1773420452.6194746
+        },
+        {
+          "mint": "5ZTXpUzYxrtuxjr8UE8ft5cxrBc3kfYJYZmTttE8pump",
+          "dex": "pump_fun",
+          "score": 0,
+          "sol_spent": 0.05,
+          "pnl_pct": -29.49,
+          "pnl_sol": -0.014743,
+          "reason": "rug_stop_loss",
+          "hold_secs": 49.884063720703125,
+          "timestamp": 1773418763.855732
+        },
+        {
+          "mint": "GqgAedUfTYTzk2YGiB6TioQ9bhLFEZy74WAqv7ujpump",
+          "dex": "pump_fun",
+          "score": 0,
+          "sol_spent": 0.05,
+          "pnl_pct": -22.74,
+          "pnl_sol": -0.002843,
+          "reason": "manual_close",
+          "hold_secs": 4377.89906167984,
+          "timestamp": 1773416787.4853396
+        },
+        {
+          "mint": "9D5cMmnDFSDQQX9WUufAw4Ego5GMxtGDHXA8EzH5pump",
+          "dex": "pump_fun",
+          "score": 0,
+          "sol_spent": 0.05,
+          "pnl_pct": -20.82,
+          "pnl_sol": -0.010408,
+          "reason": "stop_loss",
+          "hold_secs": 10.51013994216919,
+          "timestamp": 1773419555.5548072
+        }
+      ]
+    }
+  }
+}

@@ -143,9 +143,10 @@ def backfill() -> dict:
     for brain in BRAIN_FILES:
         mem = load_brain_memory(brain)
         mem["historical_summary"] = summary
-        existing = mem.get("learned_patterns", []) or []
-        # Put historical-derived patterns first, preserve up to 4 existing
-        mem["learned_patterns"] = patterns + [p for p in existing if p not in patterns][:4]
+        # Shared baseline goes into shared_context — NOT into learned_patterns.
+        # learned_patterns is now per-brain (derived from each brain's own history
+        # in memory_refresh_loop). Overwriting it here would re-homogenise them.
+        mem["shared_context"] = patterns
         save_brain_memory(brain, mem)
         updated += 1
 

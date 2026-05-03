@@ -1,0 +1,4362 @@
+[
+  {
+    "mint": "EvB1ZB5UwL4ZTdUmpZYxf9HLMvDtjBdsnyAV8fRLpump",
+    "dex": "pumpswap",
+    "exit_reason": "stop_loss",
+    "exit_price_sol": 1.811e-06,
+    "entry_price_sol": 2.000119309116908e-06,
+    "pnl_pct": -13.76,
+    "ts": 1774273583.5431895,
+    "checks": {
+      "30m": {
+        "due_at": 1774275383.5431895,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1774277183.5431895,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1774287983.5431895,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1774359983.5431895,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 18,
+      "outcome": "loss",
+      "hold_secs": 44.7
+    }
+  },
+  {
+    "mint": "7JzLK1eq9MEq9mPNGMSr2PUoF2CCUG8corxKUbgxvJ3V",
+    "dex": "raydium",
+    "exit_reason": "rug_stop_loss",
+    "exit_price_sol": 1.202e-06,
+    "entry_price_sol": 1.4496349279595804e-06,
+    "pnl_pct": -21.38,
+    "ts": 1774276817.0769117,
+    "checks": {
+      "30m": {
+        "due_at": 1774278617.0769117,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1774280417.0769117,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1774291217.0769117,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1774363217.0769117,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 19,
+      "outcome": "rug",
+      "hold_secs": 327.7
+    }
+  },
+  {
+    "mint": "7kNa7t6rKUgZRDQSFCeUDgiiuxSxiorf4Z26gymFpump",
+    "dex": "pumpswap",
+    "exit_reason": "rug_stop_loss",
+    "exit_price_sol": 4.546e-06,
+    "entry_price_sol": 5.94283521389029e-06,
+    "pnl_pct": -27.8,
+    "ts": 1774285257.9486864,
+    "checks": {
+      "30m": {
+        "due_at": 1774287057.9486864,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1774288857.9486864,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1774299657.9486864,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1774371657.9486864,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 19,
+      "outcome": "rug",
+      "hold_secs": 214.3
+    }
+  },
+  {
+    "mint": "42QTJhYUsDna63ddtzn1gs2Ai4W8KcjeRZzyNWYrpump",
+    "dex": "pumpswap",
+    "exit_reason": "rug_stop_loss",
+    "exit_price_sol": 6.834e-07,
+    "entry_price_sol": 9.180905696370084e-07,
+    "pnl_pct": -29.86,
+    "ts": 1774295556.0627565,
+    "checks": {
+      "30m": {
+        "due_at": 1774297356.0627565,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1774299156.0627565,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1774309956.0627565,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1774381956.0627565,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 21,
+      "outcome": "rug",
+      "hold_secs": 71.5
+    }
+  },
+  {
+    "mint": "14MCDvqnRtPtjUzyyoyQXianHpgA6PGenYFb2Ktepump",
+    "dex": "pumpswap",
+    "exit_reason": "stop_loss",
+    "exit_price_sol": 9.383e-07,
+    "entry_price_sol": 1.404e-06,
+    "pnl_pct": -37.47,
+    "ts": 1775067741.7743511,
+    "checks": {
+      "30m": {
+        "due_at": 1775069541.7743511,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775071341.7743511,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775082141.7743511,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775154141.7743511,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 25,
+      "outcome": "loss",
+      "hold_secs": 573.9
+    }
+  },
+  {
+    "mint": "AzBrensiV6XmMohSRZ8XJQNLeoLFrNFumu1ZGbJqpump",
+    "dex": "pumpswap",
+    "exit_reason": "rug_stop_loss",
+    "exit_price_sol": 2.528e-07,
+    "entry_price_sol": 4.38e-07,
+    "pnl_pct": -46.58,
+    "ts": 1775068059.861364,
+    "checks": {
+      "30m": {
+        "due_at": 1775069859.861364,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775071659.861364,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775082459.861364,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775154459.861364,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 21,
+      "outcome": "rug",
+      "hold_secs": 855.9
+    }
+  },
+  {
+    "mint": "CvhjU6JUCS3FVBshEaEomq3HD8oNPMVNbVmaQy7Mpump",
+    "dex": "pumpswap",
+    "exit_reason": "stall_exit",
+    "exit_price_sol": 3.859181034671953e-07,
+    "entry_price_sol": 4.129e-07,
+    "pnl_pct": -10.83,
+    "ts": 1775069933.7276425,
+    "checks": {
+      "30m": {
+        "due_at": 1775071733.7276425,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775073533.7276425,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775084333.7276425,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775156333.7276425,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 0,
+      "outcome": "loss",
+      "hold_secs": 901.1
+    }
+  },
+  {
+    "mint": "6SKFJGhSFSyCh9DFEQX41kSY9oK8fAyog9jpWCcBpump",
+    "dex": "pumpswap",
+    "exit_reason": "early_stop_loss",
+    "exit_price_sol": 3.302e-07,
+    "entry_price_sol": 3.99e-07,
+    "pnl_pct": -21.54,
+    "ts": 1775072107.4231012,
+    "checks": {
+      "30m": {
+        "due_at": 1775073907.4231012,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775075707.4231012,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775086507.4231012,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775158507.4231012,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 19,
+      "outcome": "loss",
+      "hold_secs": 105.4
+    }
+  },
+  {
+    "mint": "CiHAtMbBff3n9cVoYC7s2KuTpz25MS3WMPUjm19dpump",
+    "dex": "pumpswap",
+    "exit_reason": "tp_full_exit",
+    "exit_price_sol": 8.814e-07,
+    "entry_price_sol": 5.475e-07,
+    "pnl_pct": 56.69,
+    "ts": 1775072967.2822201,
+    "checks": {
+      "30m": {
+        "due_at": 1775074767.2822201,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775076567.2822201,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775087367.2822201,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775159367.2822201,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 25,
+      "outcome": "win",
+      "hold_secs": 220.9
+    }
+  },
+  {
+    "mint": "APr5ZdWMn7DmpxsBR6P9nHnXHcv3EThE49xP7MU1pump",
+    "dex": "pumpswap",
+    "exit_reason": "stop_loss",
+    "exit_price_sol": 3.809e-07,
+    "entry_price_sol": 5.101e-07,
+    "pnl_pct": -29.63,
+    "ts": 1775076786.4469683,
+    "checks": {
+      "30m": {
+        "due_at": 1775078586.4469683,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775080386.4469683,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775091186.4469683,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775163186.4469683,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 0,
+      "outcome": "loss",
+      "hold_secs": 877.4
+    }
+  },
+  {
+    "mint": "2XoWC7EqLt9UCEZpJpsUPzmmLqMUNJj3M58DoE1jpump",
+    "dex": "pumpswap",
+    "exit_reason": "early_stop_loss",
+    "exit_price_sol": 6.402e-07,
+    "entry_price_sol": 7.736e-07,
+    "pnl_pct": -21.54,
+    "ts": 1775077521.6151214,
+    "checks": {
+      "30m": {
+        "due_at": 1775079321.6151214,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775081121.6151214,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775091921.6151214,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775163921.6151214,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 25,
+      "outcome": "loss",
+      "hold_secs": 141.0
+    }
+  },
+  {
+    "mint": "5Bohp4HzEt6V3nY57iSvxM8EAj3iceE13AEpEJixpump",
+    "dex": "pumpswap",
+    "exit_reason": "time_limit",
+    "exit_price_sol": 4.228e-06,
+    "entry_price_sol": 4.228e-06,
+    "pnl_pct": -4.3,
+    "ts": 1775141371.3765118,
+    "checks": {
+      "30m": {
+        "due_at": 1775143171.3765118,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775144971.3765118,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775155771.3765118,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775227771.3765118,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 23,
+      "outcome": "loss",
+      "hold_secs": 63061.9
+    }
+  },
+  {
+    "mint": "4c96iiQGvZNjgREH5jSipK5rBHfnZFbbXWBT9iHqpump",
+    "dex": "pumpswap",
+    "exit_reason": "stall_exit",
+    "exit_price_sol": 1.233e-06,
+    "entry_price_sol": 1.241e-06,
+    "pnl_pct": -1.34,
+    "ts": 1775142360.8671467,
+    "checks": {
+      "30m": {
+        "due_at": 1775144160.8671467,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775145960.8671467,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775156760.8671467,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775228760.8671467,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 21,
+      "outcome": "loss",
+      "hold_secs": 900.9
+    }
+  },
+  {
+    "mint": "J29v1ZJSN1FAc8nYo6GXmwPswQRCFuq6EMdX1xsPpump",
+    "dex": "pumpswap",
+    "exit_reason": "trailing_stop_loss",
+    "exit_price_sol": 1.764e-06,
+    "entry_price_sol": 1.85e-06,
+    "pnl_pct": -5.35,
+    "ts": 1775143944.9103827,
+    "checks": {
+      "30m": {
+        "due_at": 1775145744.9103827,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775147544.9103827,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775158344.9103827,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775230344.9103827,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 24,
+      "outcome": "loss",
+      "hold_secs": 109.2
+    }
+  },
+  {
+    "mint": "BwfJVbMS47nGHVixX2p64ns7sPFGuGg6YwuoAK4pump",
+    "dex": "pumpswap",
+    "exit_reason": "trailing_stop_loss",
+    "exit_price_sol": 6.351e-06,
+    "entry_price_sol": 6.619e-06,
+    "pnl_pct": -4.75,
+    "ts": 1775146838.0151503,
+    "checks": {
+      "30m": {
+        "due_at": 1775148638.0151503,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775150438.0151503,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775161238.0151503,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775233238.0151503,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 23,
+      "outcome": "loss",
+      "hold_secs": 298.4
+    }
+  },
+  {
+    "mint": "GQBUaoCYVSEA5avVKEWYoVaTdp16oi4Dn4rg88eQpump",
+    "dex": "pumpswap",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 1.298e-06,
+    "entry_price_sol": 1.315e-06,
+    "pnl_pct": -1.99,
+    "ts": 1775157773.3268826,
+    "checks": {
+      "30m": {
+        "due_at": 1775159573.3268826,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775161373.3268826,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775172173.3268826,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775244173.3268826,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 25,
+      "outcome": "loss",
+      "hold_secs": 48.1
+    }
+  },
+  {
+    "mint": "F4SsUByf5YEE1x5mwfjKdowaxtFY2vfu5G2FLEiFpump",
+    "dex": "pumpswap",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 9.209e-07,
+    "entry_price_sol": 9.871e-07,
+    "pnl_pct": -7.41,
+    "ts": 1775160310.1444237,
+    "checks": {
+      "30m": {
+        "due_at": 1775162110.1444237,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775163910.1444237,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775174710.1444237,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775246710.1444237,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 24,
+      "outcome": "loss",
+      "hold_secs": 58.8
+    }
+  },
+  {
+    "mint": "72LSsrmE6q5jdzHbaUPC9CFxBvxHS6cQktrcjecfpump",
+    "dex": "pumpswap",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 6.861e-07,
+    "entry_price_sol": 7.282e-07,
+    "pnl_pct": -6.48,
+    "ts": 1775198446.4157481,
+    "checks": {
+      "30m": {
+        "due_at": 1775200246.4157481,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775202046.4157481,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775212846.4157481,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775284846.4157481,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 18,
+      "outcome": "loss",
+      "hold_secs": 121.5
+    }
+  },
+  {
+    "mint": "FEBTTG1TwtKWAxzRdMK5kP2HWWi1eMPnuM5aXDeZpump",
+    "dex": "pumpswap",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 1.213e-06,
+    "entry_price_sol": 1.151e-06,
+    "pnl_pct": 4.69,
+    "ts": 1775201371.560227,
+    "checks": {
+      "30m": {
+        "due_at": 1775203171.560227,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775204971.560227,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775215771.560227,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775287771.560227,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 21,
+      "outcome": "win",
+      "hold_secs": 74.1
+    }
+  },
+  {
+    "mint": "BMFFxvuydUAoSZZ9ms4c2dxLmprJXUrJHYUtnMYXpump",
+    "dex": "pumpswap",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 1.121e-06,
+    "entry_price_sol": 1.159e-06,
+    "pnl_pct": -3.98,
+    "ts": 1775211162.4910038,
+    "checks": {
+      "30m": {
+        "due_at": 1775212962.4910038,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775214762.4910038,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775225562.4910038,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775297562.4910038,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 21,
+      "outcome": "loss",
+      "hold_secs": 96.6
+    }
+  },
+  {
+    "mint": "7ZfckgCxgrwj212afqfxVrb4fDe56e54NDnV2Bpapump",
+    "dex": "pumpswap",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 1.017e-06,
+    "entry_price_sol": 1.065e-06,
+    "pnl_pct": -5.21,
+    "ts": 1775225330.890674,
+    "checks": {
+      "30m": {
+        "due_at": 1775227130.890674,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775228930.890674,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775239730.890674,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775311730.890674,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 20,
+      "outcome": "loss",
+      "hold_secs": 204.1
+    }
+  },
+  {
+    "mint": "Cu7njg347gLNAUpjV1c2cegZm1dijTbXsy88BvPfpump",
+    "dex": "pumpswap",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 1.433e-06,
+    "entry_price_sol": 1.402e-06,
+    "pnl_pct": 1.51,
+    "ts": 1775227697.8710344,
+    "checks": {
+      "30m": {
+        "due_at": 1775229497.8710344,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775231297.8710344,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775242097.8710344,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775314097.8710344,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 24,
+      "outcome": "win",
+      "hold_secs": 108.2
+    }
+  },
+  {
+    "mint": "2H9sAayT5JHRekSHGNsv1P27xp48gXFV1Aq6LvPVpump",
+    "dex": "pumpswap",
+    "exit_reason": "trailing_stop_loss",
+    "exit_price_sol": 1.086e-06,
+    "entry_price_sol": 1.249e-06,
+    "pnl_pct": -13.75,
+    "ts": 1775229832.8448594,
+    "checks": {
+      "30m": {
+        "due_at": 1775231632.8448594,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775233432.8448594,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775244232.8448594,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775316232.8448594,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 22,
+      "outcome": "loss",
+      "hold_secs": 109.7
+    }
+  },
+  {
+    "mint": "5HrkV93nWGoscatGoDFR474wHA3qribQpFqkjoStpump",
+    "dex": "pumpswap",
+    "exit_reason": "trailing_stop_loss",
+    "exit_price_sol": 1.068e-06,
+    "entry_price_sol": 1.045e-06,
+    "pnl_pct": 1.5,
+    "ts": 1775234092.550892,
+    "checks": {
+      "30m": {
+        "due_at": 1775235892.550892,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775237692.550892,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775248492.550892,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775320492.550892,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 24,
+      "outcome": "win",
+      "hold_secs": 238.2
+    }
+  },
+  {
+    "mint": "2VnWiQhyWFGUofWRFMVRcBryF1SEitpu7JPzanaUpump",
+    "dex": "pumpswap",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 3.539e-06,
+    "entry_price_sol": 2.854e-06,
+    "pnl_pct": 23.3,
+    "ts": 1775235461.6050913,
+    "checks": {
+      "30m": {
+        "due_at": 1775237261.6050913,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775239061.6050913,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775249861.6050913,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775321861.6050913,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 24,
+      "outcome": "win",
+      "hold_secs": 61.0
+    }
+  },
+  {
+    "mint": "sgeo6xzhQN9AroqzpAaVSw85jkbDN41suiuAGWopump",
+    "dex": "pumpswap",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 8.453e-06,
+    "entry_price_sol": 9.009e-06,
+    "pnl_pct": -6.87,
+    "ts": 1775235943.1536722,
+    "checks": {
+      "30m": {
+        "due_at": 1775237743.1536722,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775239543.1536722,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775250343.1536722,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775322343.1536722,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 21,
+      "outcome": "loss",
+      "hold_secs": 47.1
+    }
+  },
+  {
+    "mint": "8ipTcFNf7eDZijGRnUseRbKVha6xbERhgnUUAe6apump",
+    "dex": "pumpswap",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 4.405e-07,
+    "entry_price_sol": 4.668e-07,
+    "pnl_pct": -6.33,
+    "ts": 1775235997.2224648,
+    "checks": {
+      "30m": {
+        "due_at": 1775237797.2224648,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775239597.2224648,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775250397.2224648,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775322397.2224648,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 15,
+      "outcome": "loss",
+      "hold_secs": 65.4
+    }
+  },
+  {
+    "mint": "EFkUxv3JQhRNf7TxwjH6tdJBTkfSjYLAymSqt2UNpump",
+    "dex": "pumpswap",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 9.286e-07,
+    "entry_price_sol": 9.366e-07,
+    "pnl_pct": -1.55,
+    "ts": 1775242261.8161879,
+    "checks": {
+      "30m": {
+        "due_at": 1775244061.8161879,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775245861.8161879,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775256661.8161879,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775328661.8161879,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 39,
+      "outcome": "loss",
+      "hold_secs": 64.9
+    }
+  },
+  {
+    "mint": "7ysTCAYFYuiheD5o8L4x8HB6274hnRFXVu9wVwhWpump",
+    "dex": "pumpswap",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 1.147e-05,
+    "entry_price_sol": 1.164e-05,
+    "pnl_pct": -2.16,
+    "ts": 1775242299.8725224,
+    "checks": {
+      "30m": {
+        "due_at": 1775244099.8725224,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775245899.8725224,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775256699.8725224,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775328699.8725224,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 21,
+      "outcome": "loss",
+      "hold_secs": 144.0
+    }
+  },
+  {
+    "mint": "6uzyiUPjnKURD6Fe2QfarNPMPd3Y6jiuZ8V5zhFupump",
+    "dex": "pumpswap",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 1.296e-06,
+    "entry_price_sol": 1.18e-06,
+    "pnl_pct": 9.13,
+    "ts": 1775242386.608049,
+    "checks": {
+      "30m": {
+        "due_at": 1775244186.608049,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775245986.608049,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775256786.608049,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775328786.608049,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 21,
+      "outcome": "win",
+      "hold_secs": 272.1
+    }
+  },
+  {
+    "mint": "B4iKYPPbyrkt5tewrDEoMqujEUAVvUXtBk1e4kFspump",
+    "dex": "pumpswap",
+    "exit_reason": "trailing_stop_loss",
+    "exit_price_sol": 1.105e-06,
+    "entry_price_sol": 1.259e-06,
+    "pnl_pct": -12.93,
+    "ts": 1775248460.859264,
+    "checks": {
+      "30m": {
+        "due_at": 1775250260.859264,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775252060.859264,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775262860.859264,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775334860.859264,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 30,
+      "outcome": "loss",
+      "hold_secs": 33.6
+    }
+  },
+  {
+    "mint": "GAzYRdz7ggZ97M7qEDLdoJugzdScSeoo43Q9ERaRpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.890102929616486e-08,
+    "entry_price_sol": 2.890102929616486e-08,
+    "pnl_pct": -0.4,
+    "ts": 1775251092.1815643,
+    "checks": {
+      "30m": {
+        "due_at": 1775252892.1815643,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775254692.1815643,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775265492.1815643,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775337492.1815643,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 46.8
+    }
+  },
+  {
+    "mint": "6u631JGryxMf6yxHGvwBBdyLxihdGrt2vZthvgsmpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 3.476522399752372e-08,
+    "entry_price_sol": 3.337223452676207e-08,
+    "pnl_pct": 3.77,
+    "ts": 1775251951.780629,
+    "checks": {
+      "30m": {
+        "due_at": 1775253751.780629,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775255551.780629,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775266351.780629,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775338351.780629,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "win",
+      "hold_secs": 46.7
+    }
+  },
+  {
+    "mint": "FmcjiVMLv2QA9fVcfJc4iuWx8zzkXbrayBofgVevpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.8143203949390488e-08,
+    "entry_price_sol": 2.8143203949390488e-08,
+    "pnl_pct": -0.4,
+    "ts": 1775252337.0444279,
+    "checks": {
+      "30m": {
+        "due_at": 1775254137.0444279,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775255937.0444279,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775266737.0444279,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775338737.0444279,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 46.8
+    }
+  },
+  {
+    "mint": "3F2owQytBxJkQGduvy3c6sKYfTBg4nL4vGEDkT56pump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 1.2966709208310976e-08,
+    "entry_price_sol": 1.295450130297222e-08,
+    "pnl_pct": -0.31,
+    "ts": 1775252350.788378,
+    "checks": {
+      "30m": {
+        "due_at": 1775254150.788378,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775255950.788378,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775266750.788378,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775338750.788378,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 47.0
+    }
+  },
+  {
+    "mint": "5nyLBkfawGnt3i3fRAvZkErriA9cCez1vX4HE9oRpump",
+    "dex": "pumpswap",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 1.508e-06,
+    "entry_price_sol": 1.576e-06,
+    "pnl_pct": -5.01,
+    "ts": 1775254133.8555424,
+    "checks": {
+      "30m": {
+        "due_at": 1775255933.8555424,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775257733.8555424,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775268533.8555424,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775340533.8555424,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 33,
+      "outcome": "loss",
+      "hold_secs": 47.8
+    }
+  },
+  {
+    "mint": "EDvNh5jRYwEW1SaTHq6RH915ZoMTrDordauMEKxEpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.796526296912654e-08,
+    "entry_price_sol": 2.796526296912654e-08,
+    "pnl_pct": -0.4,
+    "ts": 1775254301.286137,
+    "checks": {
+      "30m": {
+        "due_at": 1775256101.286137,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775257901.286137,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775268701.286137,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775340701.286137,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 46.8
+    }
+  },
+  {
+    "mint": "3B5qHZHoqeuuq96PuyNSF6wWWuYKQB6ergYC5y9xpump",
+    "dex": "pump_fun",
+    "exit_reason": "stop_loss",
+    "exit_price_sol": 2.8421437557220297e-08,
+    "entry_price_sol": 3.696292027567199e-08,
+    "pnl_pct": -23.51,
+    "ts": 1775254480.0650089,
+    "checks": {
+      "30m": {
+        "due_at": 1775256280.0650089,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775258080.0650089,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775268880.0650089,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775340880.0650089,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 10.0
+    }
+  },
+  {
+    "mint": "EEHk3DjnHF2RYBLen4c1gbYnW1B6sUsrTaJ9Xb8Qpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.8154148135320312e-08,
+    "entry_price_sol": 2.8104541356040186e-08,
+    "pnl_pct": -0.22,
+    "ts": 1775256068.151564,
+    "checks": {
+      "30m": {
+        "due_at": 1775257868.151564,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775259668.151564,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775270468.151564,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775342468.151564,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 47.9
+    }
+  },
+  {
+    "mint": "AwJucFNnaQntE8xBiTtgoeL6zozNkUPJmzSjVAWcpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 3.01007586064096e-08,
+    "entry_price_sol": 2.9948142055223276e-08,
+    "pnl_pct": 0.11,
+    "ts": 1775256256.4908974,
+    "checks": {
+      "30m": {
+        "due_at": 1775258056.4908974,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775259856.4908974,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775270656.4908974,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775342656.4908974,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "win",
+      "hold_secs": 46.8
+    }
+  },
+  {
+    "mint": "2spu3uScA3wMVXisz3VH8J1BXjBYNQqV1hmTRSPKpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.7960834429184902e-08,
+    "entry_price_sol": 2.84894005781085e-08,
+    "pnl_pct": -2.26,
+    "ts": 1775256641.082261,
+    "checks": {
+      "30m": {
+        "due_at": 1775258441.082261,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775260241.082261,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775271041.082261,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775343041.082261,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 46.8
+    }
+  },
+  {
+    "mint": "g2S2NWrrzKysKo6NFQ63fmU7E8VrLK98krj7UcNpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.8427285051110797e-08,
+    "entry_price_sol": 2.8446127376473216e-08,
+    "pnl_pct": -0.47,
+    "ts": 1775257223.145235,
+    "checks": {
+      "30m": {
+        "due_at": 1775259023.145235,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775260823.145235,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775271623.145235,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775343623.145235,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 48.8
+    }
+  },
+  {
+    "mint": "DZ1q76XPsBABcoCWLmagFh193xAEJCwkuUPgEKkMpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 3.010794044668237e-08,
+    "entry_price_sol": 2.998370192441013e-08,
+    "pnl_pct": 0.01,
+    "ts": 1775257346.9095867,
+    "checks": {
+      "30m": {
+        "due_at": 1775259146.9095867,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775260946.9095867,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775271746.9095867,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775343746.9095867,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "win",
+      "hold_secs": 47.2
+    }
+  },
+  {
+    "mint": "EKTJM1JojPPAytnnCos9fhz9FPqKKVR7ZtWn44xhpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.871606124255574e-08,
+    "entry_price_sol": 2.871606124255574e-08,
+    "pnl_pct": -0.4,
+    "ts": 1775257411.4619086,
+    "checks": {
+      "30m": {
+        "due_at": 1775259211.4619086,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775261011.4619086,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775271811.4619086,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775343811.4619086,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 48.3
+    }
+  },
+  {
+    "mint": "9SXAfyttedDcrKjwrY2bectf5XavAmkdDJLSZrWKpump",
+    "dex": "pump_fun",
+    "exit_reason": "stop_loss",
+    "exit_price_sol": 2.8003982486419474e-08,
+    "entry_price_sol": 3.087860269455815e-08,
+    "pnl_pct": -9.71,
+    "ts": 1775258170.9677594,
+    "checks": {
+      "30m": {
+        "due_at": 1775259970.9677594,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775261770.9677594,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775272570.9677594,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775344570.9677594,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 39.2
+    }
+  },
+  {
+    "mint": "B1tY9Bmr1p28juhCNbBNFE3ZKJqDYnTiAbwuU3w4pump",
+    "dex": "pump_fun",
+    "exit_reason": "stop_loss",
+    "exit_price_sol": 3.906936341048133e-08,
+    "entry_price_sol": 4.1894411738094604e-08,
+    "pnl_pct": -7.14,
+    "ts": 1775258787.75595,
+    "checks": {
+      "30m": {
+        "due_at": 1775260587.75595,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775262387.75595,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775273187.75595,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775345187.75595,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 10.7
+    }
+  },
+  {
+    "mint": "Ck8M548F2hB2J5q2L1MYR9mut935L3hAmb1ep6w1pump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.8048366976949006e-08,
+    "entry_price_sol": 2.8048366976949006e-08,
+    "pnl_pct": -0.4,
+    "ts": 1775261146.5656028,
+    "checks": {
+      "30m": {
+        "due_at": 1775262946.5656028,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775264746.5656028,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775275546.5656028,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775347546.5656028,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 48.4
+    }
+  },
+  {
+    "mint": "8cJootCLAcCYFCinPrtbts4YEsZ5DE8t6GBcBsbppump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 3.0299956778407204e-08,
+    "entry_price_sol": 3.0299956778407204e-08,
+    "pnl_pct": -0.4,
+    "ts": 1775261209.0164182,
+    "checks": {
+      "30m": {
+        "due_at": 1775263009.0164182,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775264809.0164182,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775275609.0164182,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775347609.0164182,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 47.8
+    }
+  },
+  {
+    "mint": "96fLdZ3rQLbPnfiSxw914DKhTTcELibih2f5vV5Ppump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 5.5063742307529956e-08,
+    "entry_price_sol": 4.782834373191786e-08,
+    "pnl_pct": 14.73,
+    "ts": 1775261263.988916,
+    "checks": {
+      "30m": {
+        "due_at": 1775263063.988916,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775264863.988916,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775275663.988916,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775347663.988916,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "win",
+      "hold_secs": 46.9
+    }
+  },
+  {
+    "mint": "AYeRfJQb5YnqE6cu9D4rRt2BcFzdcscJzNz7NopJpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.8576856588004682e-08,
+    "entry_price_sol": 2.9084288357614485e-08,
+    "pnl_pct": -2.14,
+    "ts": 1775261402.5647695,
+    "checks": {
+      "30m": {
+        "due_at": 1775263202.5647695,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775265002.5647695,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775275802.5647695,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775347802.5647695,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 46.7
+    }
+  },
+  {
+    "mint": "5D644L4cSNsFwoq66wSKFSPXBsjJaCV19ZF5hiBGpump",
+    "dex": "pump_fun",
+    "exit_reason": "stop_loss",
+    "exit_price_sol": 2.9230225661408023e-08,
+    "entry_price_sol": 3.283612897629653e-08,
+    "pnl_pct": -11.38,
+    "ts": 1775261639.404615,
+    "checks": {
+      "30m": {
+        "due_at": 1775263439.404615,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775265239.404615,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775276039.404615,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775348039.404615,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 12.0
+    }
+  },
+  {
+    "mint": "5pk9tnVzhZ5SYUdKt2VuH58KwcwnWr1eUtL8ECAupump",
+    "dex": "pump_fun",
+    "exit_reason": "stop_loss",
+    "exit_price_sol": 3.830956784389663e-08,
+    "entry_price_sol": 4.0829721860950337e-08,
+    "pnl_pct": -6.57,
+    "ts": 1775262332.9698417,
+    "checks": {
+      "30m": {
+        "due_at": 1775264132.9698417,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775265932.9698417,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775276732.9698417,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775348732.9698417,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 10.4
+    }
+  },
+  {
+    "mint": "oDXmPYdsw4V2f81PQjhwkS8AidNfDonC9dZkXrepump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 3.5729009698253e-08,
+    "entry_price_sol": 3.46598730315539e-08,
+    "pnl_pct": 2.68,
+    "ts": 1775263083.6670296,
+    "checks": {
+      "30m": {
+        "due_at": 1775264883.6670296,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775266683.6670296,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775277483.6670296,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775349483.6670296,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "win",
+      "hold_secs": 46.7
+    }
+  },
+  {
+    "mint": "BUFWxy69d2J9moJaYgxMNzgUKuVV5aJVPeHPKU63pump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.8887466141636994e-08,
+    "entry_price_sol": 3.014046388298531e-08,
+    "pnl_pct": -4.56,
+    "ts": 1775263700.856443,
+    "checks": {
+      "30m": {
+        "due_at": 1775265500.856443,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775267300.856443,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775278100.856443,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775350100.856443,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 47.2
+    }
+  },
+  {
+    "mint": "CpY18XEuaYFzxt2aKYF46m9SQNfAN7fULjcvWVZupump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 3.13845950405695e-08,
+    "entry_price_sol": 3.107330030374316e-08,
+    "pnl_pct": 0.6,
+    "ts": 1775263976.6271882,
+    "checks": {
+      "30m": {
+        "due_at": 1775265776.6271882,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775267576.6271882,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775278376.6271882,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775350376.6271882,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "win",
+      "hold_secs": 46.9
+    }
+  },
+  {
+    "mint": "EL4ctjXzTbbewfQkdr4PzFK1oNfRT9V2qaFqwoRqpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.7958993484622556e-08,
+    "entry_price_sol": 2.8899099705505598e-08,
+    "pnl_pct": -3.65,
+    "ts": 1775264105.5489237,
+    "checks": {
+      "30m": {
+        "due_at": 1775265905.5489237,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775267705.5489237,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775278505.5489237,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775350505.5489237,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 47.4
+    }
+  },
+  {
+    "mint": "3T9dKtFgJr1Fydn5Tr4TgGXQhKfYKTyfNbqNoN9Mpump",
+    "dex": "pump_fun",
+    "exit_reason": "stop_loss",
+    "exit_price_sol": 3.0479979038067814e-08,
+    "entry_price_sol": 3.377357220367009e-08,
+    "pnl_pct": -10.15,
+    "ts": 1775264475.2624187,
+    "checks": {
+      "30m": {
+        "due_at": 1775266275.2624187,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775268075.2624187,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775278875.2624187,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775350875.2624187,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 10.7
+    }
+  },
+  {
+    "mint": "FvCqhoctoJSGJHhcrd6iv9bppan9varur5ykChPopump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.8055082781278797e-08,
+    "entry_price_sol": 2.815430035993307e-08,
+    "pnl_pct": -0.75,
+    "ts": 1775265142.4936814,
+    "checks": {
+      "30m": {
+        "due_at": 1775266942.4936814,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775268742.4936814,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775279542.4936814,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775351542.4936814,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 47.6
+    }
+  },
+  {
+    "mint": "ECSiUWmqBwanp66UdHhaa7q3VZfJtVuzyx5w5t4hpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 3.02298303656959e-08,
+    "entry_price_sol": 2.9891516770557696e-08,
+    "pnl_pct": 0.73,
+    "ts": 1775265415.8798788,
+    "checks": {
+      "30m": {
+        "due_at": 1775267215.8798788,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775269015.8798788,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775279815.8798788,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775351815.8798788,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "win",
+      "hold_secs": 48.0
+    }
+  },
+  {
+    "mint": "Ht3dHFYU4LmvDRt8SjPtRkbGREWccQaZ1tz1X9zkpump",
+    "dex": "pump_fun",
+    "exit_reason": "stop_loss",
+    "exit_price_sol": 3.149534453532071e-08,
+    "entry_price_sol": 3.4148775169096894e-08,
+    "pnl_pct": -8.17,
+    "ts": 1775265507.0085104,
+    "checks": {
+      "30m": {
+        "due_at": 1775267307.0085104,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775269107.0085104,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775279907.0085104,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775351907.0085104,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 44.3
+    }
+  },
+  {
+    "mint": "FtmGrgQwiR4oZchof5EsPmhiw3MUts2iFm6SuTNtpump",
+    "dex": "pump_fun",
+    "exit_reason": "stop_loss",
+    "exit_price_sol": 3.256074965148607e-08,
+    "entry_price_sol": 3.450867708619467e-08,
+    "pnl_pct": -6.04,
+    "ts": 1775266224.6964784,
+    "checks": {
+      "30m": {
+        "due_at": 1775268024.6964784,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775269824.6964784,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775280624.6964784,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775352624.6964784,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 22.5
+    }
+  },
+  {
+    "mint": "3gRcG7kjVcfAGwcFhTfR3mL94Ktkm38XkhwQtKNjpump",
+    "dex": "pump_fun",
+    "exit_reason": "stop_loss",
+    "exit_price_sol": 2.8543363845729366e-08,
+    "entry_price_sol": 3.098214051056378e-08,
+    "pnl_pct": -8.27,
+    "ts": 1775266585.303471,
+    "checks": {
+      "30m": {
+        "due_at": 1775268385.303471,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775270185.303471,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775280985.303471,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775352985.303471,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 14.6
+    }
+  },
+  {
+    "mint": "6vtEho4ASaQLf5mh985b8ZBvSwwrioamShYnM4tSpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.797994054823533e-08,
+    "entry_price_sol": 2.797994054823533e-08,
+    "pnl_pct": -0.4,
+    "ts": 1775266591.2115479,
+    "checks": {
+      "30m": {
+        "due_at": 1775268391.2115479,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775270191.2115479,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775280991.2115479,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775352991.2115479,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 48.4
+    }
+  },
+  {
+    "mint": "66r14D8sB8ToKUk5G83mNYPS5s7ZLVZmeKXWfYmwpump",
+    "dex": "pump_fun",
+    "exit_reason": "stop_loss",
+    "exit_price_sol": 6.676847053841253e-08,
+    "entry_price_sol": 7.583427611748581e-08,
+    "pnl_pct": -12.35,
+    "ts": 1775266917.82471,
+    "checks": {
+      "30m": {
+        "due_at": 1775268717.82471,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775270517.82471,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775281317.82471,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775353317.82471,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 11.2
+    }
+  },
+  {
+    "mint": "Gj61pF4En8uzsN1sgDzhSZo1b4CgXTV3ht1KpzgNpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.8513997179065957e-08,
+    "entry_price_sol": 2.8513997179065957e-08,
+    "pnl_pct": -0.4,
+    "ts": 1775267208.6105683,
+    "checks": {
+      "30m": {
+        "due_at": 1775269008.6105683,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775270808.6105683,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775281608.6105683,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775353608.6105683,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 47.6
+    }
+  },
+  {
+    "mint": "7Xp2dxYsqdv7HRXNDsZS4iV6y8Riv1cSrKJaGabjpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.8000895471604963e-08,
+    "entry_price_sol": 2.8000895471604963e-08,
+    "pnl_pct": -0.4,
+    "ts": 1775268210.8126771,
+    "checks": {
+      "30m": {
+        "due_at": 1775270010.8126771,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775271810.8126771,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775282610.8126771,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775354610.8126771,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 46.9
+    }
+  },
+  {
+    "mint": "CtEpahbHxPckqkHXhKReL7GHf9PU5nWpzuq98B2Wpump",
+    "dex": "pump_fun",
+    "exit_reason": "stop_loss",
+    "exit_price_sol": 2.8374881204941785e-08,
+    "entry_price_sol": 3.0310033833314996e-08,
+    "pnl_pct": -6.78,
+    "ts": 1775268295.794941,
+    "checks": {
+      "30m": {
+        "due_at": 1775270095.794941,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775271895.794941,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775282695.794941,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775354695.794941,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 24.8
+    }
+  },
+  {
+    "mint": "9jfaqeQP4dWwui53RBHAwuhS8rg8b2VUN1C4YLiKpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.7979845732949385e-08,
+    "entry_price_sol": 2.799818142733193e-08,
+    "pnl_pct": -0.47,
+    "ts": 1775269208.5494552,
+    "checks": {
+      "30m": {
+        "due_at": 1775271008.5494552,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775272808.5494552,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775283608.5494552,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775355608.5494552,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 48.3
+    }
+  },
+  {
+    "mint": "FspJrPipyhBzK35obtp1M5fzWDavBojqBiEXJYaupump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.800089547347029e-08,
+    "entry_price_sol": 2.800089547347029e-08,
+    "pnl_pct": -0.4,
+    "ts": 1775269707.9044771,
+    "checks": {
+      "30m": {
+        "due_at": 1775271507.9044771,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775273307.9044771,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775284107.9044771,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775356107.9044771,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 47.0
+    }
+  },
+  {
+    "mint": "9dsRtKFMT3j8AxQqhA1QSbZJFGZom6XGaWwCnyu6pump",
+    "dex": "pump_fun",
+    "exit_reason": "tp_full_exit",
+    "exit_price_sol": 3.903709099134495e-08,
+    "entry_price_sol": 2.9615671228903103e-08,
+    "pnl_pct": 31.41,
+    "ts": 1775270275.1030521,
+    "checks": {
+      "30m": {
+        "due_at": 1775272075.1030521,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775273875.1030521,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775284675.1030521,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775356675.1030521,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "win",
+      "hold_secs": 42.1
+    }
+  },
+  {
+    "mint": "BpbnbEXB1KVCLXXsBfnGN4fw2RMxTF3Lzodvpv14pump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.832324838944966e-08,
+    "entry_price_sol": 2.836572996158117e-08,
+    "pnl_pct": -0.55,
+    "ts": 1775270798.6001275,
+    "checks": {
+      "30m": {
+        "due_at": 1775272598.6001275,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775274398.6001275,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775285198.6001275,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775357198.6001275,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 46.9
+    }
+  },
+  {
+    "mint": "9Mg7ms3h19sZsHMKguSdgyZGSc4jcEH6NhJPfNHwpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.985073843837703e-08,
+    "entry_price_sol": 3.032936385913667e-08,
+    "pnl_pct": -1.98,
+    "ts": 1775271229.529653,
+    "checks": {
+      "30m": {
+        "due_at": 1775273029.529653,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775274829.529653,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775285629.529653,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775357629.529653,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 48.0
+    }
+  },
+  {
+    "mint": "7zJGHsH8hoQ9D7eBJbH7rAkykJgYAHPkmfrprxispump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 3.266928037699601e-08,
+    "entry_price_sol": 3.0709624011679024e-08,
+    "pnl_pct": 5.98,
+    "ts": 1775271472.5938692,
+    "checks": {
+      "30m": {
+        "due_at": 1775273272.5938692,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775275072.5938692,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775285872.5938692,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775357872.5938692,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "win",
+      "hold_secs": 48.1
+    }
+  },
+  {
+    "mint": "5ntzT9z4tk6xs61rNYQKmKp3dgk1fk8q15EQ3Wx6pump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 3.3735657550131076e-08,
+    "entry_price_sol": 3.3757187276538846e-08,
+    "pnl_pct": -0.46,
+    "ts": 1775271561.1435354,
+    "checks": {
+      "30m": {
+        "due_at": 1775273361.1435354,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775275161.1435354,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775285961.1435354,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775357961.1435354,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 47.8
+    }
+  },
+  {
+    "mint": "5qxSgGg4YRZERtDFGgargoT8PZumuBfssZWxRQiepump",
+    "dex": "pumpswap",
+    "exit_reason": "early_stop_loss",
+    "exit_price_sol": 4.122e-07,
+    "entry_price_sol": 5.477e-07,
+    "pnl_pct": -25.44,
+    "ts": 1775271830.2857456,
+    "checks": {
+      "30m": {
+        "due_at": 1775273630.2857456,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775275430.2857456,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775286230.2857456,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775358230.2857456,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 20,
+      "outcome": "loss",
+      "hold_secs": 64.9
+    }
+  },
+  {
+    "mint": "AaZzDijd4K1mAHjAmyXbjV45mVCF8FYvcdTGJs7rpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 5.4599627267816687e-08,
+    "entry_price_sol": 5.1513360079273206e-08,
+    "pnl_pct": 5.59,
+    "ts": 1775273462.4967012,
+    "checks": {
+      "30m": {
+        "due_at": 1775275262.4967012,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775277062.4967012,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775287862.4967012,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775359862.4967012,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 7,
+      "outcome": "win",
+      "hold_secs": 47.0
+    }
+  },
+  {
+    "mint": "D2ey1bFoMFm8MpSDrvJ4kgttzHqpsE6broK1C5jEpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 3.4760223968710166e-08,
+    "entry_price_sol": 3.4693954860484934e-08,
+    "pnl_pct": -0.21,
+    "ts": 1775273657.495715,
+    "checks": {
+      "30m": {
+        "due_at": 1775275457.495715,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775277257.495715,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775288057.495715,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775360057.495715,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 47.4
+    }
+  },
+  {
+    "mint": "GMFQFSRW5fdU6Not7cS7ZkAQELTgBb8pUcfNf6DFpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 6.434286370384408e-08,
+    "entry_price_sol": 5.528049469862032e-08,
+    "pnl_pct": 15.99,
+    "ts": 1775273856.1078491,
+    "checks": {
+      "30m": {
+        "due_at": 1775275656.1078491,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775277456.1078491,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775288256.1078491,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775360256.1078491,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 7,
+      "outcome": "win",
+      "hold_secs": 46.6
+    }
+  },
+  {
+    "mint": "8kMBxAidnKd4ZSSFgukAuRC1KCqCbdZp7yi6CnJxpump",
+    "dex": "pump_fun",
+    "exit_reason": "rug_stop_loss",
+    "exit_price_sol": 2.8889101391936158e-08,
+    "entry_price_sol": 5.167708497085903e-08,
+    "pnl_pct": -44.5,
+    "ts": 1775275502.3881485,
+    "checks": {
+      "30m": {
+        "due_at": 1775277302.3881485,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775279102.3881485,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775289902.3881485,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775361902.3881485,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 7,
+      "outcome": "rug",
+      "hold_secs": 12.3
+    }
+  },
+  {
+    "mint": "2iPPoadFYGQoLmHy93FPccjRKZcFvDuzFpgBRmhmpump",
+    "dex": "pumpswap",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 5.604e-07,
+    "entry_price_sol": 5.358e-07,
+    "pnl_pct": 3.89,
+    "ts": 1775276212.2163794,
+    "checks": {
+      "30m": {
+        "due_at": 1775278012.2163794,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775279812.2163794,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775290612.2163794,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775362612.2163794,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 22,
+      "outcome": "win",
+      "hold_secs": 47.7
+    }
+  },
+  {
+    "mint": "9KUZ6vU4gPgotbKLexGmEZtYzXUm4p1ccY7NyrRYpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.7958993476234855e-08,
+    "entry_price_sol": 2.7958993476234855e-08,
+    "pnl_pct": -0.4,
+    "ts": 1775276275.073935,
+    "checks": {
+      "30m": {
+        "due_at": 1775278075.073935,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775279875.073935,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775290675.073935,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775362675.073935,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 47.5
+    }
+  },
+  {
+    "mint": "95yeaTqMyQyQcx37vUR4WsnLxfqMt7eqVvh8b5dpump",
+    "dex": "pump_fun",
+    "exit_reason": "stop_loss",
+    "exit_price_sol": 4.687088378737995e-08,
+    "entry_price_sol": 5.133461366038576e-08,
+    "pnl_pct": -9.1,
+    "ts": 1775276406.7756908,
+    "checks": {
+      "30m": {
+        "due_at": 1775278206.7756908,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775280006.7756908,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775290806.7756908,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775362806.7756908,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 10.9
+    }
+  },
+  {
+    "mint": "2v6YZBcskvEktqmF8X3sW2V382zBXSh2TTuFQT9Bpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.9156068969510714e-08,
+    "entry_price_sol": 2.9063087269212553e-08,
+    "pnl_pct": -0.08,
+    "ts": 1775277651.8462715,
+    "checks": {
+      "30m": {
+        "due_at": 1775279451.8462715,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775281251.8462715,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775292051.8462715,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775364051.8462715,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 46.5
+    }
+  },
+  {
+    "mint": "6EEzxPsdSptEYtztZQkASyrHFatMva459kn2mXLjpump",
+    "dex": "pump_fun",
+    "exit_reason": "stop_loss",
+    "exit_price_sol": 7.852333337209663e-09,
+    "entry_price_sol": 9.39994446941335e-09,
+    "pnl_pct": -16.86,
+    "ts": 1775277687.045839,
+    "checks": {
+      "30m": {
+        "due_at": 1775279487.045839,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775281287.045839,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775292087.045839,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775364087.045839,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 10.3
+    }
+  },
+  {
+    "mint": "7ncbKfj54dea17XMhjnBBKKTUtufZh4VGNr4Viejpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.9256529010658077e-08,
+    "entry_price_sol": 2.9295925961566415e-08,
+    "pnl_pct": -0.53,
+    "ts": 1775279335.4568348,
+    "checks": {
+      "30m": {
+        "due_at": 1775281135.4568348,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775282935.4568348,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775293735.4568348,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775365735.4568348,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 47.3
+    }
+  },
+  {
+    "mint": "5xu4MYrn8iDwWLuhZRvaGeEYBrGJidZeZwnYUzp6pump",
+    "dex": "pump_fun",
+    "exit_reason": "stop_loss",
+    "exit_price_sol": 1.613100252845473e-08,
+    "entry_price_sol": 2.4019267852930193e-08,
+    "pnl_pct": -33.24,
+    "ts": 1775279749.296557,
+    "checks": {
+      "30m": {
+        "due_at": 1775281549.296557,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775283349.296557,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775294149.296557,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775366149.296557,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 10.7
+    }
+  },
+  {
+    "mint": "6oLPZjvPbPnHJAUuRCbCz8oEvsVqqXYEUmowVGS1pump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 3.277707385883382e-08,
+    "entry_price_sol": 3.277707385883382e-08,
+    "pnl_pct": -0.4,
+    "ts": 1775284849.323472,
+    "checks": {
+      "30m": {
+        "due_at": 1775286649.323472,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775288449.323472,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775299249.323472,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775371249.323472,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 47.7
+    }
+  },
+  {
+    "mint": "AjUJFm5LzHh62u45C6DzRNRv5jE3XVSxbxTmw4grpump",
+    "dex": "pumpswap",
+    "exit_reason": "stall_exit",
+    "exit_price_sol": 5.695e-06,
+    "entry_price_sol": 5.642e-06,
+    "pnl_pct": 0.24,
+    "ts": 1775296007.9032896,
+    "checks": {
+      "30m": {
+        "due_at": 1775297807.9032896,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775299607.9032896,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775310407.9032896,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775382407.9032896,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 21,
+      "outcome": "win",
+      "hold_secs": 11166.0
+    }
+  },
+  {
+    "mint": "8cW3mUwT7uEL4H2QBTYoV2m9rTrsLAesCeMCvSRqpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.82465785768741e-08,
+    "entry_price_sol": 2.82465785768741e-08,
+    "pnl_pct": -0.4,
+    "ts": 1775296087.5282555,
+    "checks": {
+      "30m": {
+        "due_at": 1775297887.5282555,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775299687.5282555,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775310487.5282555,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775382487.5282555,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 46.8
+    }
+  },
+  {
+    "mint": "3CDwfCaLwJS8sh2L4NxcHjR9N14Qsg7uryHFT6xEpump",
+    "dex": "pump_fun",
+    "exit_reason": "jarvis_exit",
+    "exit_price_sol": 2.8292908586611865e-08,
+    "entry_price_sol": 2.892041944650318e-08,
+    "pnl_pct": -2.57,
+    "ts": 1775296301.610916,
+    "checks": {
+      "30m": {
+        "due_at": 1775298101.610916,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775299901.610916,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775310701.610916,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775382701.610916,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 64.3
+    }
+  },
+  {
+    "mint": "2V8BLMtA7HrC3sYTtwmFcFNmBhDiEsU54j9bfVyCpump",
+    "dex": "pump_fun",
+    "exit_reason": "stagnant_exit",
+    "exit_price_sol": 2.8900449317324054e-08,
+    "entry_price_sol": 2.8900449317324054e-08,
+    "pnl_pct": -0.4,
+    "ts": 1775297247.185209,
+    "checks": {
+      "30m": {
+        "due_at": 1775299047.185209,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775300847.185209,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775311647.185209,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775383647.185209,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 181.3
+    }
+  },
+  {
+    "mint": "79MpxnrB9bu9gQPgJPvU5vzCihmGNpRySm4YeYqipump",
+    "dex": "pump_fun",
+    "exit_reason": "stagnant_exit",
+    "exit_price_sol": 2.8244193094021084e-08,
+    "entry_price_sol": 2.8394235110710817e-08,
+    "pnl_pct": -0.93,
+    "ts": 1775297700.8623822,
+    "checks": {
+      "30m": {
+        "due_at": 1775299500.8623822,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775301300.8623822,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775312100.8623822,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775384100.8623822,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 181.7
+    }
+  },
+  {
+    "mint": "84tyaacmFh5euLhk2VGkXDd2s2U2MTN3bWToXgqJpump",
+    "dex": "pump_fun",
+    "exit_reason": "early_stop_loss",
+    "exit_price_sol": 3.8615856294660277e-08,
+    "entry_price_sol": 4.468181842964966e-08,
+    "pnl_pct": -13.98,
+    "ts": 1775297761.8469837,
+    "checks": {
+      "30m": {
+        "due_at": 1775299561.8469837,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775301361.8469837,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775312161.8469837,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775384161.8469837,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 77.5
+    }
+  },
+  {
+    "mint": "8mHpWSLgPpYfRd2xq6nDsysB4ZMte17wns9mjkrNpump",
+    "dex": "pumpswap",
+    "exit_reason": "tp_full_exit",
+    "exit_price_sol": 1.689e-06,
+    "entry_price_sol": 1.278e-06,
+    "pnl_pct": 31.46,
+    "ts": 1775298253.1315908,
+    "checks": {
+      "30m": {
+        "due_at": 1775300053.1315908,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775301853.1315908,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775312653.1315908,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775384653.1315908,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 15,
+      "outcome": "win",
+      "hold_secs": 1149.7
+    }
+  },
+  {
+    "mint": "FQ4R8sY6KRXo5hfyNkUACsCpofHuEkqNH6Fzm7Rupump",
+    "dex": "pump_fun",
+    "exit_reason": "stagnant_exit",
+    "exit_price_sol": 5.5477745789883545e-08,
+    "entry_price_sol": 5.5477745789883545e-08,
+    "pnl_pct": -0.4,
+    "ts": 1775300861.5809877,
+    "checks": {
+      "30m": {
+        "due_at": 1775302661.5809877,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775304461.5809877,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775315261.5809877,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775387261.5809877,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 7,
+      "outcome": "loss",
+      "hold_secs": 181.2
+    }
+  },
+  {
+    "mint": "arn67kUuQTeGe5igRrRocnJ1H9z3GrDJKKtAEnFpump",
+    "dex": "pump_fun",
+    "exit_reason": "stagnant_exit",
+    "exit_price_sol": 2.796412480015595e-08,
+    "entry_price_sol": 2.9279886525513503e-08,
+    "pnl_pct": -4.89,
+    "ts": 1775301310.4460423,
+    "checks": {
+      "30m": {
+        "due_at": 1775303110.4460423,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775304910.4460423,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775315710.4460423,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775387710.4460423,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "loss",
+      "hold_secs": 265.2
+    }
+  },
+  {
+    "mint": "EzvJw44M9YU3JjasGxBdLSdUDJ6YFM6kqTTFTSzSpump",
+    "dex": "pump_fun",
+    "exit_reason": "tp_full_exit",
+    "exit_price_sol": 3.909677545357149e-08,
+    "entry_price_sol": 2.925777884987614e-08,
+    "pnl_pct": 33.23,
+    "ts": 1775303050.1990626,
+    "checks": {
+      "30m": {
+        "due_at": 1775304850.1990626,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775306650.1990626,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775317450.1990626,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775389450.1990626,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 8,
+      "outcome": "win",
+      "hold_secs": 259.1
+    }
+  },
+  {
+    "mint": "6zMtCxwgPQceSNJUm3Wvbyr1XJzEZSoVD7apsSutpump",
+    "dex": "pumpswap",
+    "exit_reason": "trailing_stop_loss",
+    "exit_price_sol": 2.216e-06,
+    "entry_price_sol": 1.805e-06,
+    "pnl_pct": 20.47,
+    "ts": 1775359832.4921796,
+    "checks": {
+      "30m": {
+        "due_at": 1775361632.4921796,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775363432.4921796,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775374232.4921796,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775446232.4921796,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 18,
+      "outcome": "win",
+      "hold_secs": 737.9
+    }
+  },
+  {
+    "mint": "HrFH13e6uJTFXoEMJwpfzkP4QAGkp5kYcPmfdmQQpump",
+    "dex": "pumpswap",
+    "exit_reason": "trailing_stop_loss",
+    "exit_price_sol": 4.977e-06,
+    "entry_price_sol": 5.191e-06,
+    "pnl_pct": -6.42,
+    "ts": 1775363722.390812,
+    "checks": {
+      "30m": {
+        "due_at": 1775365522.390812,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775367322.390812,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775378122.390812,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775450122.390812,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 41,
+      "outcome": "loss",
+      "hold_secs": 334.2
+    }
+  },
+  {
+    "mint": "3WsibZCj7dpyJduiXfFSDpbFpeaAKUB2eHY3VQdtpump",
+    "dex": "pumpswap",
+    "exit_reason": "trailing_stop_loss",
+    "exit_price_sol": 1.823e-06,
+    "entry_price_sol": 1.609e-06,
+    "pnl_pct": 11.0,
+    "ts": 1775388947.9977057,
+    "checks": {
+      "30m": {
+        "due_at": 1775390747.9977057,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775392547.9977057,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775403347.9977057,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775475347.9977057,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 18,
+      "outcome": "win",
+      "hold_secs": 507.6
+    }
+  },
+  {
+    "mint": "9LbueXn3HMWWSTZPbH8jJKEZNKnb6YvTVn8HvqeQpump",
+    "dex": "pumpswap",
+    "exit_reason": "trailing_stop_loss",
+    "exit_price_sol": 4.807e-06,
+    "entry_price_sol": 5.563e-06,
+    "pnl_pct": -15.89,
+    "ts": 1775396951.052163,
+    "checks": {
+      "30m": {
+        "due_at": 1775398751.052163,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775400551.052163,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775411351.052163,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775483351.052163,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 19,
+      "outcome": "loss",
+      "hold_secs": 247.4
+    }
+  },
+  {
+    "mint": "3jcimw2sPCCwrdnCeUv7vkUSoL6VjU1qFLQVcnbqwfTb",
+    "dex": "pumpswap",
+    "exit_reason": "trailing_stop_loss",
+    "exit_price_sol": 2.955e-06,
+    "entry_price_sol": 3.403e-06,
+    "pnl_pct": -15.46,
+    "ts": 1775447218.3481238,
+    "checks": {
+      "30m": {
+        "due_at": 1775449018.3481238,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775450818.3481238,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775461618.3481238,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775533618.3481238,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 18,
+      "outcome": "loss",
+      "hold_secs": 145.6
+    }
+  },
+  {
+    "mint": "VpRP3m5wQBNkDRcDRn6J5syA2VJsiFBXU6V3wMQpump",
+    "dex": "pumpswap",
+    "exit_reason": "trailing_stop_loss",
+    "exit_price_sol": 7.808e-06,
+    "entry_price_sol": 6.585e-06,
+    "pnl_pct": 16.27,
+    "ts": 1775453773.9538317,
+    "checks": {
+      "30m": {
+        "due_at": 1775455573.9538317,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775457373.9538317,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775468173.9538317,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775540173.9538317,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 18,
+      "outcome": "win",
+      "hold_secs": 605.0
+    }
+  },
+  {
+    "mint": "BksagHFY9AQTHNtUVRn6ZtjMCg6zEmZVcQMVaD6Xpump",
+    "dex": "pumpswap",
+    "exit_reason": "trailing_stop_loss",
+    "exit_price_sol": 1.557e-06,
+    "entry_price_sol": 1.878e-06,
+    "pnl_pct": -19.39,
+    "ts": 1775473100.9962132,
+    "checks": {
+      "30m": {
+        "due_at": 1775474900.9962132,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775476700.9962132,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775487500.9962132,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775559500.9962132,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 18,
+      "outcome": "loss",
+      "hold_secs": 407.1
+    }
+  },
+  {
+    "mint": "72w3wu8UDh8G1QL3aQM4KSQpodz4QqUpt8sNGWZmbnYL",
+    "dex": "pumpswap",
+    "exit_reason": "trailing_stop_loss",
+    "exit_price_sol": 1.048e-06,
+    "entry_price_sol": 1.225e-06,
+    "pnl_pct": -16.75,
+    "ts": 1775475212.6071105,
+    "checks": {
+      "30m": {
+        "due_at": 1775477012.6071105,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775478812.6071105,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775489612.6071105,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775561612.6071105,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 16,
+      "outcome": "loss",
+      "hold_secs": 177.8
+    }
+  },
+  {
+    "mint": "HeerBN2kj3WT2zwp3w5onXNaq1EKn8jJD9DisS2ypump",
+    "dex": "pump_fun",
+    "exit_reason": "early_stop_loss",
+    "exit_price_sol": 7.014044049389255e-08,
+    "entry_price_sol": 7.746060567564302e-08,
+    "pnl_pct": -9.89,
+    "ts": 1775475499.390422,
+    "checks": {
+      "30m": {
+        "due_at": 1775477299.390422,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775479099.390422,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775489899.390422,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775561899.390422,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 0,
+      "outcome": "loss",
+      "hold_secs": 154.2
+    }
+  },
+  {
+    "mint": "DLadLPrz3bM8fM6ktbPuD4FDUmNqWxdUQxmXjKkcpump",
+    "dex": "pump_fun",
+    "exit_reason": "stagnant_exit",
+    "exit_price_sol": 2.8467697567437714e-08,
+    "entry_price_sol": 2.8467697567437714e-08,
+    "pnl_pct": -0.49,
+    "ts": 1775475526.3738987,
+    "checks": {
+      "30m": {
+        "due_at": 1775477326.3738987,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775479126.3738987,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775489926.3738987,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775561926.3738987,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 0,
+      "outcome": "loss",
+      "hold_secs": 181.2
+    }
+  },
+  {
+    "mint": "2ZUH6yJENjn4L6HfCSoMjbhES19wZF3VopexC4XXUP8g",
+    "dex": "pump_fun",
+    "exit_reason": "stagnant_exit",
+    "exit_price_sol": 6.041805953238512e-08,
+    "entry_price_sol": 6.003028159592764e-08,
+    "pnl_pct": 0.2,
+    "ts": 1775475526.463295,
+    "checks": {
+      "30m": {
+        "due_at": 1775477326.463295,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775479126.463295,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775489926.463295,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775561926.463295,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 0,
+      "outcome": "win",
+      "hold_secs": 181.3
+    }
+  },
+  {
+    "mint": "72JyUX23TZ5TPU7h3bz8wzPsb7tX8McWa5K8VRaJpump",
+    "dex": "pump_fun",
+    "exit_reason": "trailing_stop_loss",
+    "exit_price_sol": 4.5187436203240864e-08,
+    "entry_price_sol": 4.521227462133551e-08,
+    "pnl_pct": -0.5,
+    "ts": 1775476138.724373,
+    "checks": {
+      "30m": {
+        "due_at": 1775477938.724373,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "1h": {
+        "due_at": 1775479738.724373,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "4h": {
+        "due_at": 1775490538.724373,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      },
+      "24h": {
+        "due_at": 1775562538.724373,
+        "done": false,
+        "price_change_pct": null,
+        "price_sol": null
+      }
+    },
+    "extra": {
+      "score": 0,
+      "outcome": "loss",
+      "hold_secs": 195.0
+    }
+  }
+]

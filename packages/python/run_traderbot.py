@@ -1701,20 +1701,20 @@ async def autonomous_scout_loop(runtime: AgentRuntime, graduation_queue: asyncio
         )
 
         try:
-            # ── Claude Haiku: ultra-fast EXIT/HOLD verdict (low latency critical here) ──
-            import anthropic as _anthropic_coach
-            _haiku_client = _anthropic_coach.AsyncAnthropic(
-                api_key=os.getenv("ANTHROPIC_API_KEY", "")
+            # ── Llama 3.1 via Groq: ultra-fast EXIT/HOLD verdict (low latency critical here) ──
+            import groq as _groq_coach
+            _groq_client = _groq_coach.AsyncGroq(
+                api_key=os.getenv("GROQ_API_KEY", "")
             )
-            _haiku_resp = await asyncio.wait_for(
-                _haiku_client.messages.create(
-                    model="claude-haiku-4-5-20251001",
+            _groq_resp = await asyncio.wait_for(
+                _groq_client.chat.completions.create(
+                    model="llama3.1-8b-instant",
                     max_tokens=80,
                     messages=[{"role": "user", "content": prompt}],
                 ),
                 timeout=8.0,
             )
-            advice = (_haiku_resp.content[0].text if _haiku_resp.content else "").strip()[:300]
+            advice = (_groq_resp.choices[0].message.content if _groq_resp.choices else "").strip()[:300]
             if not advice:
                 return
 

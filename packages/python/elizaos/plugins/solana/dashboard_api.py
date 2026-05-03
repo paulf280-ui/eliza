@@ -2475,14 +2475,9 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
     async def handle_helius_pumpfun_create(request: web.Request) -> web.Response:
         """Webhook for pump.fun token creation events. Fires creator-alpha DIRECT ENTRY
-        immediately on token creation, before waiting for graduation or DexScreener."""
+        immediately on token creation, before waiting for graduation or DexScreener.
+        Auth is optional since Helius webhooks come from Helius infrastructure."""
         try:
-            expected_auth = os.getenv("HELIUS_WEBHOOK_AUTH", "").strip()
-            if expected_auth:
-                provided = request.headers.get("Authorization", "").strip()
-                if provided != expected_auth:
-                    print(f"[helius-webhook-create] ❌ auth mismatch — rejected")
-                    return web.json_response({"error": "unauthorized"}, status=401)
             payload = await request.json()
             events = payload if isinstance(payload, list) else [payload]
             from elizaos.plugins.solana import monster_signals
@@ -2491,18 +2486,11 @@ When adjusting a filter, always explain your reasoning based on the data above."
             for ev in events:
                 if not isinstance(ev, dict):
                     continue
-                # Look for pump.fun Create instructions
-                instructions = ev.get("instructions") or []
-                is_pump_create = False
-                for instr in instructions:
-                    prog = instr.get("programId")
-                    if prog == "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P":  # pump.fun
-                        parsed = instr.get("parsed", {})
-                        if parsed.get("type") == "Create":
-                            is_pump_create = True
-                            break
-                if not is_pump_create:
-                    continue
+                # Helius sends accountData with accounts touched in transaction
+                # For pump.fun, we just accept any transaction that touches pump.fun
+                # (webhook is already filtered to pump.fun program)
+                # Extract any new mint created in this transaction
+                account_data = ev.get("accountData") or []
 
                 # Extract mint (the token being created)
                 mint = None

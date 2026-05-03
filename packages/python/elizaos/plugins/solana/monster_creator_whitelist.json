@@ -1,0 +1,493 @@
+{
+  "generated_utc": "2026-04-19",
+  "source_monsters": 40,
+  "serial_monster_deployers": [
+    {
+      "wallet": "DbFS3c9wpKtJiqFYu83QmpqHDBJtjKY8hqTL9AGZfRir",
+      "monsters": [
+        {
+          "mint": "F1ppSHedBsGGwEKH78JVgoqr4xkQHswtsGGLpgM7bCP2",
+          "symbol": "ASTEROID"
+        },
+        {
+          "mint": "8BrKogqwr7Uad9Pwkxw91w31v2x5qf8yDL4x52Qhpump",
+          "symbol": "NUERO"
+        },
+        {
+          "mint": "5YX8Bsgm4AENU8SbsjMEeZssDcvnT5sx96mxgf69pump",
+          "symbol": "XRP"
+        }
+      ]
+    },
+    {
+      "wallet": "CoPyPPWdm8SirumaAEe8S68nSJpHYhguN2L5i2YGxLB",
+      "monsters": [
+        {
+          "mint": "6HXCCASZxmv5jnExJDoe7TTQJMu6kfctRotVmtHGpump",
+          "symbol": "ELUN"
+        },
+        {
+          "mint": "34q2KmCvapecJgR6ZrtbCTrzZVtkt3a5mHEA3TuEsWYb",
+          "symbol": "LOL"
+        }
+      ]
+    },
+    {
+      "wallet": "AXmnRBrNtYYyyo82cLBBhnWJ7o1iqNLZbuEVpDB3V666",
+      "monsters": [
+        {
+          "mint": "2SN5omCCJPzseBpm7t38Qt2muy8gd4oknbF34tzLpump",
+          "symbol": "Hamster"
+        },
+        {
+          "mint": "BnXWvsVZYgBxTUDyDqHZjvFbQGvEZeipY4ZdmqCbpump",
+          "symbol": "assface"
+        }
+      ]
+    },
+    {
+      "wallet": "DsCJ5siuJTPQtQa3A9N69azGZaWtUPzi9VPp2G9Jfpx9",
+      "monsters": [
+        {
+          "mint": "9LbueXn3HMWWSTZPbH8jJKEZNKnb6YvTVn8HvqeQpump",
+          "symbol": "Freg"
+        },
+        {
+          "mint": "BiBMG42BrmvJE5gY5UCXLURroGR6tBC1gfcYbZuEpump",
+          "symbol": "UNCEROID"
+        }
+      ]
+    }
+  ],
+  "coordination_cluster_buyers": [
+    {
+      "wallet": "FireuLYd4yjJBhXQyBs3Mq6ZpNEjyHPNPG2eqhTP9RHV",
+      "monster_count": 9,
+      "monsters": [
+        "ASTEROID",
+        "BULL",
+        "BURNIE",
+        "PIXEL",
+        "Freg",
+        "Cthulhu",
+        "assface",
+        "XRP",
+        "DUMBMONEY"
+      ]
+    },
+    {
+      "wallet": "A7FMMgue4aZmPLLoutVtbC7gJcyqkHybUieiaDg9aaVE",
+      "monster_count": 8,
+      "monsters": [
+        "ASTEROID",
+        "apple",
+        "Freg",
+        "Cthulhu",
+        "UNCEROID",
+        "assface",
+        "XRP",
+        "DUMBMONEY"
+      ]
+    },
+    {
+      "wallet": "Luckywzbt7nYBhmEZLnzqAsQmRE8bMmgyduxsP5kktR",
+      "monster_count": 6,
+      "monsters": [
+        "ASTEROID",
+        "Chicky",
+        "fluide",
+        "Cthulhu",
+        "UNCEROID",
+        "DUMBMONEY"
+      ]
+    },
+    {
+      "wallet": "CoPyPPWdm8SirumaAEe8S68nSJpHYhguN2L5i2YGxLB",
+      "monster_count": 6,
+      "monsters": [
+        "ASTEROID",
+        "Chicky",
+        "NUERO",
+        "UNCEROID",
+        "assface",
+        "DUMBMONEY"
+      ]
+    },
+    {
+      "wallet": "66666y3RmL6gNyttNKXNhF5awxAWbBdGSfpKuaTLrjRH",
+      "monster_count": 5,
+      "monsters": [
+        "ASTEROID",
+        "NUERO",
+        "Cthulhu",
+        "UNCEROID",
+        "DUMBMONEY"
+      ]
+    },
+    {
+      "wallet": "8L2y55D11k63CAftvW7uMM2mBhtMxLoLnivG9uY2bt8j",
+      "monster_count": 5,
+      "monsters": [
+        "ZEN",
+        "ROCKET",
+        "Dunald",
+        "fluide",
+        "GAJAE"
+      ]
+    },
+    {
+      "wallet": "JESUSL2s5BsffGNNn6wQtHART2iXVGjtGhKAwGw44bL",
+      "monster_count": 4,
+      "monsters": [
+        "BURNIE",
+        "Chicky",
+        "BIGLY",
+        "UNCEROID"
+      ]
+    },
+    {
+      "wallet": "CatyeC3LgBxub7HcpW2n7cZZZ66CUKdcZ8DzHucHrSiP",
+      "monster_count": 4,
+      "monsters": [
+        "Dunald",
+        "fluide",
+        "GSD",
+        "$HACHI"
+      ]
+    },
+    {
+      "wallet": "4r33xEKAD2cNMrC9NyJy8nb4XmruUKebZ6LZZm65PVUZ",
+      "monster_count": 4,
+      "monsters": [
+        "Freg",
+        "UNCEROID",
+        "assface",
+        "XRP"
+      ]
+    },
+    {
+      "wallet": "8abFwsQkoMRAk5mD4eXFTBqVyTGsfUZ1hVsfZ3NDsDUW",
+      "monster_count": 3,
+      "monsters": [
+        "ASTEROID",
+        "Chicky",
+        "BIGLY"
+      ]
+    },
+    {
+      "wallet": "GxDC9e7SP9mzhDo4re5HbpLa2RW7gB9DtmThx4i4pXSq",
+      "monster_count": 3,
+      "monsters": [
+        "ZEN",
+        "Dunald",
+        "$HACHI"
+      ]
+    },
+    {
+      "wallet": "8pY1AukbuPgUE3EetyLa59rFLMimJGT94ZzbMEZcQF4w",
+      "monster_count": 3,
+      "monsters": [
+        "ROCKET",
+        "Dunald",
+        "$HACHI"
+      ]
+    },
+    {
+      "wallet": "8hfoNZCd2bK9aqCBkhg8f2L1AoL7qfHwd9tMv7x64qui",
+      "monster_count": 3,
+      "monsters": [
+        "BURNIE",
+        "fluide",
+        "BIGLY"
+      ]
+    },
+    {
+      "wallet": "2BLgvYgAx2WzFEQaPo7njJexFVQQYWDuSe5f1sSfj5Fm",
+      "monster_count": 3,
+      "monsters": [
+        "Dunald",
+        "fluide",
+        "GSD"
+      ]
+    },
+    {
+      "wallet": "SUPErMoycPz71hmZXr78P7cXFYQhdpV39Roeoe2DxUC",
+      "monster_count": 3,
+      "monsters": [
+        "Dunald",
+        "fluide",
+        "GAJAE"
+      ]
+    },
+    {
+      "wallet": "UUAhspPgUdGuXUnokmxERH1VvNGNh1ouN3mfcbfV8yd",
+      "monster_count": 3,
+      "monsters": [
+        "GAJAE",
+        "GSD",
+        "$HACHI"
+      ]
+    },
+    {
+      "wallet": "DsCJ5siuJTPQtQa3A9N69azGZaWtUPzi9VPp2G9Jfpx9",
+      "monster_count": 3,
+      "monsters": [
+        "Cthulhu",
+        "assface",
+        "XRP"
+      ]
+    },
+    {
+      "wallet": "roUteHjDohtkatXTb79PJ99bbxkTipgo3GJ4EJZ1YpB",
+      "monster_count": 3,
+      "monsters": [
+        "Cthulhu",
+        "UNCEROID",
+        "assface"
+      ]
+    },
+    {
+      "wallet": "GNoYNXQ66dnTqcR39nKi2QJSizjxvHHAy9GSbNszQuuq",
+      "monster_count": 3,
+      "monsters": [
+        "UNCEROID",
+        "XRP",
+        "DUMBMONEY"
+      ]
+    },
+    {
+      "wallet": "4ywa3NKfWRX3jpMxWydiWzELuSbdDUhTV5QnoGexjV3e",
+      "monster_count": 2,
+      "monsters": [
+        "ASTEROID",
+        "assface"
+      ]
+    },
+    {
+      "wallet": "Ketsy7ZpNMrJLsGLzciaHSMHdVJwAfY2R8cAyh8kJos",
+      "monster_count": 2,
+      "monsters": [
+        "ASTEROID",
+        "assface"
+      ]
+    },
+    {
+      "wallet": "moat5sFf2DwfL53x8WP8vZCMf5jP6W9k37G9Ex32nXH",
+      "monster_count": 2,
+      "monsters": [
+        "ZEN",
+        "$HACHI"
+      ]
+    },
+    {
+      "wallet": "54Pz1e35z9uoFdnxtzjp7xZQoFiofqhdayQWBMN7dsuy",
+      "monster_count": 2,
+      "monsters": [
+        "ZEN",
+        "Dunald"
+      ]
+    },
+    {
+      "wallet": "gtagyESa99t49VmUqnnfsuowYnigSNKuYXdXWyXWNdd",
+      "monster_count": 2,
+      "monsters": [
+        "ROCKET",
+        "$HACHI"
+      ]
+    },
+    {
+      "wallet": "GXRVaUGMUXe4wsF6qjRyMdNvJ57H7Zw9c2Ddzhqc9Y2Q",
+      "monster_count": 2,
+      "monsters": [
+        "BULL",
+        "Cthulhu"
+      ]
+    },
+    {
+      "wallet": "HvidZDSPXjL9b56chG7VteN3ZhE6ykDfGpwCmtGr98Cn",
+      "monster_count": 2,
+      "monsters": [
+        "Chicky",
+        "NUERO"
+      ]
+    },
+    {
+      "wallet": "6KPYDyuRnpuKcm1TerUmwLd2BcaihvhF4Ccrr8beruu2",
+      "monster_count": 2,
+      "monsters": [
+        "Chicky",
+        "Freg"
+      ]
+    },
+    {
+      "wallet": "avg1twbiWyaGiaw8o7gF9uYho5CvBRSwt6xJZuEZuME",
+      "monster_count": 2,
+      "monsters": [
+        "Dunald",
+        "GSD"
+      ]
+    },
+    {
+      "wallet": "ArBA13STtyQzLc4HnwuBFvjRWgS5mGeKFCBHPxKmp6zk",
+      "monster_count": 2,
+      "monsters": [
+        "fluide",
+        "UNCEROID"
+      ]
+    },
+    {
+      "wallet": "3KvsoNxgn64nsuHKPBHQJsguef3DgEkP2izE49k6CSAZ",
+      "monster_count": 2,
+      "monsters": [
+        "fluide",
+        "BIGLY"
+      ]
+    },
+    {
+      "wallet": "9rckk9wdAtdfBPNqihZ7VTLdT8TFprYELqt2FbhQmeP2",
+      "monster_count": 2,
+      "monsters": [
+        "GSD",
+        "$HACHI"
+      ]
+    },
+    {
+      "wallet": "8TPWakvWw4xQbk7uAYdNjZiDKKHgv9GE5GebzsbtUaHr",
+      "monster_count": 2,
+      "monsters": [
+        "UNCEROID",
+        "DUMBMONEY"
+      ]
+    },
+    {
+      "wallet": "AXmnRBrNtYYyyo82cLBBhnWJ7o1iqNLZbuEVpDB3V666",
+      "monster_count": 2,
+      "monsters": [
+        "XRP",
+        "DUMBMONEY"
+      ]
+    }
+  ],
+  "tweet_anchor_map": [
+    {
+      "monster": "ASTEROID",
+      "mint": "F1ppSHedBsGGwEKH78JVgoqr4xkQHswtsGGLpgM7bCP2",
+      "kol_handle": "elonmusk",
+      "tweet_id": "2044986783700860974",
+      "url": "https://x.com/elonmusk/status/2044986783700860974"
+    },
+    {
+      "monster": "Quality",
+      "mint": "sgeo6xzhQN9AroqzpAaVSw85jkbDN41suiuAGWopump",
+      "kol_handle": "elonmusk",
+      "tweet_id": "2039979553440121093",
+      "url": "https://x.com/elonmusk/status/2039979553440121093"
+    },
+    {
+      "monster": "Chicky",
+      "mint": "2AMYvN5zvXMC9ueA6vznaiaEqWrjpxHCisa2Nuc5pump",
+      "kol_handle": "Sizeyon",
+      "tweet_id": "2035329054878962087",
+      "url": "https://x.com/Sizeyon/status/2035329054878962087"
+    },
+    {
+      "monster": "pippin",
+      "mint": "Dfh5DzRgSvvCFDoYc2ciTkMrbDfRKybA4SoFbPmApump",
+      "kol_handle": "yoheinakajima",
+      "tweet_id": "1855337887568638431",
+      "url": "https://x.com/yoheinakajima/status/1855337887568638431"
+    },
+    {
+      "monster": "OPK",
+      "mint": "5WGkdemJNEoAVKveDQdzQmDqTyxCraXGw9ACyrwCEUMS",
+      "kol_handle": "elonmusk",
+      "tweet_id": "1852745739379658774",
+      "url": "https://x.com/elonmusk/status/1852745739379658774"
+    },
+    {
+      "monster": "Pluto",
+      "mint": "3WsibZCj7dpyJduiXfFSDpbFpeaAKUB2eHY3VQdtpump",
+      "kol_handle": "deviousbondius",
+      "tweet_id": "2040708280151150979",
+      "url": "https://x.com/deviousbondius/status/2040708280151150979"
+    },
+    {
+      "monster": "Freg",
+      "mint": "9LbueXn3HMWWSTZPbH8jJKEZNKnb6YvTVn8HvqeQpump",
+      "kol_handle": "JakTheDegen",
+      "tweet_id": "2040724746627616807",
+      "url": "https://x.com/JakTheDegen/status/2040724746627616807"
+    },
+    {
+      "monster": "assface",
+      "mint": "BnXWvsVZYgBxTUDyDqHZjvFbQGvEZeipY4ZdmqCbpump",
+      "kol_handle": "w1zar9",
+      "tweet_id": "2045651218215641160",
+      "url": "https://x.com/w1zar9/status/2045651218215641160"
+    },
+    {
+      "monster": "XRP",
+      "mint": "5YX8Bsgm4AENU8SbsjMEeZssDcvnT5sx96mxgf69pump",
+      "kol_handle": "degentintin",
+      "tweet_id": "2045175678048584068",
+      "url": "https://x.com/degentintin/status/2045175678048584068"
+    },
+    {
+      "monster": "GREKT",
+      "mint": "Sgei8pavjJLWVrYUp9PwNxK6hmP5TphQd2HR4Yxpump",
+      "kol_handle": "hyoki57",
+      "tweet_id": "2045094953983066357",
+      "url": "https://x.com/hyoki57/status/2045094953983066357"
+    }
+  ],
+  "x_community_links": [
+    {
+      "monster": "ZEN",
+      "community_id": "2039027111667618008",
+      "url": "https://x.com/i/communities/2039027111667618008"
+    },
+    {
+      "monster": "apple",
+      "community_id": "1952795788385632396",
+      "url": "https://x.com/i/communities/1952795788385632396"
+    },
+    {
+      "monster": "Hamster",
+      "community_id": "2030591777582059628",
+      "url": "https://x.com/i/communities/2030591777582059628"
+    },
+    {
+      "monster": "49",
+      "community_id": "2038604655085637693",
+      "url": "https://x.com/i/communities/2038604655085637693"
+    }
+  ],
+  "discord_launch_evidence": [
+    {
+      "monster": "Chicky",
+      "evidence": "https://x.com/Sizeyon/status/2035329054878962087 https://www.tiktok.com/@pikimoves  Launched on discord.gg/uxento "
+    }
+  ],
+  "tiktok_evidence": [
+    {
+      "monster": "Chicky",
+      "evidence": "https://x.com/Sizeyon/status/2035329054878962087 https://www.tiktok.com/@pikimoves  Launched on discord.gg/uxento"
+    },
+    {
+      "monster": "Hamster",
+      "evidence": "https://x.com/i/communities/2030591777582059628 https://www.tiktok.com/search?lang=en&q=hamster%20meme%20stickers&t=1772964974931  "
+    },
+    {
+      "monster": "49",
+      "evidence": "https://x.com/i/communities/2038604655085637693 https://www.tiktok.com/@heartzz.kyra/video/7623498359885597974  Created on https://rapidlaunch.io"
+    }
+  ],
+  "usage": {
+    "serial_deployers": "If any of these wallets deploys a new pump.fun token, alert + consider scout buy. They have already shipped 2+ monsters.",
+    "coordination_cluster_top5": "Add to WATCHED_WALLETS or as a secondary signal: these wallets are early buyers across multiple monsters. Fire* and Copy* are likely sniper bot platforms \u2014 treat as bot signal, not KOL signal.",
+    "tweet_anchors": "At mint time, the creator pins a KOL tweet as the narrative anchor. Parse pump.fun metadata on new graduations and score by KOL follower count. Elon tweet anchor = highest tier.",
+    "x_communities": "A persistent X Community link is a stronger signal than a Twitter handle. Several monsters (ZEN, apple, Hamster, 49, UNCEROID, assface) used X Communities as their primary organizing channel.",
+    "discord_launches": "Some tokens are launched through Discord servers (Chicky = discord.gg/uxento). These are invisible to us today \u2014 need to join the servers.",
+    "tiktok": "Chicky, Hamster, 49 pulled from TikTok hype \u2014 TikTok video searches as origin of narrative, invisible to current scanners."
+  }
+}

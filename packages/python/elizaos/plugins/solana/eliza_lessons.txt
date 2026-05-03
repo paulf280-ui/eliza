@@ -1,0 +1,216 @@
+================================================================================
+ELIZA TRADING LESSONS — On-Chain Verified Intelligence
+Injected into all AI brains (Groq, Gemini, Claude) at context build time.
+Each lesson is tagged with the token that proved it and the date confirmed.
+================================================================================
+
+--------------------------------------------------------------------------------
+LESSON 1 — DUAL-DEX LAUNCH IS TIER-1 ENTRY SIGNAL
+Token: ASTEROID (F1ppSHedBsGGwEKH78JVgoqr4xkQHswtsGGLpgM7bCP2) | 2026-04-17
+--------------------------------------------------------------------------------
+When a PumpSwap-graduated token opens a Meteora DLMM liquidity pool within
+10 minutes of launch, that is the strongest possible entry signal.
+
+Why it matters: Institutional/professional market-makers deploy on Meteora
+immediately when they believe a token will sustain. This dual-DEX structure
+creates cross-DEX arbitrage pressure that FORCES price discovery upward and
+provides sustained multi-wave rallies instead of single-spike pumps.
+
+ASTEROID: PumpSwap at 03:50 UTC → Meteora DLMM at 03:56 UTC (5.6 min lag)
+Result: +18769% h6, still +30% h1 at 5.7 hours old
+Walta confirmed: 0.66 SOL → 58.81 SOL in 5 minutes (89x) at 114 mins post-launch
+
+RULE: If a token has both a PumpSwap pool AND a Meteora DLMM pool, treat it
+as high-conviction. Three DEX pools = maximum conviction. Prioritise entry.
+
+--------------------------------------------------------------------------------
+LESSON 2 — THE 1-2 HOUR SURVIVORSHIP SWEET SPOT
+Token: ASTEROID | 2026-04-17
+--------------------------------------------------------------------------------
+Tokens that survive 1-2 hours after PumpSwap launch without collapsing have
+passed the "rug filter". Early snipers who bought to dump are done. Remaining
+holders are committed. This is the optimal entry window for sustained runners.
+
+Walta enters ASTEROID at 114 minutes post-launch. Not at creation (too risky).
+Not at 4 hours (early premium gone). The 60-150 minute window is the sweet spot
+for tokens that showed dual-DEX launch DNA.
+
+RULE: For pumpswap + meteora dual-DEX tokens, entry in the 60-150 minute window
+after PumpSwap launch = best risk/reward. Before 60min = rug risk. After 3h = missed most of the move.
+
+--------------------------------------------------------------------------------
+LESSON 3 — METEORA POOL AGE ≠ TOKEN AGE (CRITICAL FILTER BUG PATTERN)
+Token: ASTEROID | 2026-04-17
+--------------------------------------------------------------------------------
+Our Strategy D filters tokens by Meteora POOL age (scout_min_age_secs=900 = 15min).
+ASTEROID's Meteora pool opened at 03:56 UTC but the BASE TOKEN was launched at 03:50.
+The Meteora pool was only 6 minutes old — our age filter would have blocked it.
+
+BUT the token DNA was solid from launch. The 15-minute age filter on the POOL
+was rejecting tokens that were brand new to Meteora but already proven on PumpSwap.
+
+RULE: When scanning Meteora DLMM pools, check if the same token has an OLDER
+PumpSwap/pump.fun pool. If yes, use the TOKEN's total age (from first DEX pool),
+not the Meteora pool creation time, to evaluate maturity.
+
+--------------------------------------------------------------------------------
+LESSON 4 — VOL/LIQ RATIO AS EXPLOSIVE MOMENTUM SIGNAL
+Token: ASTEROID and dataset of 35 monster tokens | 2026-04-17
+--------------------------------------------------------------------------------
+At check time (5.7h after launch), ASTEROID had:
+  - Volume 24h: $30,338,420
+  - Liquidity: $282,451
+  - Vol/Liq ratio: 107x
+
+This 107x ratio indicates OVERWHELMING buy pressure vs available liquidity.
+Price MUST rise because demand dwarfs supply in the pool.
+
+Historical monster data shows vol/liq at CHECK TIME is always 10-107x because
+the token has already run. At ENTRY TIME (1-3h old), vol/liq is typically 2-8x
+for true monsters (not 0.3-0.5x for dead pools, not 50x for already-peaked).
+
+RULE: At entry, target vol/liq between 2x and 15x. Below 1x = dead pool (skip).
+Above 20x at entry = already peaked, buying exit liquidity (skip).
+The 2-15x entry zone is the monster launch pad.
+
+--------------------------------------------------------------------------------
+LESSON 5 — WALTA'S SMART MONEY ENTRY PATTERN (PROBE + COMMIT)
+Token: ASTEROID | 2026-04-17
+--------------------------------------------------------------------------------
+On-chain confirmed: Walta entered ASTEROID in two transactions 5 seconds apart:
+  1. 05:45:23 UTC — 0.53 SOL (large conviction buy)
+  2. 05:45:28 UTC — 0.13 SOL (secondary add, confirming fill)
+
+Then exited in 12 rapid transactions over 27 seconds at 05:50:32-05:50:59 UTC,
+each ~67k tokens for ~5 SOL. Systematic partial-exit ladder to avoid slippage.
+
+This is Walta's consistent pattern: large initial BUY in 1-2 transactions,
+then rapid multi-transaction SELL ladder to extract maximum SOL without crashing price.
+
+RULE: When our bot detects Walta's BUY signal, it is almost always a LARGE buy
+(0.5+ SOL) with high conviction. Copy immediately — do not wait for confirmation.
+Walta averages 5-15 minute holds on these momentum plays.
+
+--------------------------------------------------------------------------------
+LESSON 6 — RUGS VS SUSTAINED RUNNERS: KEY DISTINGUISHING FACTORS
+Dataset: 165 trades as of 2026-03-22 | Confirmed 2026-04-17
+--------------------------------------------------------------------------------
+RUG PATTERN (22% of losses, avg -54.4%):
+  - Buy ratio > 70% at entry (abnormal — engineered excitement)
+  - Liquidity < $10k at entry (thin pool = easy to drain)
+  - No second DEX pool (single vector = dev can pull easily)
+  - Token age < 10 minutes (creation block snipers = instant dump)
+  - No holder growth between scan intervals (fake vol with same addresses)
+  - Bundler_EeX wallet = confirmed front-running bot, 100% loss rate
+
+SUSTAINED RUNNER PATTERN (ZEN 143x, ASTEROID 89x Walta, SpaceX 11683%):
+  - Buy ratio 50-65% (healthy market-driven buying)
+  - Liquidity $50k-$500k range (real pool depth)
+  - Multiple DEX pools (decentralised liquidity)
+  - Token age > 45 minutes at entry (survivorship proven)
+  - Holder count growing between checks (real new buyers)
+  - Vol/liq 2-15x at entry (building momentum, not peaked)
+
+--------------------------------------------------------------------------------
+LESSON 7 — WHY TP=40% IS THE RIGHT EXIT STRATEGY
+Dataset: 165 trades | 100% TP win rate confirmed
+--------------------------------------------------------------------------------
+Every single trade that hit our TP target at 40% was a profitable exit.
+Zero TP exits were losses. This is mathematically confirmed across 165 trades.
+
+The temptation to hold longer is real (ASTEROID went 89x, ZEN went 143x).
+But for every ASTEROID, there are 5 tokens that hit +35% then crashed to -60%.
+
+Our edge is NOT in picking monsters — it's in CONSISTENTLY banking 40% wins
+and cutting losses at 10% SL. The math: 40% wins + 10% losses at 32% WR
+produces positive expectancy as long as win quality stays at TP level.
+
+RULE: NEVER talk the bot into holding past TP without a specific, quantified reason
+(e.g., "dual-DEX + vol/liq exploding + Walta still holding"). Vague optimism
+is the enemy of the +40% TP that keeps the account growing.
+
+--------------------------------------------------------------------------------
+LESSON 8 — HELIUS REAL-TIME PRICE vs DEXSCREENER LAG (SL EXECUTION)
+Confirmed: 2026-03-15, Dataset: 34 SL exits
+--------------------------------------------------------------------------------
+DexScreener lags 5-30 seconds behind on-chain price. When a token dumps hard,
+the real price can be -20% while DexScreener still shows -8%.
+
+Historical data: 100% of SL exits were WORSE than the -9% trigger.
+Average actual exit = -18% when using DexScreener for monitoring.
+
+Fix implemented: Helius RPC real-time price via getMultipleAccounts on
+PumpSwap pool vault accounts (offsets 139-170 token vault, 171-202 SOL vault).
+
+RULE: Always use Helius real-time price for SL monitoring on PumpSwap positions.
+DexScreener is for discovery only, not for execution decisions.
+
+--------------------------------------------------------------------------------
+LESSON 9 — METEORA STRATEGY EARLY OBSERVATIONS
+Confirmed: ongoing | 11 trades, 45.5% WR
+--------------------------------------------------------------------------------
+Meteora DLMM is our BEST-performing strategy by win rate (45.5% vs 32.9% pumpswap).
+The higher WR comes from scanning established pools with real liquidity depth.
+
+What works on Meteora:
+  - Tokens 15-90 minutes old with active vol/liq 3-8x
+  - Buy ratio 52-65% (active buying but not overbought)
+  - Liquidity $30k-$300k (enough depth for our 0.35 SOL entry)
+  - Paired token = SOL or USDC (not meme-to-meme pairs)
+
+What doesn't work on Meteora:
+  - Tokens with freeze authority (can lock your tokens permanently)
+  - Pools with vol/liq < 1x (dying — all exits, no entries)
+  - tokens where top wallet > 15% of supply (whale concentration)
+
+RULE: For Meteora positions, stay longer than PumpSwap — Meteora pools have
+deeper liquidity and more sustained moves. Min hold should be 20 minutes.
+Max hold 48h (per MAX_HOLD_PUMPSWAP setting — Meteora follows same cap).
+
+--------------------------------------------------------------------------------
+LESSON 10 — THE LIBERATION DAY CLUSTER: MACRO-DRIVEN MEME SEASON
+Confirmed: 2026-04-02 through 2026-04-05
+--------------------------------------------------------------------------------
+8 of 15+ dated monster tokens graduated or spiked within 72h of April 2 2026
+Trump tariff announcement. Major macro events trigger simultaneous meme rallies.
+
+Pattern: Political/economic uncertainty → retail traders flee to memes →
+ALL narrative tokens spike together. The correlation is unmistakable.
+
+RULE: When major political or economic news hits (tariffs, elections, war, Fed),
+switch to MONSTER DETECTION OVERDRIVE. Lower score thresholds by 1 point.
+Increase position monitoring frequency. Extend TP targets on political memes.
+
+--------------------------------------------------------------------------------
+LESSON 11 — SCANNER STRATEGIES HUNT SURVIVORS, NOT NEW LAUNCHES
+Token: SpaceX Mascot (5scW5BsN_pump) | 2026-04-18
+--------------------------------------------------------------------------------
+Strategy C (PumpSwap) and Strategy D (Meteora) are NOT new-token snipers.
+They are SURVIVOR SCOUTS. They deliberately target tokens that are 2+ hours old
+(pumpswap_min_age_secs=7200) because most new tokens rug or collapse in hour 1-2.
+
+SpaceX Mascot: entered at 2h+ old. PnL reached +75%+ on a paper trade.
+The entry looked "late" but it was exactly right — the token had survived the
+early-holder distribution and was entering a momentum phase.
+
+SpaceX previously ran +11,683% in a prior session (monster_trades_reference.json).
+Repeat runners are real: retail conviction builds across sessions.
+
+RULE: Never question a scanner entry because the token is "not new".
+Old = survived. Survived = real holders. Real holders = real moves.
+The age floor IS the safety filter — it's not a limitation, it's the edge.
+
+RULE: When a scanner position reaches +60%+ without closing, the AI cascade
+has NOT fired SELL. That means liq/holders are STILL POSITIVE. Let it run.
+A fixed TP at +30% would have cut SpaceX at the beginning of a +75% move.
+
+RULE: Both PumpSwap and Meteora scanner positions use AI cascade as primary exit.
+TP ceiling is 10x (safety net only). AI signals (liq drain, holder drop) trigger exit.
+This is now uniform across both strategies. Never revert to fixed TP for scanners.
+
+--------------------------------------------------------------------------------
+================================================================================
+END OF LESSONS — Last updated: 2026-04-18 | Total lessons: 11
+To add a new lesson: append after "END OF LESSONS" with the same format.
+Token forensics that generated these lessons are in monster_addresses.json.
+================================================================================

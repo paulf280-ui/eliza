@@ -1,0 +1,45 @@
+
+> @elizaos/polymarket-dashboard@0.1.0 start
+> next start -p 3002 -p 3002
+
+  ▲ Next.js 14.2.5
+  - Local:        http://localhost:3002
+
+ ✓ Starting...
+ ✓ Ready in 287ms
+
+> @elizaos/polymarket-dashboard@0.1.0 start
+> next start -p 3002 -p 3002
+
+  ▲ Next.js 14.2.5
+  - Local:        http://localhost:3002
+
+ ✓ Starting...
+Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id
+    at setupFsCheck (/home/paulf/eliza/packages/polymarket-dashboard/node_modules/next/dist/server/lib/router-utils/filesystem.js:151:19)
+    at async initialize (/home/paulf/eliza/packages/polymarket-dashboard/node_modules/next/dist/server/lib/router-server.js:61:23)
+    at async Server.<anonymous> (/home/paulf/eliza/packages/polymarket-dashboard/node_modules/next/dist/server/lib/start-server.js:249:36)
+npm error Lifecycle script `start` failed with error:
+npm error code 1
+npm error path /home/paulf/eliza/packages/polymarket-dashboard
+npm error workspace @elizaos/polymarket-dashboard@0.1.0
+npm error location /home/paulf/eliza/packages/polymarket-dashboard
+npm error command failed
+npm error command sh -c next start -p 3002 -p 3002
+
+> @elizaos/polymarket-dashboard@0.1.0 start
+> next start -p 3002 -p 3002
+
+  ▲ Next.js 14.2.5
+  - Local:        http://localhost:3002
+
+ ✓ Starting...
+ ✓ Ready in 240ms
+Killed
+npm error Lifecycle script `start` failed with error:
+npm error code 137
+npm error path /home/paulf/eliza/packages/polymarket-dashboard
+npm error workspace @elizaos/polymarket-dashboard@0.1.0
+npm error location /home/paulf/eliza/packages/polymarket-dashboard
+npm error command failed
+npm error command sh -c next start -p 3002 -p 3002

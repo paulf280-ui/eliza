@@ -1,0 +1,44 @@
+{
+  "_note": "Monster trades sent by trader — use these to tune filters to catch similar setups",
+  "_summary": "8 confirmed monster tokens. Common DNA: buy_ratio 50-65%, age 1-4h at entry, PumpSwap/Raydium, vol/liq ratio 1-3x at entry (NOT extreme), quiet entry m5 +/-10%, liq $30k-$80k, no social hype — quiet grinders that went parabolic over hours",
+  "trades": [
+    {"symbol": "NoHat",  "multiplier": 18,   "buy_ratio_pct": 55.0, "peak_gain_pct": 311,  "score": 4,  "hold_hours": 8,   "dex": "raydium",  "liq_usd": 45000, "notes": "Low score, quiet entry, long grind"},
+    {"symbol": "PISS",   "multiplier": 22,   "buy_ratio_pct": 55.0, "peak_gain_pct": 297,  "score": 3,  "hold_hours": 6,   "dex": "raydium",  "liq_usd": 38000, "notes": "Very low score — pure momentum play"},
+    {"symbol": "LOLA",   "multiplier": 15,   "buy_ratio_pct": 54.0, "peak_gain_pct": 172,  "score": 4,  "hold_hours": 10,  "dex": "raydium",  "liq_usd": 52000, "notes": "10h hold, patient exit"},
+    {"symbol": "ZEN",    "multiplier": 143,  "buy_ratio_pct": 57.0, "peak_gain_pct": 400,  "score": 10, "hold_hours": 8,   "dex": "raydium",  "liq_usd": 61000, "notes": "Best performer — 143x, score 10, 57% buy ratio"},
+    {"symbol": "TARO",   "multiplier": 6.7,  "buy_ratio_pct": 50.5, "peak_gain_pct": 91,   "score": 7,  "hold_hours": 189, "dex": "raydium",  "liq_usd": 29000, "notes": "7.9 day hold — longest hold, 101 traders"},
+    {"symbol": "BURNIE", "multiplier": 22,   "buy_ratio_pct": 52.4, "peak_gain_pct": 2214, "score": null, "hold_hours": 14,  "dex": "pumpswap", "liq_usd": 71643, "notes": "MISSED — h24=+2214%, entry buy ratio 52.4%, age 14h, pumpswap, liq $71k — quiet grinder"},
+    {"symbol": "milkers","multiplier": 14,   "buy_ratio_pct": 57.9, "peak_gain_pct": 1380, "score": null, "hold_hours": 20,  "dex": "pumpswap", "liq_usd": 60525, "notes": "MISSED — h24=+1380%, entry buy ratio 57.9%, age 20h, pumpswap, liq $60k — dip entry -5% m5"},
+    {"symbol": "Chicky", "multiplier": 3,    "buy_ratio_pct": 63.1, "peak_gain_pct": 207,  "score": null, "hold_hours": 83,  "dex": "pumpswap", "liq_usd": 74392, "notes": "MISSED — h24=+207%, buy ratio 63.1%, older token 83h, liq $74k — still moving"}
+  ],
+  "critical_patterns": [
+    "buy_ratio between 50-65% — balanced buyers/sellers, NOT euphoric (>70% = exit liquidity)",
+    "Age 1-4h at entry is the sweet spot — not brand new, not old and dying",
+    "Vol/liq ratio 1-3x at entry — moderate momentum, NOT extreme (>10x = wash trading or already pumped)",
+    "Liquidity $30k-$80k — real money, not micro-cap rugs, not blue-chip",
+    "Quiet m5 at entry (+/-10%) — these are NOT already pumping when you buy",
+    "PumpSwap and Raydium native — post-graduation tokens, NOT bonding curve",
+    "Hold time 6-20 hours for max gains — trailing stop essential, fixed 30% TP kills the run",
+    "Multipliers 3x-143x — trailing stop is the ONLY exit that captures these moves"
+  ],
+  "filter_implications": [
+    "TRAILING STOP is the primary exit — fixed TP at 30% or 60% would exit at the beginning of a 1000%+ move",
+    "scout_min_age_secs=3600 (1h min) — catch tokens at 1-4h old, not brand new",
+    "scout_max_m5_pct=15 — if m5 is already +15% or more, you missed the quiet entry",
+    "b/c/d_min_buy_ratio=50, max=65 — sweet spot confirmed across ALL 8 monsters",
+    "b/c/d_min_vol_liq_ratio=1.0, max=5.0 — moderate momentum floor, cap out extreme pumps",
+    "strategy_c_min_liq_usd=30000 — floor at $30k liq keeps quality, below this = micro-cap rug zone",
+    "MAX_HOLD_PUMPSWAP must be 12h+ — BURNIE and milkers needed 14-20h holds",
+    "Do NOT require high scores — PISS scored 3, NoHat scored 4, still 18x-22x"
+  ],
+  "recommended_config_changes": [
+    "trailing_stop_enabled=true — NON-NEGOTIABLE for monster trades",
+    "trailing_stop_pct=0.12 — 12% trail gives room on parabolic moves",
+    "scout_min_age_secs=3600 — 1h minimum, monsters were 1-4h old at entry",
+    "scout_max_m5_pct=15 — quiet entry filter, skip if already running hard",
+    "b_min_buy_ratio=50, c_min_buy_ratio=50, d_min_buy_ratio=50",
+    "b_max_vol_liq_ratio=5, c_max_vol_liq_ratio=5 — cap extreme pumps",
+    "strategy_c_min_liq_usd=30000 — quality floor",
+    "MAX_HOLD_PUMPSWAP=43200 (12h) — allow full monster run"
+  ]
+}

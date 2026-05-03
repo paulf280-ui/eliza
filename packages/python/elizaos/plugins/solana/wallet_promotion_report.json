@@ -1,0 +1,62 @@
+{
+  "generated_ts": 1776513177.0867238,
+  "total_wallets": 6,
+  "promote_count": 0,
+  "blacklist_count": 3,
+  "rows": [
+    {
+      "wallet": "Wallet_3BLj",
+      "trades": 1,
+      "wr_pct": 100.0,
+      "net_sol": 0.611,
+      "median_pnl_pct": 174.6,
+      "last_ts": 1775486785.021023,
+      "verdict": "WATCH"
+    },
+    {
+      "wallet": "Radiance",
+      "trades": 1,
+      "wr_pct": 0.0,
+      "net_sol": -0.1108,
+      "median_pnl_pct": -27.7,
+      "last_ts": 1775504340.9987888,
+      "verdict": "WATCH"
+    },
+    {
+      "wallet": "Trenchman",
+      "trades": 3,
+      "wr_pct": 0.0,
+      "net_sol": -0.3044,
+      "median_pnl_pct": -34.4,
+      "last_ts": 1775492048.884042,
+      "verdict": "HOLD"
+    },
+    {
+      "wallet": "Whale_CyaE",
+      "trades": 4,
+      "wr_pct": 75.0,
+      "net_sol": 0.7078,
+      "median_pnl_pct": 63.4,
+      "last_ts": 1775504026.5062585,
+      "verdict": "BLACKLIST"
+    },
+    {
+      "wallet": "Gang_0SOL",
+      "trades": 4,
+      "wr_pct": 25.0,
+      "net_sol": -0.369,
+      "median_pnl_pct": -32.0,
+      "last_ts": 1775475150.2874277,
+      "verdict": "BLACKLIST"
+    },
+    {
+      "wallet": "Bundler_EeX",
+      "trades": 15,
+      "wr_pct": 26.7,
+      "net_sol": -0.5924,
+      "median_pnl_pct": -5.9,
+      "last_ts": 1775475797.083171,
+      "verdict": "BLACKLIST"
+    }
+  ]
+}

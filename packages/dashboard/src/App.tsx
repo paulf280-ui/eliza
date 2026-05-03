@@ -280,7 +280,6 @@ export default function App() {
           winRate={ctStats?.win_rate ?? 0}
           wins={ctStats?.wins ?? 0}
           total={ctStats?.trades ?? 0}
-          title={copyTradeEnabled ? "COPY TRADE HISTORY" : "MONSTER HISTORY"}
         />
       </div>
       <div className="col-span-12 lg:col-span-4 h-[420px] overflow-hidden">

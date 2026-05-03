@@ -7,8 +7,11 @@ from elizaos.types import Plugin
 from .actions import buy_token_action, get_price_action, sell_token_action
 from .providers import launches_provider, market_provider, wallet_provider
 from .services import (
+    MonsterStrategyService,
+    PositionManagerService,
     PumpFunService,
     RaydiumService,
+    SocialMonitorService,
     SolanaWalletService,
     TokenLaunchMonitorService,
 )
@@ -27,6 +30,9 @@ def create_solana_plugin() -> Plugin:
             PumpFunService,
             RaydiumService,
             TokenLaunchMonitorService,
+            SocialMonitorService,
+            PositionManagerService,
+            MonsterStrategyService,
         ],
         providers=[wallet_provider, market_provider, launches_provider],
         actions=[buy_token_action, sell_token_action, get_price_action],
@@ -39,6 +45,9 @@ __all__ = [
     "PumpFunService",
     "RaydiumService",
     "TokenLaunchMonitorService",
+    "SocialMonitorService",
+    "PositionManagerService",
+    "MonsterStrategyService",
     "wallet_provider",
     "market_provider",
     "launches_provider",

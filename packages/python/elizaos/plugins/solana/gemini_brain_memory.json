@@ -1,0 +1,134 @@
+{
+  "brain": "gemini",
+  "role": "GEMINI ANALYSIS BRAIN (gemini-2.0-flash). You fire every 2 minutes. Your job: confirm or override Groq's call with deeper pattern analysis. Check holder trends, liquidity shifts, momentum direction. SELL confidence\u22650.70 exits.",
+  "created": "2026-04-18T12:25:47.329914+00:00",
+  "last_updated": "2026-04-18T12:25:47.329925+00:00",
+  "config_snapshot": {},
+  "open_positions": [],
+  "recent_decisions": [],
+  "session_stats": {
+    "total_calls": 0,
+    "holds_recommended": 0,
+    "exits_recommended": 0,
+    "correct_hold_then_tp": 0,
+    "premature_exit_missed_tp": 0,
+    "correct_exit_before_sl": 0,
+    "missed_rug_held_too_long": 0
+  },
+  "learned_patterns": [
+    "Historical baseline: 119 trades, WR=36.1%, net=+0.101 SOL.",
+    "Best copied wallets: Whale_CyaE(75.0%WR +0.71SOL), Wallet_3BLj(100.0%WR +0.61SOL), Frost(62.5%WR +0.41SOL)",
+    "Worst copied wallets (blacklisted): Bundler_EeX(26.7%WR -0.59SOL), Trenchman(21.1%WR -0.59SOL), Gang_0SOL(25.0%WR -0.37SOL)",
+    "Wallet mirror-exit drives 44% of closes \u2014 follow the whale out of the position fast.",
+    "SL tightened 20%\u219210% after analysis: 20% SL avg exit -33% (catastrophic); 10% SL is correct. Never raise SL.",
+    "Only 10% of trades hit TP \u2014 don't hold waiting for TP, exit on whale signal or at breakeven+.",
+    "Best hold bucket: 15-60min (WR=60%). Trades >60min have 0% WR \u2014 cut dead positions."
+  ],
+  "meteora_lessons": [],
+  "last_refresh_ts": 1776515147.3299267,
+  "historical_summary": {
+    "total_trades": 119,
+    "wins": 43,
+    "losses": 76,
+    "win_rate_pct": 36.1,
+    "net_sol": 0.101,
+    "median_pnl_pct": -4.5,
+    "best_pnl_pct": 174.6,
+    "worst_pnl_pct": -77.5,
+    "by_wallet": {
+      "Whale_CyaE": {
+        "trades": 4,
+        "wr": 75.0,
+        "net_sol": 0.708
+      },
+      "Wallet_3BLj": {
+        "trades": 1,
+        "wr": 100.0,
+        "net_sol": 0.611
+      },
+      "Frost": {
+        "trades": 8,
+        "wr": 62.5,
+        "net_sol": 0.408
+      },
+      "clukz": {
+        "trades": 20,
+        "wr": 45.0,
+        "net_sol": 0.397
+      },
+      "Walta": {
+        "trades": 7,
+        "wr": 14.3,
+        "net_sol": 0.076
+      },
+      "CookDoc": {
+        "trades": 10,
+        "wr": 50.0,
+        "net_sol": 0.002
+      },
+      "rambo": {
+        "trades": 7,
+        "wr": 28.6,
+        "net_sol": -0.04
+      },
+      "Axiom_W1": {
+        "trades": 7,
+        "wr": 28.6,
+        "net_sol": -0.068
+      },
+      "Radiance": {
+        "trades": 1,
+        "wr": 0.0,
+        "net_sol": -0.111
+      },
+      "Schoen": {
+        "trades": 16,
+        "wr": 37.5,
+        "net_sol": -0.328
+      },
+      "Gang_0SOL": {
+        "trades": 4,
+        "wr": 25.0,
+        "net_sol": -0.369
+      },
+      "Bundler_EeX": {
+        "trades": 15,
+        "wr": 26.7,
+        "net_sol": -0.592
+      },
+      "Trenchman": {
+        "trades": 19,
+        "wr": 21.1,
+        "net_sol": -0.592
+      }
+    },
+    "by_exit_reason": {
+      "wallet_exit": 52,
+      "manual_close": 15,
+      "stop_loss_20pct": 12,
+      "stop_loss_10pct": 12,
+      "tp_15pct": 9,
+      "stop_loss_15pct": 4,
+      "jarvis_close": 1,
+      "take_profit_trail_142pct": 1,
+      "take_profit_trail_18pct": 1,
+      "take_profit_42pct": 1
+    },
+    "hold_bucket_counts": {
+      "<2min": 85,
+      "2-5min": 24,
+      "5-15min": 5,
+      "15-60min": 5,
+      ">60min": 0
+    },
+    "hold_bucket_wins": {
+      "<2min": 26,
+      "2-5min": 12,
+      "5-15min": 2,
+      "15-60min": 3,
+      ">60min": 0
+    },
+    "first_trade": "2026-04-06T11:09:35.843574Z",
+    "last_trade": "2026-04-18T00:13:58.430599Z"
+  }
+}

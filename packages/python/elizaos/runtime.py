@@ -169,9 +169,11 @@ class AgentRuntime(IAgentRuntime):
         self._action_planning_option = action_planning
         self._llm_mode_option = llm_mode
         self._check_should_respond_option = check_should_respond
-        self._agent_id = (
+        _raw_agent_id = (
             agent_id or resolved_character.id or string_to_uuid(resolved_character.name)
         )
+        # Ensure agent_id is always a string (protobuf Memory expects str, not uuid.UUID)
+        self._agent_id = str(_raw_agent_id) if _raw_agent_id is not None else string_to_uuid("agent")
         self._character = resolved_character
         self._adapter = adapter
         self._conversation_length = conversation_length
@@ -193,6 +195,9 @@ class AgentRuntime(IAgentRuntime):
         self._send_handlers: dict[str, SendHandlerFunction] = {}
         self._state_cache: dict[str, State] = {}
         self._STATE_CACHE_MAX = 200
+        # In-memory fallback message store keyed by room_id string → list[Memory].
+        # Used when no database adapter is present so RECENT_MESSAGES works.
+        self._memory_store: dict[str, list[Any]] = {}
         self._current_run_id: UUID | None = None
         self._current_room_id: UUID | None = None
         self._action_results: dict[str, list[ActionResult]] = {}
@@ -1665,8 +1670,8 @@ class AgentRuntime(IAgentRuntime):
         """
         import time as _time
 
-        _user_id = user_id or as_uuid(str(uuid.uuid4()))
-        _room_id = room_id or as_uuid(str(uuid.uuid4()))
+        _user_id = as_uuid(str(user_id)) if user_id is not None else as_uuid(str(uuid.uuid4()))
+        _room_id = as_uuid(str(room_id)) if room_id is not None else as_uuid(str(uuid.uuid4()))
         message = Memory(
             id=as_uuid(str(uuid.uuid4())),
             entity_id=_user_id,
@@ -1676,7 +1681,26 @@ class AgentRuntime(IAgentRuntime):
             created_at=int(_time.time() * 1000),
         )
 
-        result = await self.message_service.handle_message(self, message)
+        # Collect all Content objects produced by action callbacks (e.g. REPLY, GET_TOKEN_PRICE)
+        callback_contents: list[Content] = []
+
+        async def _collect(content: Content) -> None:
+            callback_contents.append(content)
+
+        result = await self.message_service.handle_message(self, message, callback=_collect)
+
+        # Prefer the last callback content (final answer after action execution) over the
+        # initial planning-step response stored in response_messages.
+        if callback_contents:
+            last = callback_contents[-1]
+            return Memory(
+                id=as_uuid(str(uuid.uuid4())),
+                entity_id=self.agent_id,
+                agent_id=self.agent_id,
+                room_id=_room_id,
+                content=last,
+                created_at=int(_time.time() * 1000),
+            )
 
         if result.response_messages:
             return result.response_messages[0]
@@ -1832,7 +1856,15 @@ class AgentRuntime(IAgentRuntime):
             get_memories(room_id=room_id, limit=10)
         """
         if not self._adapter:
-            return []
+            # Fallback: read from in-memory store
+            room_key = str(room_id) if room_id is not None else (
+                str(params.get("roomId", "")) if params else ""
+            )
+            if not room_key:
+                return []
+            stored = self._memory_store.get(room_key, [])
+            _limit = limit if limit is not None else 20
+            return stored[-_limit:] if stored else []
         # Start with provided params or empty dict
         merged_params = dict(params) if params else {}
         # Explicit keyword arguments take precedence over params dict
@@ -1852,6 +1884,13 @@ class AgentRuntime(IAgentRuntime):
 
     async def get_memory_by_id(self, id: UUID) -> Any | None:
         if not self._adapter:
+            # Search in-memory store
+            id_str = str(id)
+            for messages in self._memory_store.values():
+                for m in messages:
+                    m_id = getattr(m, "id", None) or (m.get("id") if isinstance(m, dict) else None)
+                    if m_id and str(m_id) == id_str:
+                        return m
             return None
         return await self._adapter.get_memory_by_id(id)
 
@@ -1903,7 +1942,18 @@ class AgentRuntime(IAgentRuntime):
         **kwargs: object,
     ) -> UUID:
         if not self._adapter:
-            raise RuntimeError("Database adapter not set")
+            # Fallback: store in-memory so RECENT_MESSAGES provider can find it
+            if memory is not None:
+                room_id_val = (
+                    str(memory.room_id) if hasattr(memory, "room_id") and memory.room_id
+                    else str(memory.get("room_id", "")) if isinstance(memory, dict)
+                    else ""
+                )
+                if room_id_val:
+                    if room_id_val not in self._memory_store:
+                        self._memory_store[room_id_val] = []
+                    self._memory_store[room_id_val].append(memory)
+            return as_uuid(str(uuid.uuid4()))
         return await self._adapter.create_memory(
             memory, table_name, bool(unique) if unique is not None else False
         )
@@ -2252,6 +2302,9 @@ class AgentRuntime(IAgentRuntime):
             for key, value in state_fields.items():
                 if key not in ("text", "values", "data"):
                     context[key] = value
+            # Flatten state.extra Struct into context
+            if isinstance(state_fields.get("extra"), dict):
+                context.update(state_fields["extra"])
 
             # Add state.data properties
             if hasattr(state, "data"):
@@ -2262,6 +2315,17 @@ class AgentRuntime(IAgentRuntime):
             if hasattr(state, "values"):
                 values_fields = extract_fields(state.values)
                 context.update(values_fields)
+                # Flatten the extra Struct from values into context
+                if isinstance(values_fields.get("extra"), dict):
+                    context.update(values_fields["extra"])
+
+            # Add random names for {{name1}}, {{name2}}, etc. (TypeScript parity: composeRandomUser)
+            _example_names = ["Alex", "Jordan", "Sam", "Taylor", "Riley",
+                              "Morgan", "Casey", "Quinn", "Avery", "Blake"]
+            for _ni in range(1, 11):
+                _nk = f"name{_ni}"
+                if _nk not in context:
+                    context[_nk] = _example_names[(_ni - 1) % len(_example_names)]
 
             # Add smart retry context if present
             if "_smartRetryContext" in context:

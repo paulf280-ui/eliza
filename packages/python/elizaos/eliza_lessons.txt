@@ -1,0 +1,140 @@
+=== JARVIS LESSONS — CURATED FROM 31 CONFIRMED MONSTER TRADES ===
+Last rebuilt: 2026-04-05. All rules below are derived from real monster token data, not AI inference.
+DO NOT add lessons without citing a specific trade or pattern from the monster_addresses.json file.
+
+=== ENTRY FILTERS (iron-clad — backed by 31-monster dataset) ===
+[monster-dna] Buy ratio 50-65% is the primary signal. All 31 monsters had h24 buy_ratio in this range. Below 50% = selling pressure. Above 65% = euphoric top-buyers. Zero exceptions for tokens under $200k liq.
+[monster-dna] Exception: tokens with liq > $200k AND age > 180 days — floor drops to 46%. Evidence: boden (49.2%, $310k liq, 762d), pippin (48.7%, $5M liq, 511d). Both were genuine monsters.
+[monster-dna] Vol/liq ratio at entry: 1-8x. Below 1x = dead token (no momentum). Above 8x = post-pump chasing. Evidence: FML had 0.2x (dead), Quality had 34.9x (already peaked).
+[monster-dna] Entry must be QUIET. scout_max_m5_pct=15%. Monsters had flat m5 at entry (-10% to +10%). Buying mid-pump (m5 > 15%) is the #1 loss driver. Evidence: all 12+ early_stop_loss trades entered above m5=15%.
+[monster-dna] Age gates are critical. Raydium/Meteora: minimum 1h. PumpSwap scouts: minimum 2h. Brand new tokens rug at 10x the rate of established ones.
+[monster-dna] Liquidity floors: $25k minimum for C/D scouts. Tokens under $10k liq are rug territory. The $3-8k liq tokens we bought in March were the main loss driver.
+[monster-dna] strategy_b_min_liq_usd = $10k. Grad tokens start at ~$5-15k and grow fast. 7x7=49 had $11.5k at graduation and went +1547%. Never set above $10k.
+
+=== EXIT STRATEGY (from monster time-to-peak analysis) ===
+[monster-dna] Trailing stop is the ONLY correct exit for monster trades. Fixed TP at 30% or 60% would have exited all 31 monsters at a fraction of their peak. Average monster peak: +400% (range +39% to +11683%).
+[monster-dna] Trailing stop 12% below peak. Gives enough room on PumpSwap volatility (spikes/dips are 5-15%). Tighter than 10% = noise exits. Looser than 15% = gives back too much.
+[monster-dna] Average hold time to peak: Raydium 6-10h, PumpSwap 14-48h. Do not exit positions after 1-2h unless stop triggered.
+
+=== STRATEGY-SPECIFIC RULES ===
+[monster-dna] Strategy B (grad-snipe): PumpSwap graduation is the first entry signal. Top monsters (BURNIE, milkers, Dunald, ELUN, fluide) were all caught at graduation. Fast grads (<30min) are the strongest signal.
+[monster-dna] Strategy C (Raydium scout): Best monsters on Raydium were 6-519 days old. SpaceX (+11683%), NoHat, PISS, LOLA, TARO all caught by scout. Native Raydium tokens (not pump.fun graduates) are the target.
+[monster-dna] Strategy D (Meteora scout): GSD, BIGLY, apple, HACHI confirmed Meteora monsters. Same DNA as Raydium — quiet entry, buy_ratio 52-60%, age >1h.
+[monster-dna] Strategy A2 (BC sniper): BURNIE was the BC entry that became the biggest winner. BC tokens that graduate to PumpSwap can be held through graduation (auto-transitions dex).
+
+=== NARRATIVE PATTERNS ===
+[monster-dna] Top performing narratives: gambling_finance (black, BURNIE), ai_agent_tech (NUERO, pippin), humor_universal (LOL, 7x7=49), political_meme (boden, OPK), emotional_loyalty_cultural (HACHI, pippin/yoheinakajima).
+[monster-dna] J7tracker bundler signal: if pump.fun description contains 'j7tracker.com' = organized coordinated launch = positive signal. Evidence: GSD, ELUN.
+[monster-dna] X community link: if website = x.com/i/communities/... = persistent organized buying group = positive signal.
+[monster-dna] KOL creator: if token creator has verified Twitter following (e.g. pippin/yoheinakajima = BabyAGI creator, 1.8M followers) = recurring wave catalyst.
+
+=== WHAT DOES NOT WORK ===
+[monster-dna] Viral keyword bonus is permanently disabled (narrative_keyword_score=0). Tokens called 'Trump', 'Elon', 'Pepe' got +2 score bonus but rugged at same rate. The NAME does not predict the pump.
+[monster-dna] High Fear & Greed (>70) does NOT make trading safer or better. Our best monster entries happened across all F&G levels. Do not loosen filters in greed or tighten in fear — the monster DNA works in all conditions.
+[monster-dna] Disabling strategies on short-term performance is destructive. A2, C, D were all responsible for confirmed monster entries. Never disable based on fewer than 20 trades.
+
+=== FILTER MISS LOG (tokens we rejected that pumped) ===
+[2026-04-05] 7x7=49 (+1547%): Blocked at graduation — strategy_b_min_liq_usd was $13.5k, token had $11.5k. FIX: locked at $10k.
+[2026-04-05] OPK (+191%): Not in scan window. 519-day Raydium revival. Buy_ratio h1=44% post-peak declining — correct to skip at that moment. Entry window is narrow on revivals.
+[2026-04-05] NUERO (+122%): Not in scan window. h1 buy_ratio=66% at check (1pp over ceiling). h24=57% in range. Timing issue.
+
+=== ANTI-FABRICATION RULES FOR JARVIS ===
+[system] NEVER cite "consecutive losses" without listing specific trade IDs.
+[system] NEVER claim a strategy is "failing" with fewer than 10 trades of data.
+[system] NEVER issue ADJUST commands with fewer than 15 trades in the current session.
+[system] If in doubt: NO_CHANGES_NEEDED. The monster DNA filters are already optimal. Trust the research.
+[2026-04-05 11:35] WIN: 3WsibZCj (pumpswap) +11% via profit in 8min score=18 [trailing_stop_loss]
+[2026-04-06 05:36] WIN: VpRP3m5w (pumpswap) +16% via profit in 10min score=18 [trailing_stop_loss]
+[2026-04-06 11:40] [3brain] Implement a scoring system with a minimum score of 30 for trades to ensure we're targeting higher-quality tokens and reducing early_stop_loss occurrences.
+[2026-04-06 11:40] [3brain] Avoid aggressively trading in Extreme Fear market contexts, as memecoin momentum may be suppressed, increasing the likelihood of losses.
+[2026-04-06 11:40] [3brain] Consider a liquidity filter requiring a minimum liquidity of $10,000 to ensure we're entering the market with sufficient liquidity and reducing the likelihood of early losses.
+[2026-04-06 11:40] [3brain] Implement a minimum hold time of 300 seconds to allow for market stabilization and reduce the likelihood of early losses.
+[2026-04-06 11:40] [3brain] Apply a filter to DEXs with a higher early exit rate, such as pumpswap, to avoid excessive risk and optimize trading performance.
+[2026-04-06 11:40] [3brain] Monitor and avoid tokens with animal-themed names or symbols until market conditions improve, as they seemed to perform relatively worse in the analyzed trades.
+[2026-04-06 11:40] [3brain] Consider a market timing strategy where we adjust our trading approach during Extreme Fear or Greed market conditions, potentially opting for more conservative trading in times of extreme market sentiment.
+[2026-04-06 11:40] [3brain] Integrate a sentiment analysis component to monitor changes in the Fear & Greed index and adjust our trading strategy accordingly to optimize performance.
+[2026-04-06 11:50] [3brain] **Prefer higher-liquidity tokens with social media presence** to minimize early_stop_loss trades and increase the chances of profitable exits.
+[2026-04-06 11:50] [3brain] **Implement a DEX weight adjustment** to reduce the weight of pumpswap and minimize early_stop_loss trades resulting from high trading volume and liquidity.
+[2026-04-06 11:50] [3brain] **Increase the minimum holding period to 300 seconds or more** to avoid buying tokens during the initial pump phase and allow for more profitable trades.
+[2026-04-06 11:50] [3brain] **Monitor and prioritize tokens with 'Meme' or 'Animal' narrative categories**, as these have shown a preference for more promising short-term trends within the crypto market.
+[2026-04-06 11:50] [3brain] **Consider a cautionary approach when entering trades during Extreme Fear environment**, with an increased focus on stop-loss mechanisms and a preference for longer-term hold-and-hope strategies.
+[2026-04-06 11:50] [3brain] **Regularly track and update the Fear & Greed index**, using this information to adjust our trading strategy and optimize performance in response to changing market sentiment.
+[2026-04-06 11:50] [3brain] **Improve token quality filters by excluding tokens with low liquidity (< $10,000)** to reduce the likelihood of unprofitable trades due to poor market conditions.
+[2026-04-06 11:50] [3brain] **Adjust entry timing by looking for confirmation of a market trend** before initiating trades to maximize the chances of profitable exits.
+[2026-04-06 11:58] [3brain] Implement a non-meme or animal-based token filter for a higher success rate, as they were among the better-performing group in analysis.
+[2026-04-06 11:58] [3brain] Prioritize tokens with stagnant_exit exit patterns, as they showed an advantage in terms of fewer losses compared to trailing_stop_loss and early_stop_loss exits.
+[2026-04-06 11:58] [3brain] Adjust entry timing by targeting tokens with higher m5 liquidity above +5% to increase chances of profitable exits, considering the analysis of m5 liquidity metrics.
+[2026-04-06 11:58] [3brain] Use a more conservative DEX, such as pump_fun, which has a lower fill rate and fewer early_stop_loss exits compared to pumpswap.
+[2026-04-06 11:58] [3brain] Increase minimum social media engagement score to 10 to filter out low-quality tokens and improve token quality, following the entry quality analysis.
+[2026-04-06 11:58] [3brain] Avoid buying tokens with low liquidity, following the existing lesson of excluding tokens with low liquidity (< $10,000), to reduce the likelihood of unprofitable trades.
+[2026-04-06 11:58] [3brain] Consider a more cautious approach during extreme fear, when the Fear & Greed Index is below 20, to limit aggressive trading and reduce potential losses, based on the market timing findings.
+[2026-04-06 12:04] [3brain] Avoid ultra-meme tokens (e.g., Gaytarded, Sam Altcoin) due to their variance and losses, and prioritize tokens from other narrative categories instead.
+[2026-04-06 12:04] [3brain] Implement a hold time threshold of 90 seconds or less for early_stop_loss trades to buy at market tops and reduce holding onto losing positions.
+[2026-04-06 12:04] [3brain] Prioritize tokens with scores of 20 or above to reduce early_stop_loss trades and focus on higher-quality tokens.
+[2026-04-06 12:04] [3brain] Limit trades to pump_fun and consider implementing additional risk management strategies for pumpswap trades due to its high early exit rate.
+[2026-04-06 12:04] [3brain] Monitor and adjust entry strategy according to Fear & Greed Index, as the current market context seems to have little impact on our win rate.
+[2026-04-06 12:04] [3brain] Use tokens with 'animal' or 'human-related' names as a filter to exclude them from being considered for trades, following the observed narrative patterns.
+[2026-04-06 12:04] [3brain] Focus on 'Nonsensical' named tokens for trading opportunities, as they showed a mix of losses and wins, making it challenging to determine a definitive correlation with losses.
+[2026-04-06 12:04] [3brain] Set the maximum liquidity threshold for tokens traded at $20,000 to reduce trading unliquid assets and increase the chances of successful trades.
+[2026-04-06 12:20] [3brain] Avoid entering trades when the 'm5' value is above 0%, indicating a potentially overextended market, as this may lead to early_stop_loss exits.
+[2026-04-06 12:20] [3brain] Implement a token quality filter to prioritize tokens with scores above 10 and fill percentages above 20% to increase the chances of successful trades.
+[2026-04-06 12:20] [3brain] Prioritize trades on the pump_fun DEX over other DEX platforms, such as pumpswap, as pump_fun has a higher win rate and lower early exit rate.
+[2026-04-06 12:20] [3brain] Be cautious of tokens with names that evoke strong emotions, such as those derived from celebrities, as these may not provide a clear edge in trading.
+[2026-04-06 12:20] [3brain] Monitor the Fear & Greed index closely, as extreme fear ( Fear index below 13/100) may indicate a potential rebound opportunity, allowing for more aggressive trading.
+[2026-04-06 12:20] [3brain] Use a strict liquidity threshold to ensure trades are only executed when the token's liquidity exceeds $50,000 to minimize the impact of low-liquidity trades.
+[2026-04-06 12:20] [3brain] Limit the number of trades executed per day to prevent over-trading and increase the chances of successful trades.
+[2026-04-06 14:20] [3brain] Implement a minimum hold time of 5 minutes to avoid buying too early and selling too quickly based on analyst 2's findings on entry timing.
+[2026-04-06 14:20] [3brain] Set a token quality filter with a minimum score of 20 and liquidity of $10,000 to increase the chances of successful trades, as suggested by analyst 2.
+[2026-04-06 14:20] [3brain] Use a weighted average of win rate and early exit rate to select the DEX with the best performance, rather than relying on a single DEX, based on analyst 2's observations.
+[2026-04-06 14:20] [3brain] Avoid animal-themed tokens unless they have a strong supporting narrative or have gained significant popularity, as their slightly better win rate may be offset by higher risks.
+[2026-04-06 14:20] [3brain] Use a filter to exclude tokens with names that are considered "unclassified" or "nonsense," as they have the lowest average win rate.
+[2026-04-06 14:20] [3brain] Set a strict filter to exclude tokens traded on the pumpswap DEX due to its high early exit rate, as suggested by analyst 2.
+[2026-04-06 14:20] [3brain] Monitor the Fear & Greed Index for extreme fear conditions (below 13/100) and use this as a signal to increase trading aggressiveness, as hinted at by both analysts.
+[2026-04-06 14:20] [3brain] Consider implementing a narrative-based filter that favors tokens with stories surrounding well-known or popular items to increase the chances of successful trades.
+[2026-04-06 15:25] [3brain] Implement a minimum hold time of 300 seconds to reduce the number of early_stop_loss trades and allow the market to develop momentum before entering.
+[2026-04-06 15:25] [3brain] Filter out tokens scored below 10 and fill percentage below 20% to ensure only well-received tokens are traded and reduce early sell pressure.
+[2026-04-06 15:25] [3brain] Prioritize trading tokens found in the **Animal** and **Miscellaneous** categories, as these showed a higher win rate compared to the **Meme** category.
+[2026-04-06 15:25] [3brain] Avoid trading tokens listed on the pumpswap DEX if they have an early exit rate above 10%, as this increases the likelihood of a quick sell.
+[2026-04-06 15:25] [3brain] Increase trading aggressiveness when the Fear & Greed Index is below 13/100 to minimize losses in a high-risk environment.
+[2026-04-06 15:25] [3brain] Set a filter for tokens containing the names "Gaytarded" or "Penis" to avoid potential correlation with meme narratives and losses.
+[2026-04-06 15:25] [3brain] Optimize the selection of decentralized exchanges (DEXs) by prioritizing pumps using more competitive DEXs like pump_fun.
+[2026-04-06 15:25] [3brain] Reevaluate the performance of tokens with narrative-based storylines surrounding well-known or popular items and adjust the trading strategy accordingly.
+[2026-04-06 15:46] [3brain] Implement a token selection filter that prioritizes Animal narrative-based tokens, given their observed better win rates (2/2 wins), with a preference for names containing "Animal" or related words.
+[2026-04-06 15:46] [3brain] Establish a minimum hold time of 300s to ensure the market has enough momentum before entering a trade, as indicated by the low hold time (average 204s) in early_stop_loss trades.
+[2026-04-06 15:46] [3brain] Set a token quality filter to consider tokens with a minimum score of 30 and a fill percentage of 10% to ensure better liquidity and exit opportunities, as observed in the data analysis.
+[2026-04-06 15:46] [3brain] Limit trading on pumpswap to only high-liquidity tokens (fill percentage > 20%) to reduce early exit rates, as pumpswap has shown a poor early exit rate of 25% of all trades.
+[2026-04-06 15:46] [3brain] Increase caution when interacting with the market in an Extremely Fearful state, as it may indicate increased volatility and potential market shifts, suggesting a more conservative entry strategy.
+[2026-04-06 15:46] [3brain] Gradually increase market participation by setting 15-20 minutes as an ultra-fast grad and any grad above 30 minutes as slow, to gauge the effect of speed on trading performance.
+[2026-04-06 15:46] [3brain] Use the Fear & Greed index as a secondary market timing indicator, in conjunction with the Extremely Fearful state, to inform more aggressive or conservative trading approaches.
+[2026-04-06 15:46] [3brain] Monitor the performance of the 'Pumpswap' pump type, given its observed poor early exit rate and high score (average 18.2) in early_stop_loss trades, and adjust trading strategy accordingly.
+[2026-04-06 17:49] [3brain] Avoid tokens with high graduation speed, as rapid price increases may lead to premature exit at a loss.
+[2026-04-06 17:49] [3brain] Implement a minimum hold time of 300s for tokens to allow for sufficient momentum building before exiting.
+[2026-04-06 17:49] [3brain] Prioritize tokens with a score above 20 and a fill percentage above 50% to improve token quality and increase the odds of profitable trades.
+[2026-04-06 17:49] [3brain] Monitor and adjust the DEX selection strategy, prioritizing 'pumpswap' only when the bot's confidence level is above 50% and the token has a score above 30.
+[2026-04-06 17:49] [3brain] Consider using the presence of casual phrases like 'Dude' in the token name as a filtering criterion to exclude struggling meme tokens.
+[2026-04-06 17:49] [3brain] Consider the Fear & Greed Index as a primary market timing indicator when it drops below 24, signaling a highly cautious market, and adjust trading strategy accordingly.
+[2026-04-06 17:49] [3brain] Increase the trading bot's confidence level threshold to 60% before entering a trade to minimize unnecessary risk-taking.
+[2026-04-06 17:49] [3brain] Regularly review and refine the Solana DEX selection strategy, prioritizing those with more liquidity and robust order book structures to improve early exit rates.
+[2026-04-06 18:31] [3brain] Filter out tokens with meme-inspired narrative patterns, such as 'Pudgy Penguins', to reduce the risk of inconsistent returns and promote more stable growth.
+[2026-04-06 18:31] [3brain] Implement a momentum filter requiring a minimum M5 return of 5% before entering a trade, to ensure tokens with significant growth potential are considered.
+[2026-04-06 18:31] [3brain] Increase the minimum hold time to 600 seconds to allow tokens to gain significant momentum before exiting trades.
+[2026-04-06 18:31] [3brain] Enforce a minimum liquidity of $10,000 for tokens to be considered for trade, reducing the number of low-quality tokens and minimizing early exit risks.
+[2026-04-06 18:31] [3brain] Improve token quality filters by setting a minimum score of 15 to ensure higher-quality tokens with greater potential for growth are selected.
+[2026-04-06 18:31] [3brain] Regularly review the Solana DEX selection strategy, prioritizing those with more liquidity and robust order book structures to improve early exit rates and increase profitability.
+[2026-04-06 18:31] [3brain] Monitor the Fear & Greed Index and adjust the trading strategy to be more conservative when the index drops below 20, as this has been associated with a significantly reduced win rate.
+[2026-04-06 18:31] [3brain] Consider avoiding DEXs like pumpswap that have a higher early exit rate due to their aggressive nature and higher number of trades.
+[2026-04-06 20:05] [3brain] Implement an "Animal-Narrative Filter" that favors tokens with animal names and dismisses those with celebrity-derivative or nonsensical names to improve the overall win rate and reduce losses.
+[2026-04-06 20:05] [3brain] Optimize exit timing by prioritizing ultra-fast graduates (<4 minutes) with a win rate of +2.11%, outperforming slow graduates and reducing potential losses.
+[2026-04-06 20:05] [3brain] Utilize the Fear & Greed Index to adjust the trading frequency: decrease the number of trades when the index drops below 15 and increase trades when the index is above 25 to manage risk and potential gains.
+[2026-04-06 20:05] [3brain] Set a minimum hold time of 300 seconds to reduce early buys, improve token quality scores, and increase the fill rate, leading to better trading outcomes.
+[2026-04-06 20:05] [3brain] Increase the minimum score for token selection to 20 and require a fill rate of 10% to improve the overall quality of trades entered and the chances of winning.
+[2026-04-06 20:05] [3brain] Exclude DEXs with an early stop-loss rate above 20% to reduce the number of early losses and maintain better profitability.
+[2026-04-06 20:05] [3brain] Monitor and adjust the market-timing filters to avoid entry at extreme fear (Fear & Greed Index: 13), maintaining a conservative approach to minimize potential losses.
+[2026-04-06 20:24] [3brain] **Increase hold time for more momentum capture**: Implement a minimum hold time of 300s to reduce early_stop_loss trades and improve profitability. This can help capture more momentum and reduce the number of trades where we're entering too early.
+[2026-04-06 20:24] [3brain] **Filter out low-quality tokens with a score threshold**: Introduce a score threshold (e.g., 20) to filter out low-quality tokens and increase fill percentage. This should improve the quality of trades entered and the chances of winning.
+[2026-04-06 20:24] [3brain] **Adjust DEX entry conditions to reduce early exit rate**: Modify pumpswap's entry conditions to introduce a more conservative momentum indicator or increase the minimum liquidity requirement. This can help reduce the early exit rate and improve profitability.
+[2026-04-06 20:24] [3brain] **Avoid trading when Fear & Greed Index is at Extreme Fear**: Modify market-timing filters to avoid entry at extreme fear (Fear & Greed Index: 13) and maintain a more conservative approach. This can help minimize potential losses.
+[2026-04-06 20:24] [3brain] **Prioritize animal narrative tokens**: Prefer tokens with an animal narrative, as they seem to have a higher win rate based on token name patterns. This can help filter out some of the riskier, potentially loss-causing trades.
+[2026-04-06 20:24] [3brain] **Monitor and adjust DEX patterns**: Continuously monitor DEX patterns, including pumpswap's early exit rate, and adjust entry conditions accordingly to optimize profitability.
+[2026-04-06 20:24] [3brain] **Review liquidity requirements for token selection**: Consider introducing liquidity requirements or adjusting token selection criteria based on liquidity to improve fill percentage and trade quality.
+[2026-04-06 20:24] [3brain] **Increase focus on Ultra-fast grad (<6 min) trades**: Given the 1 win (+11%) in the ultra-fast grad category, consider focusing more on trades with these characteristics to improve win rate and profitability.
