@@ -49,8 +49,8 @@ MONSTER_STALLED_WINNER_LOW_PCT  = 12.0  # legacy
 MONSTER_STALLED_WINNER_HIGH_PCT = 18.0  # legacy
 MONSTER_STALLED_WINNER_SECS     = 0  # DISABLED
 
-MONSTER_MAX_CONCURRENT    = 1      # 1 slot — single concentrated position
-MONSTER_DEFAULT_SIZE_SOL  = 0.45   # one trade × 0.45 SOL — leaves headroom for full 50% slippage on 0.77 SOL wallet
+MONSTER_MAX_CONCURRENT    = 2      # 2 slots — diversified positions (test multi-runner scenario)
+MONSTER_DEFAULT_SIZE_SOL  = 0.2    # 0.2 SOL per trade × 2 positions = 0.4 SOL max in use (conservative per-trade, diversified)
 
 # Don't re-enter a mint that recently lost. Learned from MIM/hijabunc re-entry
 # bleed 2026-04-20 (lost -100%, re-entered at lower liq, lost again at -56/-36/-25).
