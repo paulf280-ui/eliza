@@ -603,19 +603,27 @@ class AICascade:
         feed: DataFeed,
         session: aiohttp.ClientSession,
     ) -> AIDecision | None:
-        """Run the appropriate AI tier and return an actionable decision.
+        """Run the appropriate AI tier for 30-40% range tokens only.
 
-        AI is now PRIMARY for monitored positions. Thresholds are set to fire
-        BEFORE the -20% safety-net SL in the price refresh task.
+        New strategy (2026-05-03): AI evaluates ONLY tokens in 30-40% PnL range.
+        Outside this range, let hard TP (+100%) and floor (-25%) handle exits.
+        For 30-40% tokens: Groq checks MC/holders/liq trends and decides.
 
         Exit thresholds:
-          Groq:   SELL + confidence ≥ 0.75 → immediate exit
-          Gemini: SELL + confidence ≥ 0.70 → exit
-          Sonnet: SELL + confidence ≥ 0.65 → exit
-          Opus:   any SELL → exit
+          Groq:   SELL + confidence ≥ 0.75 → immediate exit (30-40% range only)
+          Outside 30-40%: return None (skip AI)
         """
         now = time.time()
         age_secs = now - pos.get("entry_ts", now)
+
+        # Guard: only evaluate AI for tokens in 30-40% PnL range
+        current_price = feed.current_price if feed else 0.0
+        entry_price = pos.get("entry_price", 0.0)
+        if entry_price > 0 and current_price > 0:
+            pnl_pct = ((current_price / entry_price) - 1.0) * 100
+            if not (30.0 <= pnl_pct <= 40.0):
+                # Outside target range — skip AI, let TP and floor handle
+                return None
 
         # Probe single-whale concentration from on-chain swap history (cached
         # 10s, so multiple brain tiers within a window share one fetch). Only

@@ -32,24 +32,22 @@ from typing import Any
 import aiohttp
 
 # ─── Config ───────────────────────────────────────────────────────────────
-# 2026-04-26 hard-TP era: 1 slot × 0.6 SOL, full exit at +20%, no moonbag.
-# Brains rule the band between catastrophic floor (-25%) and TP (+20%).
-MONSTER_TP1_GAIN_PCT     = 20.0    # hard TP — full exit, no moonbag
-MONSTER_TP1_SELL_FRACTION = 1.0    # sell 100% at TP (no 25% tail to rug)
-MONSTER_PRE_TP1_FLOOR_PCT = -25.0  # catastrophic floor only — brains manage between -25 and +20
-MONSTER_BE_TRAIL_ACTIVATE_PCT = 20.0  # legacy — unused while TP1 is full exit
-MONSTER_BE_TRAIL_TARGET_PCT   = 10.0  # legacy — unused while TP1 is full exit
-MONSTER_BE_TRAIL_ENABLED      = False # legacy — unused while TP1 is full exit
-MONSTER_FLAT_TIMEOUT_SECS = 60 * 60  # 60 min pre-TP with pnl in flat zone → exit
+# 2026-05-03 lottery-TP era: +100% TP → sell 90%, keep 10% as lottery ticket.
+# User can manually close the 10% remainder from phone when it moons.
+# 30-40% range tokens: Groq evaluates MC/holders/liq trends, auto-exits if declining.
+MONSTER_TP1_GAIN_PCT     = 100.0   # TP at +100% — maximize runner profits
+MONSTER_TP1_SELL_FRACTION = 0.9    # sell 90% at TP, keep 10% as lottery play
+MONSTER_PRE_TP1_FLOOR_PCT = -25.0  # catastrophic floor only — safety rail
+MONSTER_BE_TRAIL_ACTIVATE_PCT = 20.0  # legacy — unused
+MONSTER_BE_TRAIL_TARGET_PCT   = 10.0  # legacy — unused
+MONSTER_BE_TRAIL_ENABLED      = False # legacy — unused
+MONSTER_FLAT_TIMEOUT_SECS = 0  # DISABLED — flat_gate was misfiring
 MONSTER_FLAT_ZONE_PCT     = 5.0    # ±5% = "flat" (around break-even)
 
-# Stalled-winner gate: pnl camped near TP without breaking through → bank it.
-# Triggers at 2026-04-26 user request: if we're already +12-18% and idling
-# for 10 min, take what we've got rather than waiting for a +20% break that
-# may never come. Bypassed by an active brain HOLD vote at conf ≥ 0.75.
-MONSTER_STALLED_WINNER_LOW_PCT  = 12.0  # bottom of stalled-winner band
-MONSTER_STALLED_WINNER_HIGH_PCT = 18.0  # top of stalled-winner band (just below TP)
-MONSTER_STALLED_WINNER_SECS     = 10 * 60  # 10 min in band → exit
+# Stalled-winner gate: DISABLED in new strategy
+MONSTER_STALLED_WINNER_LOW_PCT  = 12.0  # legacy
+MONSTER_STALLED_WINNER_HIGH_PCT = 18.0  # legacy
+MONSTER_STALLED_WINNER_SECS     = 0  # DISABLED
 
 MONSTER_MAX_CONCURRENT    = 1      # 1 slot — single concentrated position
 MONSTER_DEFAULT_SIZE_SOL  = 0.45   # one trade × 0.45 SOL — leaves headroom for full 50% slippage on 0.77 SOL wallet
@@ -561,45 +559,22 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
         tag = f"tp_hard_{int(tp1_gain_pct)}pct"
         return tag, tp1_sell_frac
 
-    # ── Stalled-winner exit: camped in [+12%, +18%] for 10min → bank ─────
-    # User-requested 2026-04-26: if we're up ~+15% but the move stalls
-    # without breaking through to the +20% TP, take the profit rather than
-    # sit there hoping. Resets if pnl exits the band in either direction.
-    if not tp1_fired:
-        in_stalled_zone = (
-            MONSTER_STALLED_WINNER_LOW_PCT <= pnl_pct <= MONSTER_STALLED_WINNER_HIGH_PCT
-        )
-        first_stalled = pos.get("first_in_stalled_winner_ts")
-        if in_stalled_zone:
-            if first_stalled is None:
-                pos["first_in_stalled_winner_ts"] = now
-            elif (now - first_stalled) >= MONSTER_STALLED_WINNER_SECS:
-                return f"stalled_winner_{pnl_pct:.0f}pct_{int((now - first_stalled) / 60)}min", 1.0
-        else:
-            pos["first_in_stalled_winner_ts"] = None
+    # ── Stalled-winner exit: DISABLED in new +100% TP strategy
+    # With lottery TP, we don't need artificial stall exits.
 
     # ── Catastrophic floor → full exit (brains rule above this) ─────────
     # creator_alpha uses -75% (wide), default uses -25%
     if not tp1_fired and pnl_pct <= floor_pct:
         return f"pre_tp1_floor_{pnl_pct:.0f}pct", 1.0
 
-    # ── Pre-TP flat gate: flat for 60min → full exit ────────────────────
-    if not tp1_fired:
-        in_flat = abs(pnl_pct) <= MONSTER_FLAT_ZONE_PCT
-        first = pos.get("first_in_flat_zone_ts")
-        if in_flat:
-            if first is None:
-                pos["first_in_flat_zone_ts"] = now
-            elif (now - first) >= MONSTER_FLAT_TIMEOUT_SECS:
-                return f"flat_gate_{int((now - first) / 60)}min", 1.0
-        else:
-            pos["first_in_flat_zone_ts"] = None
+    # ── Pre-TP flat gate: DISABLED (was misfiring, closing too early)
+    # New strategy: let TP (+100%) and Groq evaluator (30-40% range) handle exits.
 
-    # ── Post-TP1 moonbag state machine ────────────────────────────────────
-    # The 25% bag rides out the cooldown. We track the post-TP1 running low
-    # and only "arm" the brain cascade once the price recovers +50% off that
-    # low (V-recovery confirming Leg 2). During DORMANT, discretionary exits
-    # are suppressed — we let the bag breathe. Only safety rails are active:
+    # ── Post-TP1 lottery ticket state machine ───────────────────────────────
+    # The 10% bag is the "lottery play" — user can watch on phone and manually close.
+    # We track the post-TP1 running low and only "arm" safety rails once the price
+    # recovers +50% off that low (V-recovery confirming Leg 2). During DORMANT,
+    # exits are suppressed — we let the bag breathe. Only safety rails are active:
     #   - liq < $3k = stuck bag emergency
     #   - 8h dormant cap = don't hold forgotten bags across trading sessions
     if tp1_fired:
