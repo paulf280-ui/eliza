@@ -2481,30 +2481,60 @@ When adjusting a filter, always explain your reasoning based on the data above."
             payload = await request.json()
             events = payload if isinstance(payload, list) else [payload]
             from elizaos.plugins.solana import monster_signals
+            import json as _json
 
             detected = 0
             for ev in events:
                 if not isinstance(ev, dict):
                     continue
-                # Helius sends accountData with accounts touched in transaction
-                # For pump.fun, we just accept any transaction that touches pump.fun
-                # (webhook is already filtered to pump.fun program)
-                # Extract any new mint created in this transaction
-                account_data = ev.get("accountData") or []
 
-                # Extract mint (the token being created)
+                # Helius enhanced format has: accountData, events, fee, feePayer, description
+                # accountData = accounts touched in tx
+                # events = parsed instruction events (often empty for new token creation)
+                # feePayer = transaction signer
+
                 mint = None
-                for tt in (ev.get("tokenTransfers") or []):
-                    candidate = tt.get("mint")
-                    if candidate and candidate not in ("So11111111111111111111111111111111111111112",):
-                        mint = candidate
-                        break
-                if not mint:
-                    continue
+                creator = None
 
-                # Extract creator (signer of the Create instruction)
-                creator = ev.get("feePayer") or ""
+                # Strategy 1: Look in events array for create/initialize events
+                for evt in (ev.get("events") or []):
+                    if not isinstance(evt, dict):
+                        continue
+                    # Event might be: {"type": "create", "account": {...}, ...}
+                    if evt.get("type") in ("create", "initialize", "CreateMint", "InitializeMint"):
+                        # Account being created
+                        account = evt.get("account", {})
+                        if isinstance(account, dict):
+                            mint = account.get("address") or account.get("publicKey")
+                        creator = ev.get("feePayer")
+                        if mint:
+                            break
+
+                # Strategy 2: Look in accountData for newly created token accounts
+                if not mint:
+                    account_data = ev.get("accountData") or []
+                    for acc in account_data:
+                        if not isinstance(acc, dict):
+                            continue
+                        # New token account from pump.fun would have owner=pump.fun program
+                        # Check if this looks like a token mint
+                        owner = acc.get("owner", "")
+                        if owner == "TokenzQL339aYzdqakMMUQvzk6QKL7CKuzP2VgbAM":  # Token program
+                            mint = acc.get("address") or acc.get("pubkey")
+                            creator = ev.get("feePayer")
+                            if mint:
+                                break
+
+                # Strategy 3: Fallback - feePayer as creator (happens when webhook catches early)
                 if not creator:
+                    creator = ev.get("feePayer") or ""
+
+                if not mint or not creator:
+                    # Log once per 100 events to avoid spam
+                    if detected % 100 == 0:
+                        print(f"[helius-webhook-create] ⚠️  No mint/creator found. Keys: {list(ev.keys())}")
+                        if ev.get("accountData"):
+                            print(f"[helius-webhook-create]   accountData[0]: {ev['accountData'][0] if ev['accountData'] else 'empty'}")
                     continue
 
                 # Queue immediate DIRECT ENTRY for this mint
@@ -2520,7 +2550,9 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
             return web.json_response({"detected": detected})
         except Exception as exc:
-            print(f"[helius-webhook-create] error: {exc}")
+            import traceback
+            print(f"[helius-webhook-create] ❌ error: {exc}")
+            traceback.print_exc()
             return web.json_response({"error": str(exc), "detected": 0})
 
     app.router.add_post("/api/webhooks/helius/pumpfun-create", handle_helius_pumpfun_create)
