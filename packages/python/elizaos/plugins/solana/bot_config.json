@@ -136,6 +136,7 @@
   "creator_alpha_floor_pct": -25.0,
   "creator_alpha_tp1_mult": 2.0,
   "creator_alpha_tp1_sell_frac": 1.0,
+  "creator_alpha_max_entry_mc_usd": 20000,
   "split_buy_enabled": false,
   "split_buy_a_sol": 0.05,
   "split_buy_b_sol": 0.025,

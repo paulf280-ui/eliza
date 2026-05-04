@@ -271,9 +271,20 @@ async def _creator_alpha_direct_entry(runtime: Any, session: aiohttp.ClientSessi
     the wait-for-graduation flow. Uses PumpPortal pool='pump' for the buy."""
     if not CREATOR_ALPHA_DIRECT_ENTRY:
         return
-    # Age gate: only enter if the token is fresh (< 30 min on BC).
-    # If the bot was paused/restarted and sees this signal hours late, skip.
-    # A 3+ hour old BC token has already pumped — we'd be buying the dump.
+    # Age gate + MC gate — single DexScreener call, two filters:
+    #
+    # AGE GATE: skip if token is >30 min old (stale signal after pause/restart).
+    #
+    # MC GATE: skip if current MC is already above threshold (token has pumped
+    # before we arrived). MARATHON entered at $47K MC after bundlers pumped it
+    # from $2K in 88s — bot bought the peak. BOOBFACE entered at $6.6K (fresh).
+    # Default threshold $20K separates these cleanly. Configurable via dashboard.
+    try:
+        from elizaos.plugins.solana import live_config as _lc_mc
+        _mc_threshold = float(_lc_mc.get("creator_alpha_max_entry_mc_usd", 20_000))
+    except Exception:
+        _mc_threshold = 20_000
+
     try:
         async with session.get(
             f"https://api.dexscreener.com/latest/dex/tokens/{mint}",
@@ -282,6 +293,7 @@ async def _creator_alpha_direct_entry(runtime: Any, session: aiohttp.ClientSessi
             if _r.status == 200:
                 _pairs = (await _r.json()).get("pairs") or []
                 if _pairs:
+                    # Age gate
                     _oldest_pair_ts = min(
                         p.get("pairCreatedAt", 0) or 0 for p in _pairs
                     ) / 1000
@@ -290,6 +302,18 @@ async def _creator_alpha_direct_entry(runtime: Any, session: aiohttp.ClientSessi
                         print(
                             f"[creator-alpha] ⏭ AGE-GATE: {mint[:14]} is {_age_min:.0f}min old — "
                             f"BC pump already happened, skipping late entry"
+                        )
+                        return
+                    # MC gate — use highest-liquidity pair MC
+                    _best_pair = max(_pairs, key=lambda p: float(
+                        (p.get("liquidity") or {}).get("usd") or 0
+                    ))
+                    _current_mc = float(_best_pair.get("marketCap") or 0)
+                    if _current_mc > _mc_threshold:
+                        print(
+                            f"[creator-alpha] ⏭ MC-GATE: {mint[:14]} MC=${_current_mc:,.0f} "
+                            f"already above ${_mc_threshold:,.0f} threshold — "
+                            f"pump happened before we arrived, skipping"
                         )
                         return
     except Exception:

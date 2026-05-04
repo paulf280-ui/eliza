@@ -258,11 +258,14 @@ _config: dict = {
     # ── Creator-alpha strategy (operator/creator wallet sniper) ───────────────
     # Hard +100% TP era (2026-05-04): full exit at +100%, -25% catastrophic floor.
     # 0.2 SOL per trade × 2 concurrent = 0.4 SOL max exposure.
-    "creator_alpha_size_sol":      0.20,    # 0.2 SOL per entry — matches monster standard
-    "creator_alpha_max_concurrent": 2,       # 2 concurrent positions (matches monster_max_concurrent)
-    "creator_alpha_floor_pct":    -25.0,    # -25% catastrophic floor from entry (same as monster)
-    "creator_alpha_tp1_mult":      2.0,     # +100% TP trigger
-    "creator_alpha_tp1_sell_frac": 1.0,     # sell 100% at TP — hard full exit, no moonbag
+    "creator_alpha_size_sol":          0.20,    # 0.2 SOL per entry — matches monster standard
+    "creator_alpha_max_concurrent":    2,       # 2 concurrent positions (matches monster_max_concurrent)
+    "creator_alpha_floor_pct":        -25.0,   # -25% catastrophic floor from entry (same as monster)
+    "creator_alpha_tp1_mult":          2.0,    # +100% TP trigger
+    "creator_alpha_tp1_sell_frac":     1.0,    # sell 100% at TP — hard full exit, no moonbag
+    "creator_alpha_max_entry_mc_usd":  20_000, # MC gate: skip if token already pumped above this
+                                               # MARATHON entered at $47K (10 bundlers pumped in 88s) → blocked
+                                               # BOOBFACE entered at $6.6K (fresh) → allowed
 
     # ── Split-buy ("Harvester + Monster Hunter") dual position system ──────────
     # When enabled: each qualifying token opens TWO positions simultaneously.
@@ -448,11 +451,12 @@ def set_value(key: str, value, changed_by: str = "system", reason: str = "") -> 
         "monster_scanner_min_buy_ratio": (0.0, 95.0),
         "monster_max_concurrent":     (1, 5),       # cap 5 — wallet headroom check happens at trade time
         "monster_default_size_sol":   (0.05, 2.0),  # 0.05 SOL floor, 2 SOL ceiling
-        "creator_alpha_size_sol":     (0.05, 2.0),
-        "creator_alpha_max_concurrent": (1, 10),    # lottery-ticket — allow up to 10
-        "creator_alpha_floor_pct":    (-95.0, -10.0), # very wide floor, but never less than -10
-        "creator_alpha_tp1_mult":     (1.20, 20.0), # min +20% TP1, max +1900%
-        "creator_alpha_tp1_sell_frac": (0.0, 1.0),
+        "creator_alpha_size_sol":          (0.05, 2.0),
+        "creator_alpha_max_concurrent":    (1, 10),
+        "creator_alpha_floor_pct":         (-95.0, -10.0),
+        "creator_alpha_tp1_mult":          (1.20, 20.0),
+        "creator_alpha_tp1_sell_frac":     (0.0, 1.0),
+        "creator_alpha_max_entry_mc_usd":  (1_000, 500_000),  # $1K floor, $500K ceiling
         "split_buy_a_sol":         (0.001, 10.0),
         "split_buy_b_sol":         (0.001, 10.0),
         "split_buy_a_tp_mult":     (1.10, 20.0),
