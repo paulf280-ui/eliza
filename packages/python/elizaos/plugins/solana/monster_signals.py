@@ -329,6 +329,40 @@ async def _creator_alpha_direct_entry(runtime: Any, session: aiohttp.ClientSessi
                         f"pump happened before we arrived, skipping"
                     )
                     return
+
+                # PRICE-DIRECTION GATE: wait 6 seconds then re-check price.
+                # CoinGPT had -70%: at 61s after creation it was already DUMPING.
+                # BOOBFACE had +110%: at 34s it was still RISING.
+                # We can't tell these apart from a single snapshot — but two
+                # snapshots 6 seconds apart reveal the direction conclusively.
+                # Cost: 6s delay on every entry. Already arriving 30-90s after
+                # creation, so 6s more doesn't meaningfully change entry timing.
+                _price_snap1 = float(_best_pair.get("priceNative") or 0)
+                if _price_snap1 > 0:
+                    await asyncio.sleep(6)
+                    try:
+                        async with session.get(
+                            f"https://api.dexscreener.com/latest/dex/tokens/{mint}",
+                            timeout=aiohttp.ClientTimeout(total=5),
+                        ) as _r2:
+                            if _r2.status == 200:
+                                _pairs2 = (await _r2.json()).get("pairs") or []
+                                if _pairs2:
+                                    _best2 = max(_pairs2, key=lambda p: float(
+                                        (p.get("liquidity") or {}).get("usd") or 0
+                                    ))
+                                    _price_snap2 = float(_best2.get("priceNative") or 0)
+                                    if _price_snap2 > 0 and _price_snap1 > 0:
+                                        _chg_pct = (_price_snap2 - _price_snap1) / _price_snap1 * 100
+                                        if _chg_pct < -3.0:
+                                            print(
+                                                f"[creator-alpha] ⏭ DIRECTION-GATE: {mint[:14]} "
+                                                f"price fell {_chg_pct:.1f}% in 6s — "
+                                                f"already dumping, not entering"
+                                            )
+                                            return
+                    except Exception:
+                        pass  # direction check failed — proceed with entry
             else:
                 # DexScreener non-200 — treat as unindexed, skip to be safe
                 print(f"[creator-alpha] ⏭ DEXSCREENER-GATE: {mint[:14]} returned HTTP {_r.status}, skipping")
