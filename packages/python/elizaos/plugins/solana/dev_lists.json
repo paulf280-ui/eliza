@@ -43,18 +43,17 @@
   },
   "Ao9D9xuKxhHfTGCd3ZeBPJ3aBRUAicKKnXZ3feH6uuGC": {
     "wallet": "Ao9D9xuKxhHfTGCd3ZeBPJ3aBRUAicKKnXZ3feH6uuGC",
-    "status": "proven",
-    "reason": "Verified creator: Staccana +9000% pump in 24h from launch (2026-05-04). On-chain performance confirms winning tokens.",
+    "status": "unknown",
+    "reason": "",
     "added_at": 1775198446.5578432,
     "tokens_launched": [
       "72LSsrmE6q5jdzHbaUPC9CFxBvxHS6cQktrcjecfpump"
     ],
-    "wins": 1,
-    "losses": 0,
+    "wins": 0,
+    "losses": 1,
     "rugs": 0,
-    "successful_launches": 1,
-    "last_seen": 1714809600,
-    "notes": "STACCANA: +9000% in 24h, tier_a creator material. Monitor all future launches."
+    "successful_launches": 0,
+    "last_seen": 1775198446.5578518
   },
   "AMVwUWQHduRubXZCZFHTxymBmU11pbkqQ54G1pAPmff4": {
     "wallet": "AMVwUWQHduRubXZCZFHTxymBmU11pbkqQ54G1pAPmff4",

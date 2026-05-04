@@ -1,6 +1,6 @@
 {
   "_doc": "Curated alpha-creator and operator wallets — derived from on-chain analysis of 80 dev wallets across 3 waves of user-curated lists. These are the wallets the creator_alpha_scout monitors in real-time. When a direct_creator launches a token OR an operator funds a fresh wallet that then launches, the bot fires an entry signal with signal_source='creator_alpha'.",
-  "last_updated": "2026-05-04T07:20:00Z",
+  "last_updated": "2026-05-02T13:00:00Z",
   "playbook_version": 1,
   "_legend": {
     "tier_a": "Multi-hit + $1M+ peak — highest priority direct-track",
@@ -13,8 +13,7 @@
     "tier_a": [
       {"wallet": "4euyaqBe45J5dniAcNARERUo7B1wG96riG21sEpNndfU", "creates": 2, "graduated": 2, "rate": 100, "best_mc": 0, "note": "🔥 GOLDEN CREATOR — Milkers (+1380%) + MOG. Self-funded, heavy-trader (30K+ sigs). PRIORITY 1."},
       {"wallet": "E2RtHD8NNict752mA6yDakZXn6utsVscRWJcumNBBNZs", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "🔥 GOLDEN CREATOR — Trump Coin. Funded by DWOGE. PRIORITY 1."},
-      {"wallet": "985wHVZXTkZKb9Lg5r8dQSexje3pzzKeSGs7UqPaDho9", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "🔥 GOLDEN CREATOR — CAMINO. Funded by MEGA OPERATOR. PRIORITY 1."},
-      {"wallet": "Ao9D9xuKxhHfTGCd3ZeBPJ3aBRUAicKKnXZ3feH6uuGC", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 378200, "note": "🔥 GOLDEN CREATOR — STACCANA +9000% in 24h from launch (2026-05-04). Self-funded, proven winner. PRIORITY 1."}
+      {"wallet": "985wHVZXTkZKb9Lg5r8dQSexje3pzzKeSGs7UqPaDho9", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "🔥 GOLDEN CREATOR — CAMINO. Funded by MEGA OPERATOR. PRIORITY 1."}
     ],
     "tier_b": [],
     "high_hit": [],
