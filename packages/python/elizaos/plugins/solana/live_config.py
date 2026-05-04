@@ -252,8 +252,8 @@ _config: dict = {
     # When the wallet grows we want to dial these up without restarting the bot.
     # Reads from strategy_e_monster.py fall back to module constants if a key is
     # absent, so removing these from live_config is a safe rollback.
-    "monster_max_concurrent":     1,        # number of simultaneous monster positions (1-5)
-    "monster_default_size_sol":   0.45,     # SOL per monster trade
+    "monster_max_concurrent":     2,        # number of simultaneous monster positions (1-5) — hard-TP testing: 2 slots diversified
+    "monster_default_size_sol":   0.2,      # SOL per monster trade — hard-TP testing: 0.2 SOL × 2 = 0.4 SOL max exposure
 
     # ── Creator-alpha strategy (operator/creator wallet sniper) ───────────────
     # Different risk profile than lifecycle: smaller bets, wider stops, brain-
