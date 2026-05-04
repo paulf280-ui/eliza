@@ -38,6 +38,8 @@ export default function PositionConfigPanel({
       const result = await patchConfig({
         monster_max_concurrent: maxConc,
         monster_default_size_sol: tradeSize,
+        creator_alpha_size_sol: tradeSize,        // keep in sync — same strategy, same size
+        creator_alpha_max_concurrent: maxConc,    // keep in sync — same concurrent cap
       })
       const failed = Object.entries(result).filter(
         ([, v]) => !((v as { ok: boolean }).ok)
