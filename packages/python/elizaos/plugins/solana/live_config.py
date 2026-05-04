@@ -256,15 +256,13 @@ _config: dict = {
     "monster_default_size_sol":   0.2,      # SOL per monster trade — hard-TP testing: 0.2 SOL × 2 = 0.4 SOL max exposure
 
     # ── Creator-alpha strategy (operator/creator wallet sniper) ───────────────
-    # Different risk profile than lifecycle: smaller bets, wider stops, brain-
-    # driven exits. The thesis: most creator_alpha entries die or chop, but
-    # the rare DWOGE-class hit returns hundreds of x. Designed for asymmetric
-    # upside via lottery-ticket sizing.
-    "creator_alpha_size_sol":      0.10,    # 0.1 SOL per entry (vs 0.45 default)
-    "creator_alpha_max_concurrent": 3,       # 3 concurrent positions
-    "creator_alpha_floor_pct":    -75.0,    # catastrophic floor only — no tight SL
-    "creator_alpha_tp1_mult":      2.0,     # +100% partial exit
-    "creator_alpha_tp1_sell_frac": 0.5,     # sell 50% at TP1, keep 50% as moonbag (brain-managed)
+    # Hard +100% TP era (2026-05-04): full exit at +100%, -25% catastrophic floor.
+    # 0.2 SOL per trade × 2 concurrent = 0.4 SOL max exposure.
+    "creator_alpha_size_sol":      0.20,    # 0.2 SOL per entry — matches monster standard
+    "creator_alpha_max_concurrent": 2,       # 2 concurrent positions (matches monster_max_concurrent)
+    "creator_alpha_floor_pct":    -25.0,    # -25% catastrophic floor from entry (same as monster)
+    "creator_alpha_tp1_mult":      2.0,     # +100% TP trigger
+    "creator_alpha_tp1_sell_frac": 1.0,     # sell 100% at TP — hard full exit, no moonbag
 
     # ── Split-buy ("Harvester + Monster Hunter") dual position system ──────────
     # When enabled: each qualifying token opens TWO positions simultaneously.
