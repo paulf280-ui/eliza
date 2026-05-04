@@ -292,32 +292,52 @@ async def _creator_alpha_direct_entry(runtime: Any, session: aiohttp.ClientSessi
         ) as _r:
             if _r.status == 200:
                 _pairs = (await _r.json()).get("pairs") or []
-                if _pairs:
-                    # Age gate
-                    _oldest_pair_ts = min(
-                        p.get("pairCreatedAt", 0) or 0 for p in _pairs
-                    ) / 1000
-                    _age_min = (time.time() - _oldest_pair_ts) / 60
-                    if _oldest_pair_ts > 0 and _age_min > 30:
-                        print(
-                            f"[creator-alpha] ⏭ AGE-GATE: {mint[:14]} is {_age_min:.0f}min old — "
-                            f"BC pump already happened, skipping late entry"
-                        )
-                        return
-                    # MC gate — use highest-liquidity pair MC
-                    _best_pair = max(_pairs, key=lambda p: float(
-                        (p.get("liquidity") or {}).get("usd") or 0
-                    ))
-                    _current_mc = float(_best_pair.get("marketCap") or 0)
-                    if _current_mc > _mc_threshold:
-                        print(
-                            f"[creator-alpha] ⏭ MC-GATE: {mint[:14]} MC=${_current_mc:,.0f} "
-                            f"already above ${_mc_threshold:,.0f} threshold — "
-                            f"pump happened before we arrived, skipping"
-                        )
-                        return
+
+                # DEAD TOKEN GATE: fresh BC tokens are always indexed by DexScreener
+                # within seconds of creation. Zero pairs = old/dead/unindexed token
+                # that has no business being in our strategy.
+                # KOSPI6900 was 574 days old with 0 DexScreener pairs — this gate
+                # would have caught it. Never enter tokens DexScreener doesn't know about.
+                if not _pairs:
+                    print(
+                        f"[creator-alpha] ⏭ DEAD-TOKEN-GATE: {mint[:14]} has 0 DexScreener "
+                        f"pairs — old/dead/unindexed token, not a fresh BC launch, skipping"
+                    )
+                    return
+
+                # Age gate
+                _oldest_pair_ts = min(
+                    p.get("pairCreatedAt", 0) or 0 for p in _pairs
+                ) / 1000
+                _age_min = (time.time() - _oldest_pair_ts) / 60
+                if _oldest_pair_ts > 0 and _age_min > 30:
+                    print(
+                        f"[creator-alpha] ⏭ AGE-GATE: {mint[:14]} is {_age_min:.0f}min old — "
+                        f"BC pump already happened, skipping late entry"
+                    )
+                    return
+
+                # MC gate — use highest-liquidity pair MC
+                _best_pair = max(_pairs, key=lambda p: float(
+                    (p.get("liquidity") or {}).get("usd") or 0
+                ))
+                _current_mc = float(_best_pair.get("marketCap") or 0)
+                if _current_mc > _mc_threshold:
+                    print(
+                        f"[creator-alpha] ⏭ MC-GATE: {mint[:14]} MC=${_current_mc:,.0f} "
+                        f"already above ${_mc_threshold:,.0f} threshold — "
+                        f"pump happened before we arrived, skipping"
+                    )
+                    return
+            else:
+                # DexScreener non-200 — treat as unindexed, skip to be safe
+                print(f"[creator-alpha] ⏭ DEXSCREENER-GATE: {mint[:14]} returned HTTP {_r.status}, skipping")
+                return
     except Exception:
-        pass  # if DexScreener unreachable, proceed with entry
+        # DexScreener completely unreachable — skip rather than risk a bad entry.
+        # When the API is down we have no way to verify the token is fresh.
+        print(f"[creator-alpha] ⏭ DEXSCREENER-GATE: {mint[:14]} unreachable, skipping to be safe")
+        return
     # Slot check via source-aware capacity
     if not monster.can_open_new_position(source):
         print(f"[creator-alpha] ⏭ slot pool full — {mint[:14]} skipped (src={source})")
