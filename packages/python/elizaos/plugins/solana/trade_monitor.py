@@ -1509,34 +1509,47 @@ OUTPUT: Respond with valid JSON only — no prose. SELL only when the data shows
 
 _HOLD_SELL_PROMPT = """Decide HOLD / SELL / WATCH on this open Solana meme-coin position by evaluating six gates, then synthesizing.
 
-ENVIRONMENT — ONE set of rails applies to ALL positions:
+=== STRATEGY BRIEFING — READ THIS FIRST ===
 
-  HARD +100% TP STRATEGY (active 2026-05-04):
-    - Entry: bonding-curve BC stage from confirmed operator network (MEGA OPERATOR, DWOGE, 44 others)
-    - Hard TP: +100% → FULL 100% exit, position closed completely. No moonbag.
-    - Catastrophic floor: -25% from entry → auto-exit.
-    - Position size: 0.2 SOL per trade.
-    - You are the ONLY brain. No Gemini, no Claude. Speed and accuracy is everything.
+We enter Solana meme tokens at the bonding-curve (BC) stage — seconds after creation —
+from a curated network of 46 confirmed operators (MEGA OPERATOR, DWOGE, and 44 others)
+whose child wallets consistently produce 1000%+ tokens. Examples: Milkers (+1380%),
+Macy's Inc (HBBSGUB +160%), BOOBFACE (+110%), Trump Coin, CAMINO.
 
-  YOUR EXACT JOB (you evaluate when pnl is 15-80%):
-    Genuine monster tokens (Milkers, Macy's Inc type) blast THROUGH this range in
-    minutes and hit the +100% TP automatically — you will barely fire.
-    Stagnant or dumping tokens STALL in this range. That is when you act:
+Entry filters already applied before you see a position:
+  - MC gate: token MC < $20K at entry (not already pumped by bundlers)
+  - Age gate: token < 30 min old (not a stale signal)
+  - Bundle detection: clean or near-clean creation slot
+  - Holder guard: no hard-block flags
 
-    SELL signal — any of:
-      1. Holders declining (holder_delta_5min < -20) with flat/falling price → distribution
-      2. Liquidity draining (liq_chg_5min_pct < -15%) → LP being pulled
-      3. Token flat for extended time (age_secs > 600, chg_5min_pct near 0, bsr < 0.45) → stagnation, bank the profit
-      4. Price reverting toward entry with no bounce (pnl falling, no recovery signal)
+RAILS:
+  - Hard TP: +100% → auto full-exit. You do NOT manage this — it fires automatically.
+  - Catastrophic floor: -25% → auto full-exit. You do NOT manage this either.
+  - Position size: 0.2 SOL per trade × 2 concurrent max.
+  - You are the ONLY brain. No Gemini, no Claude.
 
-    HOLD signal — all of:
-      - Price moving UP or holding (chg_5min_pct > 0 or bsr > 0.55)
-      - Holders stable or growing (holder_delta_5min > -10)
-      - Liquidity not draining (liq_chg_5min_pct > -10%)
-      → Token is running — stay in for the +100% TP
+YOUR WINDOW: pnl = 15% to 80% only.
+  - Below 15%: still developing, floor will handle a rug. Stay out of it.
+  - Above 80%: 20% from the +100% TP. The token is running. DO NOT SELL. Let it hit the TP.
+  - In 15-80%: this is your zone — watch for stagnation and distribution.
 
-  SELL threshold: confidence ≥ 0.75 → execute immediately. Do not hesitate.
-  HOLD threshold: anything below 0.75 SELL confidence → HOLD and re-evaluate next tick.
+TWO SCENARIOS you will see in this range:
+
+  SCENARIO A — RUNNER (HOLD):
+    Token came off the BC and is climbing steadily. Holders growing, BSR > 0.55,
+    liq stable or growing. This is a Milkers or BOOBFACE in motion. Your job:
+    HOLD and let the +100% TP fire. Do NOT sell at 30% or 50% — we want the full double.
+    These tokens move fast. If everything looks healthy, HOLD with high confidence.
+
+  SCENARIO B — STALL/DUMP (SELL):
+    Token hit 20-40%, then momentum died. Holders flat or falling, BSR dipping,
+    price chopping sideways or slowly declining. The pump is over, insiders are
+    distributing. Your job: SELL now and bank the 20-40% profit before it reverses
+    back to breakeven or worse. Do not wait for a recovery that isn't coming.
+    Be decisive — a 30% exit is far better than a -25% floor exit.
+
+SELL threshold: confidence ≥ 0.75 → execute immediately. One shot, no hesitation.
+HOLD threshold: anything below 0.75 SELL confidence → HOLD. When in doubt, hold.
 
 EVALUATION GATES (assess each independently before deciding):
 
