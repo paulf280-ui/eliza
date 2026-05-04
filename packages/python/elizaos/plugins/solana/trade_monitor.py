@@ -617,7 +617,7 @@ class AICascade:
         age_secs = now - pos.get("entry_ts", now)
 
         # Guard: only evaluate AI for tokens in 30-40% PnL range
-        current_price = feed.current_price if feed else 0.0
+        current_price = (feed.latest_price() or 0.0) if feed else 0.0
         entry_price = pos.get("entry_price", 0.0)
         if entry_price > 0 and current_price > 0:
             pnl_pct = ((current_price / entry_price) - 1.0) * 100

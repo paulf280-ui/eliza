@@ -271,6 +271,29 @@ async def _creator_alpha_direct_entry(runtime: Any, session: aiohttp.ClientSessi
     the wait-for-graduation flow. Uses PumpPortal pool='pump' for the buy."""
     if not CREATOR_ALPHA_DIRECT_ENTRY:
         return
+    # Age gate: only enter if the token is fresh (< 30 min on BC).
+    # If the bot was paused/restarted and sees this signal hours late, skip.
+    # A 3+ hour old BC token has already pumped — we'd be buying the dump.
+    try:
+        async with session.get(
+            f"https://api.dexscreener.com/latest/dex/tokens/{mint}",
+            timeout=aiohttp.ClientTimeout(total=5),
+        ) as _r:
+            if _r.status == 200:
+                _pairs = (await _r.json()).get("pairs") or []
+                if _pairs:
+                    _oldest_pair_ts = min(
+                        p.get("pairCreatedAt", 0) or 0 for p in _pairs
+                    ) / 1000
+                    _age_min = (time.time() - _oldest_pair_ts) / 60
+                    if _oldest_pair_ts > 0 and _age_min > 30:
+                        print(
+                            f"[creator-alpha] ⏭ AGE-GATE: {mint[:14]} is {_age_min:.0f}min old — "
+                            f"BC pump already happened, skipping late entry"
+                        )
+                        return
+    except Exception:
+        pass  # if DexScreener unreachable, proceed with entry
     # Slot check via source-aware capacity
     if not monster.can_open_new_position(source):
         print(f"[creator-alpha] ⏭ slot pool full — {mint[:14]} skipped (src={source})")
