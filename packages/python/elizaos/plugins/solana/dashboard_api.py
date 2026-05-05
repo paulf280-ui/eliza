@@ -2176,6 +2176,22 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
     app.router.add_get("/api/holder-guard/report", handle_holder_guard_report)
 
+    # ── GET /api/audit — return last hourly audit result ─────────────────────
+    async def handle_audit(request: web.Request) -> web.Response:
+        """Return the most recent hourly audit result, or trigger one if none yet."""
+        try:
+            from elizaos.plugins.solana.bot_auditor import get_last_audit, run_audit
+            result = get_last_audit()
+            if not result:
+                # No audit run yet — run one now on demand
+                async with aiohttp.ClientSession() as sess:
+                    result = await run_audit(sess)
+            return web.json_response(result)
+        except Exception as exc:
+            return web.json_response({"error": str(exc)}, status=500)
+
+    app.router.add_get("/api/audit", handle_audit)
+
     async def handle_near_miss_report(request: web.Request) -> web.Response:
         """Daily near-miss analyzer — calibration check on filter thresholds.
 

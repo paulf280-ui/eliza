@@ -9015,6 +9015,13 @@ async def main():
     # ── Startup health check — runs async, results appear in Jarvis chat window ──
     asyncio.create_task(run_startup_health_check(runtime))
 
+    # ── Hourly internal audit — verifies all settings, gates, APIs, playbook ──
+    try:
+        from elizaos.plugins.solana.bot_auditor import audit_loop
+        asyncio.create_task(audit_loop())
+    except Exception as _audit_err:
+        print(f"[audit] Failed to start audit loop: {_audit_err}")
+
     # ── Creator Whitelist Fast-Buy — ALWAYS ON regardless of strategy toggles ──
     # When a whitelisted creator deploys a new token, buy immediately at the
     # bonding curve before the community even notices. We skip normal score/social
