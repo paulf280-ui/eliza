@@ -384,6 +384,26 @@ async def _creator_alpha_direct_entry(runtime: Any, session: aiohttp.ClientSessi
                                                 f"bundlers exiting with no buyers, skip"
                                             )
                                             return
+
+                                        # DEAD-FLOOR GATE: price completely flat AND MC is at the
+                                        # absolute floor of a pump.fun token ($2-4K = nobody buying).
+                                        # The MC gate blocks tokens that already PUMPED above $20K.
+                                        # This gate blocks tokens that NEVER pumped — dead on arrival.
+                                        #
+                                        # UNCTON: $2.4K MC, price flat, 1 holder — flatline chart.
+                                        # BOOBFACE: $6.6K MC, price rising → gate does NOT fire.
+                                        #
+                                        # Logic: if price is essentially flat (< +0.5% gain) AND MC
+                                        # is below $5K, zero buying pressure has entered since launch.
+                                        # A token about to run will be moving UP during this window.
+                                        _mc2 = float(_best2.get("marketCap") or 0)
+                                        if _price_flat and _mc2 > 0 and _mc2 < 5_000 and _chg_pct < 0.5:
+                                            print(
+                                                f"[creator-alpha] ⏭ DEAD-FLOOR-GATE: {mint[:14]} "
+                                                f"MC=${_mc2:,.0f} flat ({_chg_pct:+.1f}%) — "
+                                                f"no buyers at floor price, skip"
+                                            )
+                                            return
                     except Exception:
                         pass  # direction check failed — proceed with entry
             else:

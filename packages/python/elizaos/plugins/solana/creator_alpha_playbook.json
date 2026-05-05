@@ -1,94 +1,530 @@
 {
-  "_doc": "Curated alpha-creator and operator wallets — derived from on-chain analysis of 80+ dev wallets producing 1000%+ monster tokens. Version 2: expanded from 2 operators to 46 confirmed operators from the 70-wallet monster corpus (2026-05-04). The creator_alpha_scout monitors all listed wallets in real-time. When a direct_creator launches OR an operator funds a fresh wallet that creates, the bot fires an entry signal with signal_source='creator_alpha'.",
+  "_doc": "Curated alpha-creator and operator wallets \u2014 derived from on-chain analysis of 80+ dev wallets producing 1000%+ monster tokens. Version 2: expanded from 2 operators to 46 confirmed operators from the 70-wallet monster corpus (2026-05-04). The creator_alpha_scout monitors all listed wallets in real-time. When a direct_creator launches OR an operator funds a fresh wallet that creates, the bot fires an entry signal with signal_source='creator_alpha'.",
   "last_updated": "2026-05-04T09:00:00Z",
   "playbook_version": 2,
   "_legend": {
-    "tier_a": "Multi-hit + $1M+ peak — highest priority direct-track",
-    "tier_b": "One-shot confirmed monster — direct-track, monitor for next launch",
+    "tier_a": "Multi-hit + $1M+ peak \u2014 highest priority direct-track",
+    "tier_b": "One-shot confirmed monster \u2014 direct-track, monitor for next launch",
     "tier_c": "Proven mid-tier $250k-$1M peaks",
     "high_hit": "High graduation rate (>=50%) with 3+ launches",
-    "operators": "Parent wallets that fund fresh creator wallets — sorted by confirmed best_mc desc"
+    "operators": "Parent wallets that fund fresh creator wallets \u2014 sorted by confirmed best_mc desc"
   },
   "direct_creators": {
     "tier_a": [
-      {"wallet": "4euyaqBe45J5dniAcNARERUo7B1wG96riG21sEpNndfU", "creates": 2, "graduated": 2, "rate": 100, "best_mc": 0, "note": "🔥 GOLDEN CREATOR — Milkers (+1380%) + MOG. Self-funded, heavy-trader (30K+ sigs). PRIORITY 1."},
-      {"wallet": "E2RtHD8NNict752mA6yDakZXn6utsVscRWJcumNBBNZs", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "🔥 GOLDEN CREATOR — Trump Coin. Funded by DWOGE. PRIORITY 1."},
-      {"wallet": "985wHVZXTkZKb9Lg5r8dQSexje3pzzKeSGs7UqPaDho9", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "🔥 GOLDEN CREATOR — CAMINO. Funded by MEGA OPERATOR. PRIORITY 1."}
+      {
+        "wallet": "4euyaqBe45J5dniAcNARERUo7B1wG96riG21sEpNndfU",
+        "creates": 2,
+        "graduated": 2,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "\ud83d\udd25 GOLDEN CREATOR \u2014 Milkers (+1380%) + MOG. Self-funded, heavy-trader (30K+ sigs). PRIORITY 1."
+      },
+      {
+        "wallet": "E2RtHD8NNict752mA6yDakZXn6utsVscRWJcumNBBNZs",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "\ud83d\udd25 GOLDEN CREATOR \u2014 Trump Coin. Funded by DWOGE. PRIORITY 1."
+      },
+      {
+        "wallet": "985wHVZXTkZKb9Lg5r8dQSexje3pzzKeSGs7UqPaDho9",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "\ud83d\udd25 GOLDEN CREATOR \u2014 CAMINO. Funded by MEGA OPERATOR. PRIORITY 1."
+      }
     ],
     "tier_b": [
-      {"wallet": "9P9FiEf7EzAgXiH73wRNCHJWsuktj5gRKC2hJGSsnKNV", "creates": 2, "graduated": 2, "rate": 100, "best_mc": 2990000, "note": "2/2 100% graduation rate, $2.99M peak. Self-funded. Monitor every launch."},
-      {"wallet": "6yhdUyVsgqQqMWXrPgxDBLACSxMWKN6DBtU3QDbteufh", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 333000, "note": "1/1 100%, $333k peak. Self-funded or deep history. Monitor."},
-      {"wallet": "9Q18hhGJxvy16VAa8Th8Lua4WUSxnW1E1mYmqS16aPFN", "creates": 12, "graduated": 6, "rate": 50, "best_mc": 202000, "note": "6/12 50% graduation rate — high-hit serial creator. Confirmed monster producer."},
-      {"wallet": "BAGSB9TpGrZxQbEsrEznv5jXXdwyP6AXerN8aVRiAmcv", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "FHcbifouatL7WFxwD8JjkRtfZhhuEUFpdtwkdXwFCYS5", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "HtpCoSsZmCkLgu5DdRC2GkNmioXDLLuDrxNHcBHaCTvQ", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "J5hJpPK8Yau1JZV8vAFFDFExbqAEpwbQUBhtbFqVtPrj", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "GTheBZRWMnCZJiSjKkB3LPV68TnQtKeB4gih5LXANpUA", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "ATLw3hVRcyLHuZXqENMP9zyAi2YCkyZiZ3BnykQZiLze", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "7KJgr8NUMQnqc2dSjDQndoRXpc5Qpqz4rD7M9ZbgDV4D", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "9k8jWWqfmTTXrc8gmZqYVxSFJhygURvyVRztivJXFTYP", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "5pYBpTkovK2zyidKrJhCWCLU9AQfF3rSRjq6YCXWH8Yf", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "CBEiThDXyrDqGjGUtiBJEFxezwFRBasC2ryN4vX5Rgzc", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "DZwhiLMN5EWbvpdbHB8NmcR2mqyZCR2XPQLGvLJjb6ax", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "BynP92zRxoLoKgTMx63pGvFyWDXwkJPTTithMtEDwZyB", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "EYfdt8cNFyyTEJKp18dcoVbgUHDnM1SK3bT2uKj9XXHc", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "2DAwissezSCFyDFYb5769p5hU6z57HJfsB1ExFWEZELJ", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "2NJQY4GpGKC1YZEVRmo1uzNMx9A3NoQfC3sTG3X1yDoB", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "45Y2i9ujmHYxrX6GvNC6EjUX57kd9zPw8GFsTLVrTJH5", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "3zd5av5f3hxVhhgCDTbge7vrsmXA69wkMdaUcNHcCCSe", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "E6aukX8LRbs8iHboUFmGzFFFR5PyyiniWvrzoejcmYxX", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."},
-      {"wallet": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P", "creates": 1, "graduated": 1, "rate": 100, "best_mc": 0, "note": "Confirmed 1000%+ monster. Self-funded/deep history."}
+      {
+        "wallet": "9P9FiEf7EzAgXiH73wRNCHJWsuktj5gRKC2hJGSsnKNV",
+        "creates": 2,
+        "graduated": 2,
+        "rate": 100,
+        "best_mc": 2990000,
+        "note": "2/2 100% graduation rate, $2.99M peak. Self-funded. Monitor every launch."
+      },
+      {
+        "wallet": "6yhdUyVsgqQqMWXrPgxDBLACSxMWKN6DBtU3QDbteufh",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 333000,
+        "note": "1/1 100%, $333k peak. Self-funded or deep history. Monitor."
+      },
+      {
+        "wallet": "9Q18hhGJxvy16VAa8Th8Lua4WUSxnW1E1mYmqS16aPFN",
+        "creates": 12,
+        "graduated": 6,
+        "rate": 50,
+        "best_mc": 202000,
+        "note": "6/12 50% graduation rate \u2014 high-hit serial creator. Confirmed monster producer."
+      },
+      {
+        "wallet": "BAGSB9TpGrZxQbEsrEznv5jXXdwyP6AXerN8aVRiAmcv",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      },
+      {
+        "wallet": "FHcbifouatL7WFxwD8JjkRtfZhhuEUFpdtwkdXwFCYS5",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      },
+      {
+        "wallet": "HtpCoSsZmCkLgu5DdRC2GkNmioXDLLuDrxNHcBHaCTvQ",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      },
+      {
+        "wallet": "J5hJpPK8Yau1JZV8vAFFDFExbqAEpwbQUBhtbFqVtPrj",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      },
+      {
+        "wallet": "GTheBZRWMnCZJiSjKkB3LPV68TnQtKeB4gih5LXANpUA",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      },
+      {
+        "wallet": "ATLw3hVRcyLHuZXqENMP9zyAi2YCkyZiZ3BnykQZiLze",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      },
+      {
+        "wallet": "7KJgr8NUMQnqc2dSjDQndoRXpc5Qpqz4rD7M9ZbgDV4D",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      },
+      {
+        "wallet": "9k8jWWqfmTTXrc8gmZqYVxSFJhygURvyVRztivJXFTYP",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      },
+      {
+        "wallet": "5pYBpTkovK2zyidKrJhCWCLU9AQfF3rSRjq6YCXWH8Yf",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      },
+      {
+        "wallet": "CBEiThDXyrDqGjGUtiBJEFxezwFRBasC2ryN4vX5Rgzc",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      },
+      {
+        "wallet": "DZwhiLMN5EWbvpdbHB8NmcR2mqyZCR2XPQLGvLJjb6ax",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      },
+      {
+        "wallet": "BynP92zRxoLoKgTMx63pGvFyWDXwkJPTTithMtEDwZyB",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      },
+      {
+        "wallet": "EYfdt8cNFyyTEJKp18dcoVbgUHDnM1SK3bT2uKj9XXHc",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      },
+      {
+        "wallet": "2DAwissezSCFyDFYb5769p5hU6z57HJfsB1ExFWEZELJ",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      },
+      {
+        "wallet": "2NJQY4GpGKC1YZEVRmo1uzNMx9A3NoQfC3sTG3X1yDoB",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      },
+      {
+        "wallet": "45Y2i9ujmHYxrX6GvNC6EjUX57kd9zPw8GFsTLVrTJH5",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      },
+      {
+        "wallet": "3zd5av5f3hxVhhgCDTbge7vrsmXA69wkMdaUcNHcCCSe",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      },
+      {
+        "wallet": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+        "creates": 1,
+        "graduated": 1,
+        "rate": 100,
+        "best_mc": 0,
+        "note": "Confirmed 1000%+ monster. Self-funded/deep history."
+      }
     ],
     "high_hit": [],
     "tier_c": []
   },
   "operators": [
-    {"wallet": "5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9", "children_count": 8, "combined_grads": 13, "best_mc": 3982985, "note": "🔥 MEGA OPERATOR — CONFIRMED child: 985wHVZX (CAMINO +profitable). 7 other children tracked. Highest volume operator."},
-    {"wallet": "G5u7s6CNufkAvseFTpBbBk2qYg17hdRC1i2jasEgukBs", "children_count": 3, "combined_grads": 3, "best_mc": 3460112, "note": "🔥 DWOGE — CONFIRMED child: E2RtHD8N (Trump Coin +profitable). Also TRUTH + 1 other. 100% graduation rate."},
-    {"wallet": "2a2VX2ppv5BKkhuT4NvhVWGhdRPFmJWmg4nbZsJ1EWMU", "children_count": 1, "combined_grads": 1, "best_mc": 16100000, "note": "CONFIRMED child: EpEPwSwfR34P — HIGHEST PEAK in monster corpus $16.1M. Top priority new operator."},
-    {"wallet": "ao5VpeQqtaPiKWqsfj7DkFSVWvjwi2YyJFthosPpDit", "children_count": 1, "combined_grads": 1, "best_mc": 11200000, "note": "CONFIRMED child: 7YeCaAqhzhtR — 3/3 100% graduation rate, $11.2M peak. SERIAL ALPHA creator. Watch every launch."},
-    {"wallet": "FmB2WWbg3mZ4czicDRfaey71r5AyR5bP16By4N9gQa2f", "children_count": 1, "combined_grads": 1, "best_mc": 4750000, "note": "CONFIRMED child: BXAWg4JbaeyvA — $4.75M peak monster."},
-    {"wallet": "A8FoDjKgbfKvJG14a5kT2ewYB14bfXsGj9GU8DWRALiu", "children_count": 1, "combined_grads": 1, "best_mc": 3850000, "note": "CONFIRMED child: A3fCppLyKaCEX — 1/1 100%, $3.85M peak."},
-    {"wallet": "G2pZuZWMQquok8TbAwhtp2LoUMyfR2S5naTGMZj7Sqz", "children_count": 1, "combined_grads": 1, "best_mc": 1730000, "note": "CONFIRMED child: Ce74gzQGh9u1c — 4/9 44% graduation rate, $1.73M peak. Serial deployer."},
-    {"wallet": "CStt1UKyYPLxHMW3qwavuzw6SertoYhb8hLEKv8ZeoAE", "children_count": 1, "combined_grads": 1, "best_mc": 1350000, "note": "CONFIRMED child: 4SDJTL6VcmQb4 — 1/1 100%, $1.35M peak."},
-    {"wallet": "2snHHreXbpJ7UwZxPe37gnUNf7Wx7wv6UKDSR2JckKuS", "children_count": 2, "combined_grads": 2, "best_mc": 1000000, "note": "🔥 MULTI-HIT — 2 confirmed monster children: 6vXpuTHoFeia + Afx8Y8XufX4n. Emerging serial operator."},
-    {"wallet": "C2xnFBhKJ4TCQAPnyistMq2j9mYRMR9NvMcwVm36sff5", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: 5b27vnkB8jeqN — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "HVX9PrZRm4DXUNLt8vxqw4zGedWGpkmjsDKF5WxRa49V", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: B3oLiV6oTMKZG — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "6NBwrrHH7e1NLxz2aR1D3nTugiAExrK8JUj1DkjkD1u2", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: HJHXoEMD3Az4s — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "6sG2UFKvSg8srVNQbrRNPzpg6iGeEDRARM7EaR9SKDuo", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: F7xVaw1eh6mX8 — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "is6MTRHEgyFLNTfYcuV4QBWLjrZBfmhVNYR6ccgr8KV", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: 6wRJ9D5Qm7ynQ — 2/14 serial, $149k. Mid-tier operator."},
-    {"wallet": "FXv7aUeGs5MbttgP4oaCHBYCjkoacXPzuyXSSyyuMw5Z", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: CfkigDD8ig77b — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "7usofQ5r4sS3BkWt1XJNGhMYXQnqPhspf11t5WigHQcZ", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: FUuQKV53fUcZ8 — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "Gdpsc3n8eRHr7Vkdq5QzFPCtC2GQP2zSZbhKZCcE6M9P", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: 2RyUYqX1VFoGd — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "97Yd4wpsL8meLNZ2E5iTUZRmEztHYS5QNjJ8iPGxDXvq", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: AfxRMLKoc3Y6r — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "6cYynK24wJkbFKvqF6dQBHzZQWoeNixbhtzSNCbRawSh", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: Dz8Sdxa7S657c — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "CdNJvGo1sbArqZY75pmxxaFkqL5TdVjxkbmiq9Yj7M17", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: ESoMiyuJ1ksL5 — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "iGdFcQoyR2MwbXMHQskhmNsqddZ6rinsipHc4TNSdwu", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: G5WoM5TNp58a8 — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "AXKjp98vTZt25GesezaW28yv5pvZAk2V2REbbaHgS6Xt", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: J3k4T9XHhhAGr — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "8cmqES1XnEi6ajzycHYkAzbHLPFHm5fViC3NqZ4i4MSo", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: HYWo71Wk9PNDe — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "4dNUs2sQU7hepVKxbu9uaN5QXQWdBpApwgFNJApxkd5i", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: 7ufmve7ZSFCzu — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "ACUfBpj2GvkXoE7pH8AfBqTrbJTZA7Ra1jEo3tnsQkad", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: EUx12jXk8dQGj — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "9JbEkJacRZtQrUJdnQfafxU7NHtrnd7FpVnvd4fPBWtH", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: EtqiWsgCfNsxz — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "Ar5ZHQn85Ez6FkDTpFQrpNazyXHbteWX3mQBMZZbGAQ9", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: DYsBcLPoXj3N4 — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "JsEk3hXcd4ZEZC7T9wHyi9nUES3UvaW9NF3E46rGWD2", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: 3xVJVtHpyRJqp — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "6DaCVKh8Xdei3HeYFJh8Sfv8u6cbAkMuToUEsbVBFmxc", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: H8s4GoDcABkvy — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "HYRZV8G3xkohQCxwHdTQ7XRo26quTDTJvXSAK7dvtfXD", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: 7G9pbHHipn3av — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "6zRFqABJvvgkWq95seaHTY86a3QbRQb1piGwig4qwURf", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: 7XoNDwPakE8oh — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "Gc9MzUXFj3HvqTdbo4ZV5QiQRyeCRsTJC5Ap2Yts7Raj", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: FPrWHsHS2SVqS — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "6Se9sLUkB2EdUknYoWi7B7HbaopFzX7MK4kLh3GF7yES", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: CfkaAru9ArJ2t — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "C1DERu1G6LspNj6Fhc2TBzGMjtFq99QrBB3QdGkw6av1", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: CabEqWVu4fxCE — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "DfkcgxMfVuVP6aBpM8PZ348BkuSUBuPcwy22ToYaMDCo", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: FQwMhePTp2sQK — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "GP4fHGm6mVihTrbAPbHmr7vqQ6UqCCzDqvyiVVu5sTSW", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: 5cyxY3VatbHrf6 — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "C1Dm4Tu5vQfaJo8K3tFnTzCEXNwjjYVSJwVVYVDhFnJC", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: 6Foi4aj36N9SR — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "BPJAyXMTQuYaqhczu4iQZTW3bgaxLTw3Sm4ErCvZ6dHZ", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: E8hsZYTF7dmHZ — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "Cp8m2nRCDrQBfeFpPKMCXTFbuMKSdVDSvyJaTBuXM6Dv", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: EXFDkKcUY5R5F — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "AT9LnJ9yoWJqPqeV4FhWHDkyXaPRXycnwpLMs5epVM6b", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: CBpy8EDojUDMX — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "9abv4b3Mf3PdgmqY8mpHVUs8ij8XD4vknpsgXXyn3XMy", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: 3ifsnZfTfDN7r — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "3zq43t2ephe4b3Bch6gAZi4CMyXsvcWtaSa6Gu8voFjA", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: 8PPHLbTjvBNvz — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "85vSPRysh9FeJwePfz9fAiSqS1XieCHEMHtQEgKGC6Ak", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: 3LPDwbdCh7cGo — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "FVNp8pS5biGA73EYyk7Ef18c6SDisZeUTgXxe6dN7Fdg", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: EfkGWKfiLcVTN — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "KXzHMBj4xkHQpj87Qm3LtMh2FoA2Mw7zimFP3vXWvKG", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: 4p2xtGHxpMXuA — 1000%+ monster. From 70-wallet corpus."},
-    {"wallet": "5BX4TkNHaG83R45tBjQ4FNxEpybb9dG5QarE4kgYYX2Y", "children_count": 1, "combined_grads": 1, "best_mc": 0, "note": "CONFIRMED child: 55i6Vo1BNz3gd — 1000%+ monster. From 70-wallet corpus."}
+    {
+      "wallet": "5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9",
+      "children_count": 8,
+      "combined_grads": 13,
+      "best_mc": 3982985,
+      "note": "\ud83d\udd25 MEGA OPERATOR \u2014 CONFIRMED child: 985wHVZX (CAMINO +profitable). 7 other children tracked. Highest volume operator."
+    },
+    {
+      "wallet": "G5u7s6CNufkAvseFTpBbBk2qYg17hdRC1i2jasEgukBs",
+      "children_count": 3,
+      "combined_grads": 3,
+      "best_mc": 3460112,
+      "note": "\ud83d\udd25 DWOGE \u2014 CONFIRMED child: E2RtHD8N (Trump Coin +profitable). Also TRUTH + 1 other. 100% graduation rate."
+    },
+    {
+      "wallet": "2a2VX2ppv5BKkhuT4NvhVWGhdRPFmJWmg4nbZsJ1EWMU",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 16100000,
+      "note": "CONFIRMED child: EpEPwSwfR34P \u2014 HIGHEST PEAK in monster corpus $16.1M. Top priority new operator."
+    },
+    {
+      "wallet": "ao5VpeQqtaPiKWqsfj7DkFSVWvjwi2YyJFthosPpDit",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 11200000,
+      "note": "CONFIRMED child: 7YeCaAqhzhtR \u2014 3/3 100% graduation rate, $11.2M peak. SERIAL ALPHA creator. Watch every launch."
+    },
+    {
+      "wallet": "FmB2WWbg3mZ4czicDRfaey71r5AyR5bP16By4N9gQa2f",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 4750000,
+      "note": "CONFIRMED child: BXAWg4JbaeyvA \u2014 $4.75M peak monster."
+    },
+    {
+      "wallet": "A8FoDjKgbfKvJG14a5kT2ewYB14bfXsGj9GU8DWRALiu",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 3850000,
+      "note": "CONFIRMED child: A3fCppLyKaCEX \u2014 1/1 100%, $3.85M peak."
+    },
+    {
+      "wallet": "G2pZuZWMQquok8TbAwhtp2LoUMyfR2S5naTGMZj7Sqz",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 1730000,
+      "note": "CONFIRMED child: Ce74gzQGh9u1c \u2014 4/9 44% graduation rate, $1.73M peak. Serial deployer."
+    },
+    {
+      "wallet": "CStt1UKyYPLxHMW3qwavuzw6SertoYhb8hLEKv8ZeoAE",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 1350000,
+      "note": "CONFIRMED child: 4SDJTL6VcmQb4 \u2014 1/1 100%, $1.35M peak."
+    },
+    {
+      "wallet": "2snHHreXbpJ7UwZxPe37gnUNf7Wx7wv6UKDSR2JckKuS",
+      "children_count": 2,
+      "combined_grads": 2,
+      "best_mc": 1000000,
+      "note": "\ud83d\udd25 MULTI-HIT \u2014 2 confirmed monster children: 6vXpuTHoFeia + Afx8Y8XufX4n. Emerging serial operator."
+    },
+    {
+      "wallet": "C2xnFBhKJ4TCQAPnyistMq2j9mYRMR9NvMcwVm36sff5",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: 5b27vnkB8jeqN \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "HVX9PrZRm4DXUNLt8vxqw4zGedWGpkmjsDKF5WxRa49V",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: B3oLiV6oTMKZG \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "6NBwrrHH7e1NLxz2aR1D3nTugiAExrK8JUj1DkjkD1u2",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: HJHXoEMD3Az4s \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "6sG2UFKvSg8srVNQbrRNPzpg6iGeEDRARM7EaR9SKDuo",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: F7xVaw1eh6mX8 \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "FXv7aUeGs5MbttgP4oaCHBYCjkoacXPzuyXSSyyuMw5Z",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: CfkigDD8ig77b \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "7usofQ5r4sS3BkWt1XJNGhMYXQnqPhspf11t5WigHQcZ",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: FUuQKV53fUcZ8 \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "Gdpsc3n8eRHr7Vkdq5QzFPCtC2GQP2zSZbhKZCcE6M9P",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: 2RyUYqX1VFoGd \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "97Yd4wpsL8meLNZ2E5iTUZRmEztHYS5QNjJ8iPGxDXvq",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: AfxRMLKoc3Y6r \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "6cYynK24wJkbFKvqF6dQBHzZQWoeNixbhtzSNCbRawSh",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: Dz8Sdxa7S657c \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "CdNJvGo1sbArqZY75pmxxaFkqL5TdVjxkbmiq9Yj7M17",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: ESoMiyuJ1ksL5 \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "iGdFcQoyR2MwbXMHQskhmNsqddZ6rinsipHc4TNSdwu",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: G5WoM5TNp58a8 \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "AXKjp98vTZt25GesezaW28yv5pvZAk2V2REbbaHgS6Xt",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: J3k4T9XHhhAGr \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "8cmqES1XnEi6ajzycHYkAzbHLPFHm5fViC3NqZ4i4MSo",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: HYWo71Wk9PNDe \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "4dNUs2sQU7hepVKxbu9uaN5QXQWdBpApwgFNJApxkd5i",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: 7ufmve7ZSFCzu \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "ACUfBpj2GvkXoE7pH8AfBqTrbJTZA7Ra1jEo3tnsQkad",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: EUx12jXk8dQGj \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "9JbEkJacRZtQrUJdnQfafxU7NHtrnd7FpVnvd4fPBWtH",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: EtqiWsgCfNsxz \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "Ar5ZHQn85Ez6FkDTpFQrpNazyXHbteWX3mQBMZZbGAQ9",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: DYsBcLPoXj3N4 \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "JsEk3hXcd4ZEZC7T9wHyi9nUES3UvaW9NF3E46rGWD2",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: 3xVJVtHpyRJqp \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "6DaCVKh8Xdei3HeYFJh8Sfv8u6cbAkMuToUEsbVBFmxc",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: H8s4GoDcABkvy \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "HYRZV8G3xkohQCxwHdTQ7XRo26quTDTJvXSAK7dvtfXD",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: 7G9pbHHipn3av \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "6zRFqABJvvgkWq95seaHTY86a3QbRQb1piGwig4qwURf",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: 7XoNDwPakE8oh \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "Gc9MzUXFj3HvqTdbo4ZV5QiQRyeCRsTJC5Ap2Yts7Raj",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: FPrWHsHS2SVqS \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "6Se9sLUkB2EdUknYoWi7B7HbaopFzX7MK4kLh3GF7yES",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: CfkaAru9ArJ2t \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "C1DERu1G6LspNj6Fhc2TBzGMjtFq99QrBB3QdGkw6av1",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: CabEqWVu4fxCE \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "DfkcgxMfVuVP6aBpM8PZ348BkuSUBuPcwy22ToYaMDCo",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: FQwMhePTp2sQK \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "GP4fHGm6mVihTrbAPbHmr7vqQ6UqCCzDqvyiVVu5sTSW",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: 5cyxY3VatbHrf6 \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "C1Dm4Tu5vQfaJo8K3tFnTzCEXNwjjYVSJwVVYVDhFnJC",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: 6Foi4aj36N9SR \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "BPJAyXMTQuYaqhczu4iQZTW3bgaxLTw3Sm4ErCvZ6dHZ",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: E8hsZYTF7dmHZ \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "Cp8m2nRCDrQBfeFpPKMCXTFbuMKSdVDSvyJaTBuXM6Dv",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: EXFDkKcUY5R5F \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "AT9LnJ9yoWJqPqeV4FhWHDkyXaPRXycnwpLMs5epVM6b",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: CBpy8EDojUDMX \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "9abv4b3Mf3PdgmqY8mpHVUs8ij8XD4vknpsgXXyn3XMy",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: 3ifsnZfTfDN7r \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "3zq43t2ephe4b3Bch6gAZi4CMyXsvcWtaSa6Gu8voFjA",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: 8PPHLbTjvBNvz \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "85vSPRysh9FeJwePfz9fAiSqS1XieCHEMHtQEgKGC6Ak",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: 3LPDwbdCh7cGo \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "FVNp8pS5biGA73EYyk7Ef18c6SDisZeUTgXxe6dN7Fdg",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: EfkGWKfiLcVTN \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "KXzHMBj4xkHQpj87Qm3LtMh2FoA2Mw7zimFP3vXWvKG",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: 4p2xtGHxpMXuA \u2014 1000%+ monster. From 70-wallet corpus."
+    },
+    {
+      "wallet": "5BX4TkNHaG83R45tBjQ4FNxEpybb9dG5QarE4kgYYX2Y",
+      "children_count": 1,
+      "combined_grads": 1,
+      "best_mc": 0,
+      "note": "CONFIRMED child: 55i6Vo1BNz3gd \u2014 1000%+ monster. From 70-wallet corpus."
+    }
   ],
   "filtered_out_noise": {
     "churn_bots": [
@@ -114,6 +550,12 @@
       "9fdpKoBgZYx1CCskDNPq69Q2jqEzSvSrzhqFKBUoKLyG",
       "RQmGhBA8oNbtNqT2F9wX2tmvpySRn54SwzCyiYjLDuG",
       "Gd6uK59tMdFPNEFRtAYQKpHE9f17guj4oyii7v2y3iWn"
+    ],
+    "low_quality_operators": [
+      "is6MTRHEgyFLNTfYcuV4QBWLjrZBfmhVNYR6ccgr8KV"
+    ],
+    "low_quality_creators": [
+      "E6aukX8LRbs8iHboUFmGzFFFR5PyyiniWvrzoejcmYxX"
     ]
   }
 }
