@@ -718,7 +718,30 @@ async def _execute_monster_sell(mint: str, sell_fraction: float, runtime: Any) -
                 )
                 print(f"[monster] SELL TX {pos.get('token_name', mint[:8])} "
                       f"amount={sell_amount} pool={try_pool} slip={slip_pct}% sig={str(sig)[:20]}...")
-                return True, str(sig), est_sol_out
+
+                # Read ACTUAL SOL received from wallet balance change.
+                # The est_sol_out is a mark-to-market estimate that ignores
+                # bonding-curve slippage and can be wildly wrong (e.g. we
+                # estimated +0.3155 SOL but only received 0.034 SOL on-chain).
+                # Wait for the tx to land then read the real balance delta.
+                actual_sol_out = est_sol_out  # fallback if balance read fails
+                try:
+                    bal_before = await wallet_svc.get_sol_balance()
+                    await asyncio.sleep(4)  # wait for tx to land on-chain
+                    bal_after  = await wallet_svc.get_sol_balance()
+                    delta = bal_after - bal_before
+                    if delta > 0.0001:
+                        actual_sol_out = delta
+                        print(f"[monster] 💰 actual SOL received: {actual_sol_out:.4f} "
+                              f"(estimate was {est_sol_out:.4f}, "
+                              f"diff={actual_sol_out-est_sol_out:+.4f})")
+                    else:
+                        print(f"[monster] ⚠️  balance check inconclusive "
+                              f"(delta={delta:.4f}) — using estimate {est_sol_out:.4f}")
+                except Exception as _bal_err:
+                    print(f"[monster] balance read failed ({_bal_err}) — using estimate")
+
+                return True, str(sig), actual_sol_out
             except Exception as e:
                 last_err = str(e)
                 print(f"[monster] sell attempt {attempt_idx+1}/3 failed ({try_pool}, slip={slip_pct}%): {last_err[:150]}")
