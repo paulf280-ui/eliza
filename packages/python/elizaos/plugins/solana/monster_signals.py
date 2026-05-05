@@ -330,14 +330,11 @@ async def _creator_alpha_direct_entry(runtime: Any, session: aiohttp.ClientSessi
                     )
                     return
 
-                # PRICE-DIRECTION GATE: wait 6 seconds then re-check price.
-                # CoinGPT had -70%: at 61s after creation it was already DUMPING.
-                # BOOBFACE had +110%: at 34s it was still RISING.
-                # We can't tell these apart from a single snapshot — but two
-                # snapshots 6 seconds apart reveal the direction conclusively.
-                # Cost: 6s delay on every entry. Already arriving 30-90s after
-                # creation, so 6s more doesn't meaningfully change entry timing.
+                # ── SNAPSHOT 1: capture price + buyer activity ─────────────────
                 _price_snap1 = float(_best_pair.get("priceNative") or 0)
+                _m5_snap1_buys = int((_best_pair.get("txns") or {}).get("m5", {}).get("buys") or 0)
+                _m5_snap1_sells = int((_best_pair.get("txns") or {}).get("m5", {}).get("sells") or 0)
+
                 if _price_snap1 > 0:
                     await asyncio.sleep(6)
                     try:
@@ -352,13 +349,39 @@ async def _creator_alpha_direct_entry(runtime: Any, session: aiohttp.ClientSessi
                                         (p.get("liquidity") or {}).get("usd") or 0
                                     ))
                                     _price_snap2 = float(_best2.get("priceNative") or 0)
+                                    _m5_snap2_buys = int((_best2.get("txns") or {}).get("m5", {}).get("buys") or 0)
+                                    _m5_snap2_sells = int((_best2.get("txns") or {}).get("m5", {}).get("sells") or 0)
+
                                     if _price_snap2 > 0 and _price_snap1 > 0:
                                         _chg_pct = (_price_snap2 - _price_snap1) / _price_snap1 * 100
-                                        if _chg_pct < -3.0:
+
+                                        # DIRECTION GATE: price actively falling → dump in progress
+                                        if _chg_pct < -2.0:
                                             print(
                                                 f"[creator-alpha] ⏭ DIRECTION-GATE: {mint[:14]} "
-                                                f"price fell {_chg_pct:.1f}% in 6s — "
-                                                f"already dumping, not entering"
+                                                f"price fell {_chg_pct:.1f}% in 6s — dumping, skip"
+                                            )
+                                            return
+
+                                        # TRACTION GATE: price flat AND zero buy activity in m5.
+                                        # A genuine runner has buyers flowing in — price moves up or
+                                        # m5 buys increment between snapshots. Tokens with ZERO buys
+                                        # in both snapshots and flat price have no organic demand —
+                                        # they peaked at creation (bundler-only) and no one else cares.
+                                        # Only apply when DexScreener HAS had time to index (m5 > 0
+                                        # in either snapshot means it's indexed and active).
+                                        _m5_buys_total = _m5_snap1_buys + _m5_snap2_buys
+                                        _m5_sells_total = _m5_snap1_sells + _m5_snap2_sells
+                                        _price_flat = abs(_chg_pct) < 1.5
+                                        if (
+                                            _price_flat
+                                            and _m5_buys_total == 0
+                                            and _m5_sells_total > 0
+                                        ):
+                                            print(
+                                                f"[creator-alpha] ⏭ TRACTION-GATE: {mint[:14]} "
+                                                f"flat price ({_chg_pct:+.1f}%), 0 buys, {_m5_sells_total} sells — "
+                                                f"bundlers exiting with no buyers, skip"
                                             )
                                             return
                     except Exception:
