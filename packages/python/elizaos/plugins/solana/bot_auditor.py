@@ -38,7 +38,8 @@ _EXPECTED = {
     "creator_alpha_floor_pct":       (-25.0,  "-25% catastrophic floor"),
     "creator_alpha_tp1_mult":        (2.0,    "+100% TP target"),
     "creator_alpha_tp1_sell_frac":   (1.0,    "100% full exit at TP"),
-    "creator_alpha_max_entry_mc_usd": (20_000, "$20K MC gate"),
+    "creator_alpha_min_entry_mc_usd":  (6_000, "$6K MC floor — no organic buying below this"),
+    "creator_alpha_max_entry_mc_usd": (20_000, "$20K MC ceiling — already pumped above this"),
     "trading_paused":                (False,  "trading must NOT be paused"),
 }
 

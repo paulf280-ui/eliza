@@ -152,5 +152,6 @@
   "narrative_keyword_score": 0,
   "momentum_confirm_secs": 30,
   "macro_event_mode": false,
-  "macro_event_label": ""
+  "macro_event_label": "",
+  "creator_alpha_min_entry_mc_usd": 6000
 }

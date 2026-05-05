@@ -317,16 +317,40 @@ async def _creator_alpha_direct_entry(runtime: Any, session: aiohttp.ClientSessi
                     )
                     return
 
-                # MC gate — use highest-liquidity pair MC
+                # MC gate — two checks, ceiling AND floor:
+                #
+                # CEILING ($20K): token already pumped before we arrived
+                # (MARATHON entered at $47K after bundlers pumped it 88s)
+                #
+                # FLOOR ($6K): token has had NO organic buying beyond bundlers.
+                # All recent losses entered at $2,400-3,000 MC = 1-8% BC progress,
+                # meaning only the bundler bought. Genuine tokens reach $6K+ quickly
+                # because organic buyers push the price up.
+                # BOOBFACE $6.6K → ALLOWED (+110%) | UNCTON $2.4K → BLOCKED ✅
                 _best_pair = max(_pairs, key=lambda p: float(
                     (p.get("liquidity") or {}).get("usd") or 0
                 ))
                 _current_mc = float(_best_pair.get("marketCap") or 0)
+
+                try:
+                    from elizaos.plugins.solana import live_config as _lc_mc2
+                    _mc_floor = float(_lc_mc2.get("creator_alpha_min_entry_mc_usd", 6_000))
+                except Exception:
+                    _mc_floor = 6_000
+
                 if _current_mc > _mc_threshold:
                     print(
-                        f"[creator-alpha] ⏭ MC-GATE: {mint[:14]} MC=${_current_mc:,.0f} "
-                        f"already above ${_mc_threshold:,.0f} threshold — "
+                        f"[creator-alpha] ⏭ MC-CEILING: {mint[:14]} MC=${_current_mc:,.0f} "
+                        f"already above ${_mc_threshold:,.0f} — "
                         f"pump happened before we arrived, skipping"
+                    )
+                    return
+
+                if _current_mc > 0 and _current_mc < _mc_floor:
+                    print(
+                        f"[creator-alpha] ⏭ MC-FLOOR: {mint[:14]} MC=${_current_mc:,.0f} "
+                        f"below ${_mc_floor:,.0f} minimum — "
+                        f"only bundlers bought, no organic interest yet, skipping"
                     )
                     return
 

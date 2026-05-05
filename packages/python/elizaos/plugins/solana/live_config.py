@@ -263,9 +263,11 @@ _config: dict = {
     "creator_alpha_floor_pct":        -25.0,   # -25% catastrophic floor from entry (same as monster)
     "creator_alpha_tp1_mult":          2.0,    # +100% TP trigger
     "creator_alpha_tp1_sell_frac":     1.0,    # sell 100% at TP — hard full exit, no moonbag
-    "creator_alpha_max_entry_mc_usd":  20_000, # MC gate: skip if token already pumped above this
-                                               # MARATHON entered at $47K (10 bundlers pumped in 88s) → blocked
-                                               # BOOBFACE entered at $6.6K (fresh) → allowed
+    "creator_alpha_min_entry_mc_usd":   6_000, # MC FLOOR: skip if MC below this — only bundlers bought
+                                               # All recent losses entered at $2.4-3K MC (1-8% BC progress)
+                                               # UNCTON $2.4K → blocked | BOOBFACE $6.6K → allowed
+    "creator_alpha_max_entry_mc_usd":  20_000, # MC CEILING: skip if already pumped above this
+                                               # MARATHON entered at $47K → blocked | Homunculus $8K → allowed
 
     # ── Split-buy ("Harvester + Monster Hunter") dual position system ──────────
     # When enabled: each qualifying token opens TWO positions simultaneously.
