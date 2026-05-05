@@ -31,10 +31,10 @@ _last_audit_ts: float = 0.0
 
 # ── Expected values for the current strategy (hard-TP era, 2026-05-04+) ──
 _EXPECTED = {
-    "monster_default_size_sol":      (0.2,    "0.2 SOL per trade"),
-    "creator_alpha_size_sol":        (0.2,    "0.2 SOL per trade (creator-alpha)"),
-    "monster_max_concurrent":        (2,      "2 concurrent positions"),
-    "creator_alpha_max_concurrent":  (2,      "2 concurrent positions (creator-alpha)"),
+    "monster_default_size_sol":      (0.1,    "0.1 SOL per trade (reduced for BC price impact)"),
+    "creator_alpha_size_sol":        (0.1,    "0.1 SOL per trade (halved — BC slippage fix)"),
+    "monster_max_concurrent":        (1,      "1 concurrent position (low wallet, conservative)"),
+    "creator_alpha_max_concurrent":  (1,      "1 concurrent position (low wallet, conservative)"),
     "creator_alpha_floor_pct":       (-25.0,  "-25% catastrophic floor"),
     "creator_alpha_tp1_mult":        (2.0,    "+100% TP target"),
     "creator_alpha_tp1_sell_frac":   (1.0,    "100% full exit at TP"),
