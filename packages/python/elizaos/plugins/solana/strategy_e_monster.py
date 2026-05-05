@@ -271,16 +271,35 @@ async def open_monster_position(
     except Exception:
         pass
 
-    # Holder-guard entry check. Log-only by default (HOLDER_GUARD_ENFORCE=false);
-    # when enforcing, a hard-block decision returns False here and the scout's
-    # attempt to open is vetoed. TRADE-class failures land in block_reasons.
+    # Holder-guard entry check — two enforcement tiers:
+    #
+    # ALWAYS BLOCK (regardless of HOLDER_GUARD_ENFORCE flag):
+    #   - top10 concentration > 35%  (67% top10 = S&P500 rug, certain dump)
+    #   - dev holding > 5%            (dev holds 67% = they will dump on you)
+    #   These are absolute rug indicators. No legitimate quality token has these.
+    #
+    # LOG-ONLY (respects HOLDER_GUARD_ENFORCE, currently False):
+    #   - bundle_bot detected          (some good tokens have creation-slot buyers)
+    #   - Other soft signals
     try:
         from elizaos.plugins.solana.holder_guard import HolderGuard, config as _hg_cfg
         _guard = HolderGuard()
         _g_dec = await _guard.evaluate_entry(session, mint, scout=signal_source)
-        if _g_dec.hard_block and _hg_cfg.HOLDER_GUARD_ENFORCE:
-            print(f"[monster] 🛑 holder-guard veto on {token_name} ({mint[:8]}) — {'; '.join(_g_dec.block_reasons)}")
-            return False
+        if _g_dec.hard_block:
+            _reasons = _g_dec.block_reasons or []
+            # Check for CONCENTRATION blocks — always enforce these
+            _concentration_block = any(
+                "top10=" in r or "dev=" in r or "top10_pct" in r
+                for r in _reasons
+            )
+            if _concentration_block:
+                print(f"[monster] 🛑 CONCENTRATION BLOCK {token_name} ({mint[:8]}) "
+                      f"— {'; '.join(_reasons)}")
+                return False
+            # All other blocks (bundle_bot etc.) respect ENFORCE flag
+            elif _hg_cfg.HOLDER_GUARD_ENFORCE:
+                print(f"[monster] 🛑 holder-guard veto on {token_name} ({mint[:8]}) — {'; '.join(_reasons)}")
+                return False
     except Exception as _hg_err:
         print(f"[holder-guard] entry-check failure (non-fatal): {_hg_err}")
 
