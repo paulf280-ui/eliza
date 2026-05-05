@@ -64,7 +64,7 @@ BUY_RATIO_FLOOR           = 30.0   # sustained <30% for 10min → exit
 BUY_RATIO_SUSTAIN_SECS    = 600    # 10 min
 
 # Price refresh cadence
-MONITOR_INTERVAL_SECS     = 15
+MONITOR_INTERVAL_SECS     = 6   # 6s ticks — TP fires much faster, peak lasts seconds on BC
 
 # ─── Feature flags (env-driven, default SAFE: disabled / paper-only) ────
 def _env_on(key: str, default: str = "false") -> bool:
@@ -698,10 +698,41 @@ async def _execute_monster_sell(mint: str, sell_fraction: float, runtime: Any) -
             if sell_amount <= 0:
                 return False, None, 0.0
 
-        # Pool ladder: try configured pool first, then the other PumpPortal
-        # option. Slippage ladder 50 → 70 → 90 so panic exits still land when
-        # the book thins out.
+        # ── Pre-sell: check if token has GRADUATED since entry ───────────────
+        # If entered on BC (pool=pump) but now on PumpSwap, sell on AMM.
+        # AMM slippage is far lower than BC slippage for 0.2 SOL sells.
         cfg_pool = pos.get("pool", "pump-amm")
+        try:
+            import aiohttp as _aio_ps
+            async with _aio_ps.ClientSession() as _ps_sess:
+                async with _ps_sess.get(
+                    f"https://api.dexscreener.com/latest/dex/tokens/{mint}",
+                    timeout=_aio_ps.ClientTimeout(total=4),
+                ) as _ps_r:
+                    if _ps_r.status == 200:
+                        _ps_pairs = (await _ps_r.json()).get("pairs") or []
+                        _has_amm = any(
+                            p.get("dexId") in ("pump-amm","pumpswap","raydium")
+                            for p in _ps_pairs
+                        )
+                        _best_ps = max(
+                            _ps_pairs,
+                            key=lambda p: float((p.get("liquidity") or {}).get("usd") or 0),
+                            default=None,
+                        )
+                        _fresh_price = float(_best_ps.get("priceNative") or 0) if _best_ps else 0
+                        _entry_p = pos.get("entry_price") or 0
+                        if _fresh_price > 0 and _entry_p > 0:
+                            _fresh_pnl = (_fresh_price / _entry_p - 1) * 100
+                            print(f"[monster] 🔄 pre-sell check {mint[:8]}: "
+                                  f"fresh_pnl={_fresh_pnl:+.1f}% "
+                                  f"(decision was {(pos.get('current_price',_entry_p)/_entry_p-1)*100:+.1f}%)")
+                            if _has_amm and cfg_pool == "pump":
+                                cfg_pool = "pump-amm"
+                                print(f"[monster] 📈 token graduated — upgrading sell to pump-amm pool")
+        except Exception:
+            pass  # pre-sell check failed — continue with original pool
+
         pool_order = [cfg_pool, "pump-amm" if cfg_pool == "pump" else "pump"]
         slippage_ladder = [50, 70, 90]
         last_err = ""

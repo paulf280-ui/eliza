@@ -258,7 +258,7 @@ _config: dict = {
     # ── Creator-alpha strategy (operator/creator wallet sniper) ───────────────
     # Hard +100% TP era (2026-05-04): full exit at +100%, -25% catastrophic floor.
     # 0.2 SOL per trade × 2 concurrent = 0.4 SOL max exposure.
-    "creator_alpha_size_sol":          0.20,    # 0.2 SOL per entry — matches monster standard
+    "creator_alpha_size_sol":          0.10,    # 0.1 SOL per entry — halved to reduce BC price impact on sells
     "creator_alpha_max_concurrent":    2,       # 2 concurrent positions (matches monster_max_concurrent)
     "creator_alpha_floor_pct":        -25.0,   # -25% catastrophic floor from entry (same as monster)
     "creator_alpha_tp1_mult":          2.0,    # +100% TP trigger
