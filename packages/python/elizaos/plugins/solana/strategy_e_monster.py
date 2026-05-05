@@ -568,8 +568,25 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
     if not tp1_fired and pnl_pct <= floor_pct:
         return f"pre_tp1_floor_{pnl_pct:.0f}pct", 1.0
 
+    # ── Time-based stagnation exit ───────────────────────────────────────
+    # If a position has been open >10 minutes and peak PnL never exceeded 15%,
+    # the token never had real momentum — bank whatever small profit/loss exists
+    # and free the slot for the next genuine signal.
+    #
+    # Data: Trade #2 sat for 4h20m at +1.3% peak, blocking a slot all night.
+    # Trades #8, #9, #10 sat 1-8 minutes at sub-5% peaks, wasting entries.
+    # None of them were going to hit 100% TP. Exit early, free the slot.
+    #
+    # Safe for winners: Homunculus (+118%) peaked at +118% within 7 min —
+    # peak_pnl_pct exceeds 15% immediately so this gate never fires on runners.
+    if not tp1_fired:
+        age_secs = now - float(pos.get("entry_ts") or now)
+        peak_pnl = float(pos.get("peak_pnl_pct") or 0.0)
+        if age_secs > 600 and peak_pnl < 15.0:
+            return f"stagnant_no_momentum_{int(age_secs//60)}min_peak{peak_pnl:.1f}pct", 1.0
+
     # ── Pre-TP flat gate: DISABLED (was misfiring, closing too early)
-    # New strategy: let TP (+100%) and Groq evaluator (30-40% range) handle exits.
+    # New strategy: let TP (+100%) and Groq evaluator (15-80% range) handle exits.
 
     # ── Post-TP1 lottery ticket state machine ───────────────────────────────
     # The 10% bag is the "lottery play" — user can watch on phone and manually close.
