@@ -135,38 +135,61 @@ def _is_creator_alpha_source(source: str | None) -> bool:
     return bool(source) and (source.startswith("creator_alpha"))
 
 
+def _is_lifecycle_source(source: str | None) -> bool:
+    return bool(source) and source.startswith(("lifecycle", "pumpswap_grad", "graduation"))
+
+
 def get_size_for_source(source: str | None) -> float:
-    """Return the trade size for a given signal_source — creator_alpha gets
-    its own (smaller) sizing; everything else uses the standard monster size."""
+    """Return the trade size for a given signal_source."""
     if _is_creator_alpha_source(source):
         try:
             from elizaos.plugins.solana import live_config as _lc
             return float(_lc.get("creator_alpha_size_sol", 0.10))
         except Exception:
             return 0.10
+    if _is_lifecycle_source(source):
+        try:
+            from elizaos.plugins.solana import live_config as _lc
+            return float(_lc.get("lifecycle_size_sol", 0.10))
+        except Exception:
+            return 0.10
     return get_default_size_sol()
 
 
 def get_floor_for_source(source: str | None) -> float:
-    """Catastrophic floor (negative %) — creator_alpha gets a much wider floor
-    (-75% default) since monster runs often dip deeply before launching."""
+    """Catastrophic floor (negative %)."""
     if _is_creator_alpha_source(source):
         try:
             from elizaos.plugins.solana import live_config as _lc
-            return float(_lc.get("creator_alpha_floor_pct", -75.0))
+            return float(_lc.get("creator_alpha_floor_pct", -25.0))
         except Exception:
-            return -75.0
+            return -25.0
+    if _is_lifecycle_source(source):
+        # Tighter floor for AMM — AMM tokens move more orderly than BC
+        try:
+            from elizaos.plugins.solana import live_config as _lc
+            return float(_lc.get("lifecycle_floor_pct", -20.0))
+        except Exception:
+            return -20.0
     return MONSTER_PRE_TP1_FLOOR_PCT
 
 
 def get_tp1_mult_for_source(source: str | None) -> float:
-    """TP1 trigger multiple — creator_alpha targets +100% by default vs +20% standard."""
+    """TP1 trigger multiple."""
     if _is_creator_alpha_source(source):
         try:
             from elizaos.plugins.solana import live_config as _lc
             return float(_lc.get("creator_alpha_tp1_mult", 2.0))
         except Exception:
             return 2.0
+    if _is_lifecycle_source(source):
+        # Data: 21 winning PumpSwap grad-snipes averaged +69% at TP.
+        # +60% TP is consistent and achievable. NOT +100% (AMM != BC).
+        try:
+            from elizaos.plugins.solana import live_config as _lc
+            return float(_lc.get("lifecycle_tp1_mult", 1.60))
+        except Exception:
+            return 1.60
     return 1.0 + (MONSTER_TP1_GAIN_PCT / 100.0)
 
 

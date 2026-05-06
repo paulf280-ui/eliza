@@ -1690,20 +1690,27 @@ async def _serial_after_graduation(runtime: Any, session: aiohttp.ClientSession,
 #   * m5 price change ≤ +5%     (don't buy the micro-spike)
 #   * socials present on base token
 
-LIFECYCLE_MIN_LIQ_USD       = 30_000          # dropped 50k → 30k 2026-04-29: fresh tokens commonly sit at $30-45k for the first 60-90min; with 0.45 SOL trades the pool impact stays under 2%
+# ── GRADUATION SNIPE thresholds — derived from 21 winning PumpSwap trades ──
+# Data: winning entry MC avg=$149K median=$115K, liq ≥$14K, age 20-240min.
+# Previous MIN_MC_USD=250K was 5-10x past the optimal entry — that's why the
+# lifecycle scout kept missing opportunities. Correct entry is POST-graduation
+# cool-off: $25K-$300K MC, real liquidity, buyers still present.
+LIFECYCLE_MIN_LIQ_USD       = 15_000   # was 30K — winning trades needed ≥$14K
 LIFECYCLE_MAX_LIQ_USD       = 300_000
-LIFECYCLE_MIN_MC_USD        = 250_000          # dropped 300k → 250k 2026-04-29: Sunny-class post-peak rollovers ($250-300k mc) blocked at the floor; watchlist still gates entry on bounce confirmation
-LIFECYCLE_MAX_MC_USD        = 3_000_000
+LIFECYCLE_MIN_MC_USD        = 25_000   # was 250K — CATASTROPHICALLY WRONG.
+                                        # 21 winning trades: median $115K, min $30K.
+                                        # 250K waited until tokens already 5-10x.
+LIFECYCLE_MAX_MC_USD        = 300_000  # was 3M — focus early-stage $25K-$300K
 LIFECYCLE_MIN_LIQ_MC_RATIO  = 0.04
-LIFECYCLE_MAX_LIQ_MC_RATIO  = 0.20
-LIFECYCLE_MIN_AGE_SECS      = 20 * 60         # 20min (dropped 60→20 on 2026-04-21; MIM/hijabunc/TERMINAL/ALTSZN all spiked at 30-45min)
-LIFECYCLE_MAX_AGE_SECS      = 90 * 60         # 90min (tightened 6h → 90min 2026-04-20; MIM/hijabunc bled at 126/167min)
+LIFECYCLE_MAX_LIQ_MC_RATIO  = 0.30    # was 0.20 — allow higher liq/mc (fresher grads)
+LIFECYCLE_MIN_AGE_SECS      = 20 * 60  # 20min minimum — past initial FOMO spike
+LIFECYCLE_MAX_AGE_SECS      = 240 * 60 # was 90min — 4h window for cool-off entries
 LIFECYCLE_TOP1_MAX_PCT      = 10.0
 LIFECYCLE_BUY_RATIO_MIN     = 48.0
-LIFECYCLE_BUY_RATIO_MAX     = 65.0
-LIFECYCLE_H1_CHANGE_MAX_PCT = 100.0           # raised 40→100 (2026-04-23): SAM +300% in 3h was rejected by the old cap
-LIFECYCLE_H1_CHANGE_MIN_PCT = -10.0           # added 2026-04-24: reject free-falling tokens. TRADE entered at h1=-38.7% and died -17%.
-LIFECYCLE_M5_CHANGE_MAX_PCT = 15.0            # raised 5→15 (2026-04-23): caught only pullbacks, missed first-leg breakouts. Safety held by mcap velocity + peak ratio + LP burn.
+LIFECYCLE_BUY_RATIO_MAX     = 80.0    # was 65 — allow strongly buy-heavy tokens
+LIFECYCLE_H1_CHANGE_MAX_PCT = 200.0   # was 100 — allow larger initial moves
+LIFECYCLE_H1_CHANGE_MIN_PCT = -30.0   # was -10 — allow healthy pullbacks
+LIFECYCLE_M5_CHANGE_MAX_PCT = 20.0    # was 15 — slightly looser
 
 
 async def _fetch_via_search(session: aiohttp.ClientSession, query: str) -> list[dict]:

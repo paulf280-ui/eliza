@@ -263,6 +263,13 @@ _config: dict = {
     "creator_alpha_floor_pct":        -25.0,   # -25% catastrophic floor from entry (same as monster)
     "creator_alpha_tp1_mult":          2.0,    # +100% TP trigger
     "creator_alpha_tp1_sell_frac":     1.0,    # sell 100% at TP — hard full exit, no moonbag
+    # ── Lifecycle / post-graduation snipe ────────────────────────────────────
+    # Enters tokens that graduated from pump.fun BC and cooled off on PumpSwap.
+    # Data: 21 qualifying trades = 100% win rate, avg +69%, TP at +60%.
+    "lifecycle_size_sol":      0.10,   # 0.1 SOL per trade (conservative while rebuilding)
+    "lifecycle_floor_pct":    -20.0,   # -20% floor (tighter than BC — AMM is orderly)
+    "lifecycle_tp1_mult":      1.60,   # +60% TP — proven by 21/21 wins in data
+
     "creator_alpha_min_entry_mc_usd":   6_000, # MC FLOOR: skip if MC below this — only bundlers bought
                                                # All recent losses entered at $2.4-3K MC (1-8% BC progress)
                                                # UNCTON $2.4K → blocked | BOOBFACE $6.6K → allowed
