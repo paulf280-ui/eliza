@@ -247,7 +247,7 @@ _CREATOR_ALPHA_PRIORITY_H1_MAX   = 600       # vs LIFECYCLE_H1_CHANGE_MAX_PCT=10
 # Direct-entry mode — fire entry on token creation rather than waiting for
 # graduation. With this enabled the bot enters at $5-30k MC instead of
 # $50-100k+ MC. Uses pump.fun bonding-curve buy via PumpPortal pool="pump".
-CREATOR_ALPHA_DIRECT_ENTRY = True
+CREATOR_ALPHA_DIRECT_ENTRY = _env_on("CREATOR_ALPHA_DIRECT_ENTRY_ENABLED", "true")
 
 
 def mark_creator_alpha_priority(mint: str, source: str, creator: str | None,
