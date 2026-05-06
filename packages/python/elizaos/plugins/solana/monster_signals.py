@@ -1944,17 +1944,36 @@ async def lifecycle_scout_loop(runtime: Any,
                     m5_change = float(pc.get("m5") or 0)
                     h1_max = _CREATOR_ALPHA_PRIORITY_H1_MAX if priority_rec else LIFECYCLE_H1_CHANGE_MAX_PCT
                     if h1_change > h1_max:
-                        # Viral override: catch early-pump fresh-grads that
-                        # DexScreener reports with inflated h1 (since pair has
-                        # < 1h of data). 5-token backtest showed CCP/FOFAR/EVA
-                        # all viral-positive at +10min and TP+20% would have
-                        # hit in same minute.
                         if not viral_eligible:
                             cycle_rejects["h1_high"] += 1
-                            continue  # ran too hard in the last hour — chase risk
+                            continue
                     if h1_change < LIFECYCLE_H1_CHANGE_MIN_PCT:
                         cycle_rejects["h1_low"] += 1
-                        continue  # falling knife — token is mid-fade, don't catch
+                        continue
+
+                    # ── COOL-OFF POSITION CHECK ──────────────────────────────
+                    # Florentina lesson: the bot entered at $163K when the h6
+                    # showed a big 6h run. The token had peaked at ~$250K and
+                    # was only 35% below peak — recovery bounce was already
+                    # well underway. The IDEAL entry (shown on chart) was at
+                    # $80-100K = 60-70% below peak.
+                    #
+                    # Rule: if the token had a large 6h run (h6 > 150%) but
+                    # h1 is POSITIVE (>+15%), the price has already recovered
+                    # significantly from its cool-off low. We're entering into
+                    # a bounce, not into a cool-off. Skip.
+                    #
+                    # If h6 big AND h1 is flat-to-negative → we ARE in the
+                    # cool-off window → allow entry.
+                    pc_h6 = float((p.get("priceChange") or {}).get("h6") or 0)
+                    if pc_h6 > 150 and h1_change > 15:
+                        cycle_rejects["cooloff_missed"] = cycle_rejects.get("cooloff_missed", 0) + 1
+                        if on_watch:
+                            print(f"[monster-lifecycle] ⏱ {mint[:8]} cool-off missed — "
+                                  f"h6={pc_h6:+.0f}% but h1={h1_change:+.1f}% (recovery bounce running, "
+                                  f"ideal entry was earlier in the dip)")
+                            _lifecycle_deferred.pop(mint, None)
+                        continue
 
                     # Wash-trading cap — vol_m5/liq > 3x is the same gate the
                     # breakout scout uses; lifecycle_bounce was bypassing it.
@@ -2191,6 +2210,60 @@ async def lifecycle_scout_loop(runtime: Any,
                         "h1_change_pct": h1_change,
                         "m5_change_pct": m5_change,
                     })
+                    # ── GROQ ENTRY CONFIRMATION ───────────────────────────
+                    # Fast Groq check (200-400ms) before committing SOL.
+                    # Groq looks at the full price context and flags if we're
+                    # chasing a recovery bounce rather than entering a cool-off.
+                    # Florentina: h6=+400%, h1=+4%, MC=$163K — Groq would flag
+                    # "h6 shows big 6h run, current MC near recovery high, wait
+                    # for deeper cool-off or next confirmed dip."
+                    _groq_entry_ok = True
+                    _groq_skip_reason = ""
+                    try:
+                        _groq_key_lc = os.getenv("GROQ_API_KEY", "")
+                        if _groq_key_lc:
+                            pc_h6_lc = float((p.get("priceChange") or {}).get("h6") or 0)
+                            pc_h24_lc = float((p.get("priceChange") or {}).get("h24") or 0)
+                            _entry_prompt = (
+                                f"Post-graduation cool-off entry check. Token facts:\n"
+                                f"Age: {age_secs/60:.0f} min | MC: ${mc_usd:,.0f} | Liq: ${liq_usd:,.0f}\n"
+                                f"Price changes: m5={m5_change:+.1f}% h1={h1_change:+.1f}% h6={pc_h6_lc:+.0f}% h24={pc_h24_lc:+.0f}%\n"
+                                f"Buy ratio (h1): {br:.0f}% | Top10 holders: {t10:.1f}%\n\n"
+                                f"Strategy: enter during the COOL-OFF phase after a big initial pump, "
+                                f"before the second leg up. Ideal: price 40-70% below recent peak, "
+                                f"h1 flat or mildly negative, buyers returning.\n\n"
+                                f"Is this a valid cool-off entry RIGHT NOW, or has recovery already "
+                                f"run too far? Reply JSON only: "
+                                f'{{\"enter\": true/false, \"reason\": \"one sentence\"}}'
+                            )
+                            async with session.post(
+                                "https://api.groq.com/openai/v1/chat/completions",
+                                headers={"Authorization": f"Bearer {_groq_key_lc}", "Content-Type": "application/json"},
+                                json={"model": "llama-3.3-70b-versatile",
+                                      "messages": [{"role": "user", "content": _entry_prompt}],
+                                      "temperature": 0.1, "max_tokens": 80},
+                                timeout=aiohttp.ClientTimeout(total=4),
+                            ) as _gr:
+                                if _gr.status == 200:
+                                    _grd = await _gr.json()
+                                    _raw = (_grd.get("choices") or [{}])[0].get("message", {}).get("content", "") or ""
+                                    import json as _json_gr
+                                    try:
+                                        _clean = _raw.strip().strip("```json").strip("```").strip()
+                                        _parsed = _json_gr.loads(_clean)
+                                        _groq_entry_ok = bool(_parsed.get("enter", True))
+                                        _groq_skip_reason = _parsed.get("reason", "")
+                                        if not _groq_entry_ok:
+                                            print(f"[monster-lifecycle] 🤖 GROQ SKIP {mint[:8]}: {_groq_skip_reason}")
+                                    except Exception:
+                                        pass  # parse fail → allow entry
+                    except Exception:
+                        pass  # Groq unreachable → allow entry
+
+                    if not _groq_entry_ok:
+                        cycle_rejects["groq_skip"] = cycle_rejects.get("groq_skip", 0) + 1
+                        continue
+
                     # Drop from watchlist on entry; the position now lives in
                     # _monster_positions and the deferred snapshot history is no
                     # longer needed.
