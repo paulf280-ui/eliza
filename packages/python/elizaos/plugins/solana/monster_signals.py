@@ -1815,9 +1815,9 @@ LIFECYCLE_MIN_MC_USD        = 25_000   # was 250K — CATASTROPHICALLY WRONG.
 LIFECYCLE_MAX_MC_USD        = 300_000  # was 3M — focus early-stage $25K-$300K
 LIFECYCLE_MIN_LIQ_MC_RATIO  = 0.04
 LIFECYCLE_MAX_LIQ_MC_RATIO  = 0.60    # was 0.30 — 0.30 contradicted min_liq for MC < $50K (impossible zone)
-LIFECYCLE_MIN_AGE_SECS         = 20 * 60  # default 20min — past initial FOMO spike
-LIFECYCLE_WEBHOOK_MIN_AGE_SECS =  5 * 60  # 5min for Helius webhook grads — we know exact graduation time
-LIFECYCLE_MAX_AGE_SECS         = 90 * 60  # 90min ceiling — was 240min, tokens >90min already had their move
+LIFECYCLE_MIN_AGE_SECS         = 30 * 60  # 30min floor — Kabina at 21min proved 20min still too volatile
+LIFECYCLE_WEBHOOK_MIN_AGE_SECS = 15 * 60  # 15min for Helius webhook grads — UFO at 6min proved 5min too hot
+LIFECYCLE_MAX_AGE_SECS         = 90 * 60  # 90min ceiling — tokens >90min already had their move
 LIFECYCLE_TOP1_MAX_PCT      = 10.0
 LIFECYCLE_BUY_RATIO_MIN     = 48.0
 LIFECYCLE_BUY_RATIO_MAX     = 80.0    # was 65 — allow strongly buy-heavy tokens
@@ -2124,6 +2124,19 @@ async def lifecycle_scout_loop(runtime: Any,
                         print(f"[monster-lifecycle] 🌊 {mint[:8]} wash-override: "
                               f"vol/liq={vol_m5_lc/liq_usd:.1f}x but m5_buys={lc_m5_buys} "
                               f"≥ {BREAKOUT_WASH_OVERRIDE_BUYERS} — viral momentum, allow")
+
+                    # ── Young token guard ────────────────────────────────
+                    # Tokens under 30min are still in early volatility. Even
+                    # when m5 looks "good" (calm), DexScreener lag can mask
+                    # an active dump. Under-30min tokens MUST prove a bounce
+                    # from a watchlisted pullback — never enter via direct
+                    # standard path. Kabina (21min, -23% in 2min) & UFO
+                    # (6min, -23% in 1min) post-mortem 2026-05-09.
+                    if age_secs < 30 * 60 and not on_watch and not priority_rec:
+                        _lifecycle_record_snapshot(mint, float(p.get("priceNative") or 0), m5_change, h1_change, liq_usd)
+                        cycle_added_to_watchlist += 1
+                        print(f"[monster-lifecycle] 👶 {mint[:8]} young ({age_secs/60:.0f}min) — watchlist only, need bounce confirmation")
+                        continue
 
                     # ── Entry-shape gate (with bounce-watchlist) ─────────
                     # Instead of rejecting bad-shape tokens outright, defer
