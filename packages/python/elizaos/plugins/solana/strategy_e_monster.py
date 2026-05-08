@@ -106,6 +106,22 @@ def _load_state() -> None:
 
 def _save_state() -> None:
     MONSTER_POSITIONS_FILE.write_text(json.dumps(_monster_positions, indent=2))
+    # Before writing closed trades, preserve any records that were manually
+    # corrected with real on-chain data (marked by _on_chain_note). This
+    # prevents blockchain-verified P&L from being overwritten by the
+    # in-memory ghost_purge/-100% values every time _save_state fires.
+    try:
+        if MONSTER_CLOSED_TRADES_FILE.exists():
+            _on_chain_corrections: dict[str, dict] = {}
+            for rec in json.loads(MONSTER_CLOSED_TRADES_FILE.read_text()):
+                if rec.get("_on_chain_note") and rec.get("mint"):
+                    _on_chain_corrections[rec["mint"]] = rec
+            if _on_chain_corrections:
+                for i, rec in enumerate(_monster_closed):
+                    if rec.get("mint") in _on_chain_corrections:
+                        _monster_closed[i] = _on_chain_corrections[rec["mint"]]
+    except Exception:
+        pass
     MONSTER_CLOSED_TRADES_FILE.write_text(json.dumps(_monster_closed, indent=2))
 
 

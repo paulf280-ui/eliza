@@ -1880,8 +1880,25 @@ When adjusting a filter, always explain your reasoning based on the data above."
             # list so the dashboard trade cards surface BOTH strategies.
             merged: list[dict] = list(_paper_trades[-50:]) if copy_trade_enabled else []
             try:
-                from elizaos.plugins.solana import strategy_e_monster as _mon
-                for mc in _mon._monster_closed[-50:]:
+                import json as _json_hist, os as _os_hist
+                _mc_path = _os_hist.path.join(_os_hist.path.dirname(__file__), "monster_closed_trades.json")
+                _corr_path = _os_hist.path.join(_os_hist.path.dirname(__file__), "monster_corrections.json")
+                if _os_hist.path.exists(_mc_path):
+                    _mc_all = _json_hist.loads(open(_mc_path).read())
+                else:
+                    from elizaos.plugins.solana import strategy_e_monster as _mon
+                    _mc_all = _mon._monster_closed
+                # Merge on-chain verified corrections — this file is never
+                # touched by _save_state so corrections survive all restarts
+                _corrections: dict = {}
+                if _os_hist.path.exists(_corr_path):
+                    _corrections = _json_hist.loads(open(_corr_path).read())
+                if _corrections:
+                    for _i, _rec in enumerate(_mc_all):
+                        _cm = _rec.get("mint", "")
+                        if _cm in _corrections:
+                            _mc_all[_i] = {**_rec, **_corrections[_cm]}
+                for mc in _mc_all[-50:]:
                     entry_p = float(mc.get("entry_price") or 0)
                     close_p = float(mc.get("close_price") or entry_p)
                     entry_ts = float(mc.get("entry_ts") or 0)
