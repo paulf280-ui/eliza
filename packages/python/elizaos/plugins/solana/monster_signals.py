@@ -2146,6 +2146,22 @@ async def lifecycle_scout_loop(runtime: Any,
                     cycle_passed_baseline += 1
                     price_native = float(p.get("priceNative") or p.get("priceUsd") or 0)
                     shape, shape_reason = _lifecycle_classify_entry_shape(m5_change, h1_change)
+
+                    # ── Watchlist-first gate ─────────────────────────────────
+                    # If h1 > 30% and the token has never been on our watchlist,
+                    # force it through the watchlist path. We need to see a
+                    # confirmed pullback + bounce before entry — not just a calm
+                    # m5 mid-upswing. DISCLOSURE: h1=+617%, m5 calm, entered on
+                    # the way UP not at support. The white-line support zones only
+                    # appear AFTER a pullback; the bounce path enforces that.
+                    if (not on_watch and not priority_rec and not viral_eligible
+                            and h1_change > 30.0 and shape == "good"):
+                        _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
+                        cycle_added_to_watchlist += 1
+                        print(f"[monster-lifecycle] 📋 {mint[:8]} h1=+{h1_change:.0f}% "
+                              f"never watchlisted — require pullback+bounce before entry")
+                        continue
+
                     if shape != "good" and not viral_eligible and not priority_rec:
                         # Viral override fast-paths through the shape gate — at the
                         # peak of a viral pump, m5 will read "overheated" (>+8%) but

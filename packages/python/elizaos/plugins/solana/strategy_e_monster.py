@@ -1195,19 +1195,35 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                                 # it's an externally-closed (manual / stall / Jupiter)
                                 # sale, not a phantom rug. Use the net we know.
                                 _had_partials = bool(pos.get("partial_exits"))
-                                _final_sol = _locked - _spent if _had_partials else -_spent
-                                _final_pct = (
-                                    (_final_sol / _spent * 100.0) if _spent > 0 and _had_partials
-                                    else -100.0
-                                )
+                                # Use the last monitored price as exit price — it's
+                                # updated every 6s so is close to the actual manual
+                                # sell price. Much better than showing -100% / entry
+                                # price when the user manually closed on Phantom.
+                                _last_known_price = float(pos.get("current_price") or entry_price)
+                                if _had_partials:
+                                    _final_sol = _locked - _spent
+                                    _final_pct = (_final_sol / _spent * 100.0) if _spent > 0 else -100.0
+                                    _close_reason = "externally_closed"
+                                    _close_price = _last_known_price
+                                elif _last_known_price > 0 and entry_price > 0:
+                                    # Manual sell detected — use last known price for P&L
+                                    _final_pct = (_last_known_price / entry_price - 1.0) * 100.0
+                                    _final_sol = _spent * (_final_pct / 100.0)
+                                    _close_reason = "manual_close"
+                                    _close_price = _last_known_price
+                                    print(f"[monster] 👤 manual close {tn}: "
+                                          f"est pnl={_final_pct:+.1f}% at price={_last_known_price:.3e}")
+                                else:
+                                    _final_sol = -_spent
+                                    _final_pct = -100.0
+                                    _close_reason = "ghost_purge"
+                                    _close_price = entry_price
                                 close_rec = {
                                     **pos,
                                     "mint": mint,
-                                    "close_reason": (
-                                        "externally_closed" if _had_partials else "ghost_purge"
-                                    ),
+                                    "close_reason": _close_reason,
                                     "close_ts": now,
-                                    "close_price": entry_price,  # last known
+                                    "close_price": _close_price,
                                     "final_pnl_sol": _final_sol,
                                     "final_pnl_pct": _final_pct,
                                 }
