@@ -181,12 +181,17 @@ _helius_fresh_grad_queue: list[dict] = []
 _HELIUS_QUEUE_MAX_LEN = 500
 
 
+# Mints received via Helius webhook — known to be genuinely fresh.
+# These get the reduced age floor (5 min vs 20 min default).
+_webhook_sourced_mints: set[str] = set()
+
 def push_fresh_grad(mint: str, pool: str, on_chain_ts: float | None = None) -> None:
     """Called by the dashboard webhook receiver. Bounded list semantics —
     drop oldest if we hit the cap (means lifecycle scout is starving)."""
     import time as _time
     if not mint:
         return
+    _webhook_sourced_mints.add(mint)  # track for reduced age floor
     rec = {
         "mint": mint,
         "pool": pool or "",
@@ -805,7 +810,9 @@ _lifecycle_deferred: dict[str, dict] = {}  # mint → {"first_seen": ts, "snapsh
 # entered, rejects: {age:N, liq:N, ...}}. At 30s cadence, 24h = 2880 entries
 # ≈ 600KB on disk; deque trims oldest automatically.
 _REJECT_HISTORY_PATH = Path(__file__).parent / "lifecycle_rejects_24h.json"
+_DAILY_SUMMARY_PATH  = Path(__file__).parent / "lifecycle_daily_summaries.json"
 _reject_history: deque = deque(maxlen=2880)
+_last_daily_snapshot_date: str = ""  # "YYYY-MM-DD" of last written summary
 try:
     if _REJECT_HISTORY_PATH.exists():
         with open(_REJECT_HISTORY_PATH) as _f:
@@ -816,8 +823,55 @@ except Exception:
     pass
 
 
+def _maybe_write_daily_summary() -> None:
+    """At day rollover, append yesterday's aggregate stats to the permanent
+    lifecycle_daily_summaries.json. Called from _persist_reject_snapshot so it
+    fires automatically without needing a cron job."""
+    global _last_daily_snapshot_date
+    import datetime as _dt
+    today = _dt.datetime.utcnow().strftime("%Y-%m-%d")
+    if _last_daily_snapshot_date == today or not _reject_history:
+        return
+    # Only write if we have a previous date to summarise (not first run of the day)
+    if _last_daily_snapshot_date and _last_daily_snapshot_date != today:
+        try:
+            snaps = list(_reject_history)
+            totals: dict[str, int] = {}
+            for s in snaps:
+                for k, v in (s.get("rejects") or {}).items():
+                    totals[k] = totals.get(k, 0) + int(v)
+            total_candidates = sum(s.get("candidates", 0) for s in snaps)
+            total_entered    = sum(s.get("entered", 0)    for s in snaps)
+            summary = {
+                "date":              _last_daily_snapshot_date,
+                "cycles":            len(snaps),
+                "candidates_total":  total_candidates,
+                "entered_total":     total_entered,
+                "pass_rate_pct":     round(total_entered / max(total_candidates, 1) * 100, 3),
+                "reject_totals":     totals,
+                "avg_rej_per_cycle": round(sum(totals.values()) / max(len(snaps), 1), 1),
+            }
+            existing: list = []
+            if _DAILY_SUMMARY_PATH.exists():
+                with open(_DAILY_SUMMARY_PATH) as _df:
+                    existing = json.load(_df)
+            # Avoid duplicate dates
+            existing = [e for e in existing if e.get("date") != _last_daily_snapshot_date]
+            existing.append(summary)
+            with open(_DAILY_SUMMARY_PATH, "w") as _df:
+                json.dump(existing, _df, indent=2)
+            print(f"[lifecycle] 📊 daily summary saved: {_last_daily_snapshot_date} "
+                  f"— {total_entered} entries / {total_candidates} candidates "
+                  f"({summary['pass_rate_pct']:.2f}% pass rate)")
+        except Exception as _dse:
+            print(f"[lifecycle] daily summary error: {_dse}")
+    _last_daily_snapshot_date = today
+
+
 def _persist_reject_snapshot(snapshot: dict) -> None:
-    """Append a cycle snapshot to the rolling 24h window and flush to disk."""
+    """Append a cycle snapshot to the rolling 24h window, flush to disk,
+    and trigger a daily summary at day rollover."""
+    _maybe_write_daily_summary()
     _reject_history.append(snapshot)
     try:
         with open(_REJECT_HISTORY_PATH, "w") as f:
@@ -840,7 +894,7 @@ LIFECYCLE_MAX_M5_VOL_LIQ         = 3.0       # vol_m5/liq cap — same gate brea
 # of these gates simultaneously; both winners (TRUTH +21%, FOFAR +21%) pass all.
 LIFECYCLE_BOUNCE_H1_MIN_PCT          = 0.0   # h1 must be net positive at bounce-confirm (winners +5 to +80%; CCP -2.6%)
 LIFECYCLE_BOUNCE_TOP10_MAX_PCT       = 13.5  # winner ceiling 12.53%; CCP 15.95%
-LIFECYCLE_BOUNCE_TOP1_MAX_PCT        = 2.0   # winner ceiling 1.74%; CCP 1.625% borderline
+LIFECYCLE_BOUNCE_TOP1_MAX_PCT        = 5.0   # raised from 2.0 — 2.0 was from 2 trades only; 3.3-3.4% blocked real bounces (26vtHb7b, FGijtUZ5 2026-05-07)
 LIFECYCLE_BOUNCE_M5_BUYS_MIN         = 20    # winners had 28-66 m5 buyers; CCP had 11
 LIFECYCLE_BOUNCE_M5_BUY_SELL_RATIO   = 1.5   # winners 1.66x to 9.3x; CCP 0.85x (more sells than buys = distribution pretending to be a bounce)
 
@@ -870,6 +924,11 @@ def _lifecycle_record_snapshot(mint: str, price: float, m5: float, h1: float, li
     entry["snapshots"].append({"ts": now, "price": price, "m5": m5, "h1": h1, "liq": liq})
     cutoff = now - LIFECYCLE_SNAPSHOT_WINDOW_SECS
     entry["snapshots"] = [s for s in entry["snapshots"] if s["ts"] >= cutoff]
+    # Track highest h1 ever seen for this mint while in watchlist.
+    # Used to block bounce entries on tokens that already ran hard — if it
+    # ever hit h1 ≥ 50%, the big move already happened. We're late.
+    if h1 > entry.get("max_h1_seen", 0.0):
+        entry["max_h1_seen"] = h1
 
 
 def _lifecycle_local_low_price(mint: str) -> float | None:
@@ -917,7 +976,60 @@ def _lifecycle_classify_entry_shape(m5: float, h1: float) -> tuple[str, str]:
         return "pullback", f"m5={m5:.1f}% < {LIFECYCLE_M5_GOOD_LOW:.0f}% — actively falling"
     if h1 >= LIFECYCLE_POSTPEAK_H1_THRESHOLD and m5 <= 0:
         return "postpeak", f"h1=+{h1:.0f}% with m5={m5:.1f}% — rollover from peak"
+    # Range position: h1 is elevated (token already ran hard in the last hour)
+    # AND m5 still positive = we're entering near the TOP of the h1 move.
+    # Defer to watchlist — wait for the pullback before entering.
+    # ALIEN/alein post-mortem 2026-05-08: entered at h1=+70-400% while m5>0.
+    if h1 >= 50.0 and m5 > 2.0:
+        return "overheated", (f"h1=+{h1:.0f}% elevated, m5=+{m5:.1f}% still rising "
+                              f"— near top of h1 move, wait for pullback")
     return "good", f"m5={m5:.1f}%, h1={h1:.0f}%"
+
+
+# ─── Zombie token detection ──────────────────────────────────────────────
+# A "zombie" token is an old mint being re-pumped. The pair on pump-amm looks
+# fresh (passes age 20-240min gate) but the underlying mint existed on other
+# DEXes months/years earlier. Classic pump-and-dump setup.
+# Detection: fetch ALL DexScreener pairs for the mint. If the OLDEST pair is
+# more than LIFECYCLE_ZOMBIE_MAX_PAIR_AGE_SECS old, reject.
+# ALIEN (2024 vintage re-pumped 2026-05-08) would have failed this check.
+LIFECYCLE_ZOMBIE_MAX_PAIR_AGE_SECS = 3 * 24 * 3600  # 3 days
+_zombie_cache: dict[str, bool] = {}  # mint → is_zombie (TTL via bot restart)
+
+
+async def _is_zombie_token(session: aiohttp.ClientSession, mint: str) -> bool:
+    """Returns True if any DEX pair for this mint is older than 3 days."""
+    if mint in _zombie_cache:
+        return _zombie_cache[mint]
+    try:
+        async with session.get(
+            f"https://api.dexscreener.com/latest/dex/tokens/{mint}",
+            timeout=aiohttp.ClientTimeout(total=5),
+        ) as r:
+            if r.status != 200:
+                return False  # can't check → fail open
+            d = await r.json()
+            pairs = d.get("pairs") or []
+            if not pairs:
+                return False
+            oldest_ms = min(
+                (p.get("pairCreatedAt") or (time.time() * 1000))
+                for p in pairs
+            )
+            age_secs = time.time() - oldest_ms / 1000
+            result = age_secs > LIFECYCLE_ZOMBIE_MAX_PAIR_AGE_SECS
+            _zombie_cache[mint] = result
+            if result:
+                age_days = age_secs / 86400
+                oldest_dex = next(
+                    (p.get("dexId", "?") for p in pairs
+                     if (p.get("pairCreatedAt") or 0) == oldest_ms), "?"
+                )
+                print(f"[monster-lifecycle] 🧟 {mint[:8]} zombie — oldest pair "
+                      f"{age_days:.0f}d old on {oldest_dex} — classic re-pump, skip")
+            return result
+    except Exception:
+        return False  # error → fail open
 
 
 # ─── Helius helpers ─────────────────────────────────────────────────────
@@ -1702,9 +1814,10 @@ LIFECYCLE_MIN_MC_USD        = 25_000   # was 250K — CATASTROPHICALLY WRONG.
                                         # 250K waited until tokens already 5-10x.
 LIFECYCLE_MAX_MC_USD        = 300_000  # was 3M — focus early-stage $25K-$300K
 LIFECYCLE_MIN_LIQ_MC_RATIO  = 0.04
-LIFECYCLE_MAX_LIQ_MC_RATIO  = 0.30    # was 0.20 — allow higher liq/mc (fresher grads)
-LIFECYCLE_MIN_AGE_SECS      = 20 * 60  # 20min minimum — past initial FOMO spike
-LIFECYCLE_MAX_AGE_SECS      = 240 * 60 # was 90min — 4h window for cool-off entries
+LIFECYCLE_MAX_LIQ_MC_RATIO  = 0.60    # was 0.30 — 0.30 contradicted min_liq for MC < $50K (impossible zone)
+LIFECYCLE_MIN_AGE_SECS         = 20 * 60  # default 20min — past initial FOMO spike
+LIFECYCLE_WEBHOOK_MIN_AGE_SECS =  5 * 60  # 5min for Helius webhook grads — we know exact graduation time
+LIFECYCLE_MAX_AGE_SECS         = 90 * 60  # 90min ceiling — was 240min, tokens >90min already had their move
 LIFECYCLE_TOP1_MAX_PCT      = 10.0
 LIFECYCLE_BUY_RATIO_MIN     = 48.0
 LIFECYCLE_BUY_RATIO_MAX     = 80.0    # was 65 — allow strongly buy-heavy tokens
@@ -1919,7 +2032,15 @@ async def lifecycle_scout_loop(runtime: Any,
                     elif viral_eligible:
                         age_floor = LIFECYCLE_VIRAL_AGE_MIN_SECS
                     else:
-                        age_floor = LIFECYCLE_MIN_AGE_SECS
+                        # Webhook-sourced grads: reduce floor to 5min.
+                        # Helius tells us the EXACT graduation moment — we
+                        # don't need to wait 20min for a token we already
+                        # know is fresh. AREA51/alein post-mortem: 20min
+                        # delay means we arrive after the first leg every time.
+                        if mint in _webhook_sourced_mints:
+                            age_floor = LIFECYCLE_WEBHOOK_MIN_AGE_SECS
+                        else:
+                            age_floor = LIFECYCLE_MIN_AGE_SECS
                     if age_secs < age_floor or age_secs > age_max:
                         if on_watch and age_secs > age_max:
                             _lifecycle_deferred.pop(mint, None)  # aged out of watchlist
@@ -1965,8 +2086,13 @@ async def lifecycle_scout_loop(runtime: Any,
                     #
                     # If h6 big AND h1 is flat-to-negative → we ARE in the
                     # cool-off window → allow entry.
+                    #
+                    # IMPORTANT: only applies to tokens ≥ 90min old. For younger
+                    # tokens h6 == h1 by definition (they haven't been trading for
+                    # 6 hours), so the check fires falsely on every strong young
+                    # token (ETZKRf2V/6qkLuxj5 post-mortem 2026-05-07).
                     pc_h6 = float((p.get("priceChange") or {}).get("h6") or 0)
-                    if pc_h6 > 150 and h1_change > 15:
+                    if pc_h6 > 150 and h1_change > 15 and age_secs > 90 * 60:
                         cycle_rejects["cooloff_missed"] = cycle_rejects.get("cooloff_missed", 0) + 1
                         if on_watch:
                             print(f"[monster-lifecycle] ⏱ {mint[:8]} cool-off missed — "
@@ -2125,19 +2251,38 @@ async def lifecycle_scout_loop(runtime: Any,
                     if t10 is not None and t10 >= MONSTER_TOP10_MAX_PCT:
                         cycle_rejects["top10"] += 1
                         continue  # TRADE-class: insiders hold >35% → dump liquidity
-                    # Bounce-path tighter holder caps — winners had top10 ≤ 12.53%
-                    # and top1 ≤ 1.74%. CCP entered at top10=15.95%, top1=1.625%
-                    # (borderline) and lost. Drop the watchlist entry — re-add only
-                    # if accumulation thins concentration later.
+                    # Bounce-path holder cap — top1 only. The top10 aggregate
+                    # (13.5% ceiling from 2 trades) was blocking ideal entries:
+                    # alein had top10=21% across 10 wallets (avg 2.1% each, no
+                    # single dump risk) and went +496%. Top1 catches the real
+                    # threat — one wallet that can move the market alone.
+                    # alein post-mortem 2026-05-08.
                     if on_watch:
+                        # If this token ever showed h1 ≥ 50% while in our watchlist,
+                        # the big move already happened. A bounce here is a dead-cat
+                        # on an already-pumped token — we'd be late to the party.
+                        # "If we're late, stay late. Don't enter." — AREA51/alein lesson.
+                        _max_h1 = (_lifecycle_deferred.get(mint) or {}).get("max_h1_seen", 0.0)
+                        if _max_h1 >= 50.0:
+                            print(f"[monster-lifecycle] 🪦 {mint[:8]} bounce-reject "
+                                  f"max_h1_seen={_max_h1:.0f}% — big move already happened, we're late")
+                            _lifecycle_deferred.pop(mint, None)
+                            cycle_rejects["late_to_party"] = cycle_rejects.get("late_to_party", 0) + 1
+                            continue
                         if t1 is not None and t1 >= LIFECYCLE_BOUNCE_TOP1_MAX_PCT:
                             print(f"[monster-lifecycle] 🪦 {mint[:8]} bounce-reject "
-                                  f"top1={t1}% > {LIFECYCLE_BOUNCE_TOP1_MAX_PCT}% (winner ceiling 1.74%)")
+                                  f"top1={t1}% > {LIFECYCLE_BOUNCE_TOP1_MAX_PCT}% (single wallet dump risk)")
                             _lifecycle_deferred.pop(mint, None)
                             continue
-                        if t10 is not None and t10 >= LIFECYCLE_BOUNCE_TOP10_MAX_PCT:
-                            print(f"[monster-lifecycle] 🪦 {mint[:8]} bounce-reject "
-                                  f"top10={t10}% > {LIFECYCLE_BOUNCE_TOP10_MAX_PCT}% (winner ceiling 12.53%)")
+
+                    # Zombie token check — reject old mints being re-pumped.
+                    # Compares pump-amm pair age (recent) vs oldest pair on ANY
+                    # DEX. Gap reveals classic P&D on dormant/dead tokens.
+                    # Only runs for tokens that cleared all other gates to
+                    # minimise extra DexScreener calls. Fails open on API error.
+                    if not priority_rec:  # creator-alpha fast-path skips this
+                        if await _is_zombie_token(session, mint):
+                            cycle_rejects["zombie"] = cycle_rejects.get("zombie", 0) + 1
                             _lifecycle_deferred.pop(mint, None)
                             continue
 
@@ -2229,11 +2374,13 @@ async def lifecycle_scout_loop(runtime: Any,
                                 f"Age: {age_secs/60:.0f} min | MC: ${mc_usd:,.0f} | Liq: ${liq_usd:,.0f}\n"
                                 f"Price changes: m5={m5_change:+.1f}% h1={h1_change:+.1f}% h6={pc_h6_lc:+.0f}% h24={pc_h24_lc:+.0f}%\n"
                                 f"Buy ratio (h1): {br:.0f}% | Top10 holders: {t10:.1f}%\n\n"
-                                f"Strategy: enter during the COOL-OFF phase after a big initial pump, "
-                                f"before the second leg up. Ideal: price 40-70% below recent peak, "
-                                f"h1 flat or mildly negative, buyers returning.\n\n"
-                                f"Is this a valid cool-off entry RIGHT NOW, or has recovery already "
-                                f"run too far? Reply JSON only: "
+                                f"Strategy: enter during the COOL-OFF or early consolidation phase after graduation, "
+                                f"before the next leg up. For tokens under 60min old, h1 flat-to-slightly-positive "
+                                f"(0-20%) with buyers returning IS a valid entry — do NOT require a 40-70% retreat "
+                                f"that can't happen on a token this young. For older tokens (60min+) with a big h6 run, "
+                                f"require more meaningful cool-off (h1 flat or negative vs h6). "
+                                f"Key signals: buy ratio healthy, m5 stabilising, liq not draining.\n\n"
+                                f"Is this a valid entry RIGHT NOW? Reply JSON only: "
                                 f'{{\"enter\": true/false, \"reason\": \"one sentence\"}}'
                             )
                             async with session.post(

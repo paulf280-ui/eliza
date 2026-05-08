@@ -594,6 +594,9 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
     src = pos.get("signal_source")
     tp1_mult = get_tp1_mult_for_source(src)
     tp1_gain_pct = (tp1_mult - 1.0) * 100.0
+    # Groq TP veto can raise the target on a single position (see monitor loop)
+    if pos.get("_tp_override_pct") is not None:
+        tp1_gain_pct = float(pos["_tp_override_pct"])
     tp1_sell_frac = get_tp1_sell_frac_for_source(src)
     floor_pct = get_floor_for_source(src)
 
@@ -611,7 +614,7 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
         return f"pre_tp1_floor_{pnl_pct:.0f}pct", 1.0
 
     # ── Time-based stagnation exit ───────────────────────────────────────
-    # If a position has been open >10 minutes and peak PnL never exceeded 15%,
+    # If a position has been open >15 minutes and peak PnL never exceeded 20%,
     # the token never had real momentum — bank whatever small profit/loss exists
     # and free the slot for the next genuine signal.
     #
@@ -620,12 +623,20 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
     # None of them were going to hit 100% TP. Exit early, free the slot.
     #
     # Safe for winners: Homunculus (+118%) peaked at +118% within 7 min —
-    # peak_pnl_pct exceeds 15% immediately so this gate never fires on runners.
+    # peak_pnl_pct exceeds 20% immediately so this gate never fires on runners.
+    #
+    # Buy-pressure bypass: PLANDEMIC 2026-05-07 peaked at +9.5% then dipped to
+    # -13.8% at 10min — stagnation fired, then token ran +30%+. The token had
+    # strong buy ratio throughout. Skip stagnation when buyers are still active
+    # (buy_ratio > 45%) — a shake-out looks different to a dead token.
     if not tp1_fired:
         age_secs = now - float(pos.get("entry_ts") or now)
         peak_pnl = float(pos.get("peak_pnl_pct") or 0.0)
-        if age_secs > 600 and peak_pnl < 15.0:
-            return f"stagnant_no_momentum_{int(age_secs//60)}min_peak{peak_pnl:.1f}pct", 1.0
+        if age_secs > 900 and peak_pnl < 20.0:
+            if current_buy_ratio is not None and current_buy_ratio > 45.0:
+                pass  # buyers still active — skip stagnation, give it more time
+            else:
+                return f"stagnant_no_momentum_{int(age_secs//60)}min_peak{peak_pnl:.1f}pct", 1.0
 
     # ── Pre-TP flat gate: DISABLED (was misfiring, closing too early)
     # New strategy: let TP (+100%) and Groq evaluator (15-80% range) handle exits.
@@ -1033,7 +1044,80 @@ async def _apply_exit(mint: str, reason: str, sell_fraction: float, runtime: Any
             _hg_flow.purge(mint)
         except Exception:
             pass
+
+        # ── Golden rule: persist to traded_mints.json so re-entry is blocked
+        # across restarts. The in-memory _recently_signalled check (monster_signals)
+        # is wiped on every restart — without this write the same mint can be
+        # re-entered immediately after a bot restart. HANTA re-entry 2026-05-07.
+        try:
+            import json as _json_gr
+            _traded_path = _BASE / "traded_mints.json"
+            _existing: list = []
+            if _traded_path.exists():
+                with open(_traded_path) as _f:
+                    _existing = _json_gr.load(_f)
+            if mint not in _existing:
+                _existing.append(mint)
+                with open(_traded_path, "w") as _f:
+                    _json_gr.dump(_existing, _f)
+                print(f"[monster] 🔒 golden rule: {mint[:20]} added to traded_mints.json")
+        except Exception as _gr_err:
+            print(f"[monster] traded_mints write failed: {_gr_err}")
+
     _save_state()
+
+
+# ─── Helius DAS price fallback ─────────────────────────────────────────────
+# Used when DexScreener returns no pair data for a mint (common for freshly
+# graduated pump-amm tokens in the first 5-15 minutes). Helius DAS sources
+# price from Jupiter, updates every ~5s, and resolves via our existing RPC
+# key — no extra cost. Returns SOL-denominated price or 0.0 on failure.
+_SOL_MINT = "So11111111111111111111111111111111111111112"
+_helius_sol_price_cache: tuple[float, float] = (0.0, 0.0)  # (price_usd, fetched_ts)
+
+async def _helius_price_sol(session: aiohttp.ClientSession, mint: str) -> float:
+    """Fetch SOL-denominated price via Helius DAS getAsset. ~60ms latency."""
+    global _helius_sol_price_cache
+    import os as _os
+    rpc_url = _os.getenv("SOLANA_RPC_URL", "")
+    if not rpc_url:
+        return 0.0
+    try:
+        import time as _t
+        now = _t.time()
+        # Re-use cached SOL price for 10s to halve RPC calls
+        sol_usd = _helius_sol_price_cache[0]
+        if not sol_usd or now - _helius_sol_price_cache[1] > 10:
+            async with session.post(
+                rpc_url,
+                json={"jsonrpc": "2.0", "id": 1, "method": "getAsset",
+                      "params": {"id": _SOL_MINT}},
+                timeout=aiohttp.ClientTimeout(total=3),
+            ) as r:
+                if r.status == 200:
+                    d = await r.json()
+                    pi = ((d.get("result") or {}).get("token_info") or {}).get("price_info") or {}
+                    sol_usd = float(pi.get("price_per_token") or 0)
+                    if sol_usd:
+                        _helius_sol_price_cache = (sol_usd, now)
+        if not sol_usd:
+            return 0.0
+        async with session.post(
+            rpc_url,
+            json={"jsonrpc": "2.0", "id": 1, "method": "getAsset",
+                  "params": {"id": mint}},
+            timeout=aiohttp.ClientTimeout(total=3),
+        ) as r:
+            if r.status != 200:
+                return 0.0
+            d = await r.json()
+            pi = ((d.get("result") or {}).get("token_info") or {}).get("price_info") or {}
+            token_usd = float(pi.get("price_per_token") or 0)
+            if not token_usd:
+                return 0.0
+            return token_usd / sol_usd
+    except Exception:
+        return 0.0
 
 
 # ─── Monitor loop ─────────────────────────────────────────────────────────
@@ -1147,6 +1231,7 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                 vol_h1_v = 0.0
                 buys_h1 = 0
                 sells_h1 = 0
+                _pair_snapshot: dict = {}
                 try:
                     async with session.get(
                         f"https://api.dexscreener.com/latest/dex/tokens/{mint}",
@@ -1161,6 +1246,7 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                             )
                             if pairs:
                                 p0 = pairs[0]
+                                _pair_snapshot = p0
                                 current_price = float(p0.get("priceNative") or 0)
                                 current_liq = float((p0.get("liquidity") or {}).get("usd") or 0)
                                 current_mc = float(p0.get("marketCap") or p0.get("fdv") or 0) or None
@@ -1173,12 +1259,29 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                 except Exception:
                     pass
 
+                # ── Helius DAS price fallback ──────────────────────────────
+                # DexScreener often has no pair data for the first 5-15 min
+                # after graduation. During this window current_price stays 0
+                # and evaluate_exit can't fire — positions drift to the floor
+                # completely unmonitored (L2.0, pWRG/AND-M post-mortem).
+                # Helius DAS (Jupiter-sourced, ~5s freshness, ~60ms latency)
+                # fills the gap using our existing Helius RPC key.
+                _used_helius_price = False
+                if current_price == 0:
+                    _h_price = await _helius_price_sol(session, mint)
+                    if _h_price > 0:
+                        current_price = _h_price
+                        _used_helius_price = True
+
                 if current_price > 0:
                     pos["current_price"] = current_price
                     pnl_pct = ((current_price / (pos["entry_price"] or 1)) - 1.0) * 100
                     if pnl_pct > (pos.get("peak_pnl_pct") or 0):
                         pos["peak_pnl_pct"] = pnl_pct
                         pos["peak_price"] = current_price
+                    if _used_helius_price:
+                        print(f"[monster] 📡 helius price {pos.get('token_name', mint[:8])}: "
+                              f"{current_price:.3e} SOL pnl={pnl_pct:+.1f}% (dexscreener blind)")
 
                 # ── 1. Deterministic rules (TP1, floor, flat, post-TP1 events) ──
                 reason, frac = evaluate_exit(pos, current_price, current_liq, current_buy_ratio)
@@ -1260,7 +1363,11 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                         # +100% TP1 — we don't want Groq/Gemini yanking a +24%
                         # runner just because 5m change dipped. AI is the
                         # emergency brake, not the primary exit.
-                        if decision and decision.action == "SELL":
+                        # Risk-level exit: act on observable categorisation, not
+                        # binary SELL. Code triggers on HIGH; AI classifies the facts.
+                        _risk_lvl = getattr(decision, "risk_level", "MEDIUM") if decision else "MEDIUM"
+                        _is_high_risk = (_risk_lvl == "HIGH")
+                        if decision and (decision.action == "SELL" or _is_high_risk):
                             cur_pnl = ((current_price / (pos["entry_price"] or 1)) - 1.0) * 100
                             peak_pnl = pos.get("peak_pnl_pct") or 0.0
                             drawdown_from_peak = peak_pnl - cur_pnl  # positive = we gave back gains
@@ -1292,7 +1399,14 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                             min_conf = 0.70
                             if (tier != "claude"
                                 and peak_pnl >= 5.0
-                                and cur_pnl > -10.0):
+                                and cur_pnl > -10.0
+                                and drawdown_from_peak < 10.0):
+                                # Only protect when drawdown from peak is small (<10%).
+                                # If we've given back ≥10% from peak the token is
+                                # genuinely rolling over — let the brain exit at 0.70.
+                                # HANTA 2026-05-07: peaked +30.9%, Groq correctly
+                                # read rollover at +17% (13% drawdown) but was blocked
+                                # by 0.90 threshold and we rode it down.
                                 min_conf = 0.90
 
                             # Claude-HOLD veto on lower tiers — extends below
@@ -1330,11 +1444,21 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                                 ai_allowed = True
                                 gate_reason = f"brain_primary_{tier}_pnl{cur_pnl:+.0f}"
 
+                            # Risk-level fast path: if Groq/Gemini explicitly
+                            # categorised danger as HIGH with ≥0.70 confidence,
+                            # bypass peak-protect. The risk categorisation prompt
+                            # requires MULTIPLE gates to confirm HIGH simultaneously —
+                            # it's not triggered by a single uncertain signal.
+                            if _is_high_risk and conf >= 0.70 and not tp1_fired:
+                                ai_allowed = True
+                                gate_reason = f"risk_high_{tier}_conf{conf:.2f}"
+
                             if ai_allowed:
                                 ai_reason = f"ai_{tier}_{conf:.2f}_{gate_reason}"
+                                risk_tag = f" risk={_risk_lvl}" if _is_high_risk else ""
                                 print(f"[monster] 🧠 AI EXIT ALLOWED {pos.get('token_name', mint[:8])} "
-                                      f"tier={tier} conf={conf:.2f} pnl={cur_pnl:+.1f}% peak={peak_pnl:+.1f}% "
-                                      f"gate={gate_reason} why={decision.reason[:80]}")
+                                      f"tier={tier} conf={conf:.2f} pnl={cur_pnl:+.1f}% peak={peak_pnl:+.1f}%"
+                                      f"{risk_tag} gate={gate_reason} why={decision.reason[:80]}")
                             else:
                                 if claude_veto:
                                     tag = f"🛡 CLAUDE-VETO (Claude HOLD conf={claude_veto_conf:.2f})"
@@ -1348,6 +1472,77 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                                       f"why={decision.reason[:80]}")
                     except Exception as _ai_err:
                         print(f"[monster] AI cascade error for {mint[:8]}: {_ai_err}")
+
+                # ── Groq TP veto — one shot at the 20% hard TP ──────────────
+                # If Groq sees strong momentum (volume, holders, buy pressure),
+                # it can veto the 20% sell and raise the target to hold for more.
+                # Only fires once per position (tp_groq_vetoed flag). If Groq is
+                # unavailable or uncertain, default is to SELL and bank the profit.
+                if (reason and reason.startswith("tp_hard")
+                        and _is_lifecycle_source(pos.get("signal_source"))
+                        and not pos.get("tp_groq_vetoed")):
+                    _groq_key_tp = os.getenv("GROQ_API_KEY", "")
+                    if _groq_key_tp:
+                        try:
+                            _meta = pos.get("metadata") or {}
+                            _vol_m5 = float((_pair_snapshot.get("volume") or {}).get("m5") or 0)
+                            _pc = _pair_snapshot.get("priceChange") or {}
+                            _m5_chg = float(_pc.get("m5") or 0)
+                            _h1_chg = float(_pc.get("h1") or 0)
+                            _txns_m5 = (_pair_snapshot.get("txns") or {}).get("m5") or {}
+                            _m5_buys = int(_txns_m5.get("buys") or 0)
+                            _m5_sells = int(_txns_m5.get("sells") or 0)
+                            _top10_entry = _meta.get("top10_pct") or 0
+                            _age_min = (time.time() - float(pos.get("entry_ts") or time.time())) / 60
+                            _peak = pos.get("peak_pnl_pct") or 0
+                            _br = current_buy_ratio or 0
+                            _veto_prompt = (
+                                f"Monster trade just hit +20% TP. Bank it now or let it run?\n\n"
+                                f"Token stats at TP trigger:\n"
+                                f"  Age since entry: {_age_min:.0f}min | PNL: +20% | Peak: {_peak:.1f}%\n"
+                                f"  Price m5: {_m5_chg:+.1f}% | Price h1: {_h1_chg:+.1f}%\n"
+                                f"  Volume m5: ${_vol_m5:,.0f} | Volume h1: ${vol_h1_v:,.0f}\n"
+                                f"  m5 buys: {_m5_buys} | m5 sells: {_m5_sells}\n"
+                                f"  Buy ratio h1: {_br:.0f}% | Liquidity: ${current_liq:,.0f}\n"
+                                f"  Top10 holders at entry: {_top10_entry:.1f}%\n\n"
+                                f"HOLD only if ALL three are strong: (1) m5 buy count > 30 AND buys > sells, "
+                                f"(2) price m5 positive or flat (not dumping), "
+                                f"(3) top10 concentration reasonable (<14%). "
+                                f"If any signal is weak or mixed, SELL and bank the profit. "
+                                f"Default to SELL if uncertain.\n\n"
+                                f"Reply JSON only: "
+                                f'{{\"action\": \"sell\"|\"hold\", \"hold_until_pct\": 40, \"reason\": \"one sentence\"}}'
+                            )
+                            async with session.post(
+                                "https://api.groq.com/openai/v1/chat/completions",
+                                headers={"Authorization": f"Bearer {_groq_key_tp}", "Content-Type": "application/json"},
+                                json={"model": "llama-3.3-70b-versatile",
+                                      "messages": [{"role": "user", "content": _veto_prompt}],
+                                      "temperature": 0.1, "max_tokens": 80},
+                                timeout=aiohttp.ClientTimeout(total=4),
+                            ) as _vr:
+                                if _vr.status == 200:
+                                    _vrd = await _vr.json()
+                                    _vraw = (_vrd.get("choices") or [{}])[0].get("message", {}).get("content", "") or ""
+                                    import json as _jv
+                                    _vclean = _vraw.strip().strip("```json").strip("```").strip()
+                                    _vparsed = _jv.loads(_vclean)
+                                    _vaction = (_vparsed.get("action") or "sell").lower()
+                                    _vnew_tp = float(_vparsed.get("hold_until_pct") or 40)
+                                    _vnew_tp = min(max(_vnew_tp, 25.0), 60.0)
+                                    _vreason = _vparsed.get("reason", "")
+                                    pos["tp_groq_vetoed"] = True
+                                    if _vaction == "hold":
+                                        pos["_tp_override_pct"] = _vnew_tp
+                                        reason = None
+                                        frac = 0.0
+                                        print(f"[monster] 🚀 GROQ TP-HOLD {pos.get('token_name', mint[:8])}: "
+                                              f"momentum strong — holding through +20% → target +{_vnew_tp:.0f}% | {_vreason}")
+                                    else:
+                                        print(f"[monster] ✅ GROQ TP-CONFIRM {pos.get('token_name', mint[:8])}: "
+                                              f"banking +20% | {_vreason}")
+                        except Exception as _ve:
+                            print(f"[monster] ⚠ GROQ TP-VETO error {mint[:8]}: {_ve} — defaulting to SELL")
 
                 # Rules win over AI on ties — rules are deterministic & cheap.
                 if reason:

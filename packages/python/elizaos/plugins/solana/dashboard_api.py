@@ -28,6 +28,90 @@ if TYPE_CHECKING:
 
 PAPER_TRADING: bool = os.getenv("PAPER_TRADING", "false").lower() in ("true", "1", "yes")
 
+# ── Helius DAS real-time price cache ──────────────────────────────────────────
+# Prices fetched via Helius DAS (Jupiter-sourced, ~5s freshness, ~60ms latency)
+# for open monster positions. Dashboard auto-refreshes every 5s, so this cache
+# ensures at most one Helius RPC call per refresh cycle regardless of how many
+# positions are open. Falls back to the monitor's stale DexScreener price if
+# Helius is unavailable.
+_helius_px_cache: dict[str, tuple[float, float]] = {}  # mint → (price_sol, ts)
+_helius_sol_px_cache: tuple[float, float] = (0.0, 0.0) # (sol_usd, ts)
+_HELIUS_PX_TTL = 3.0   # seconds — refresh every 3s, well within 5s dashboard cycle
+_HELIUS_SOL_TTL = 10.0  # SOL price changes slowly; re-fetch every 10s
+_HELIUS_SOL_MINT = "So11111111111111111111111111111111111111112"
+
+
+async def _helius_prices_batch(mints: list[str]) -> dict[str, float]:
+    """Fetch SOL-denominated prices for multiple mints via Helius DAS getAssetBatch.
+
+    Returns {mint: price_sol}. Mints not found in Helius return 0.0.
+    Results are cached for _HELIUS_PX_TTL seconds to cap RPC load.
+    """
+    import aiohttp as _aio
+    global _helius_sol_px_cache
+
+    if not mints:
+        return {}
+
+    rpc_url = os.getenv("SOLANA_RPC_URL", "")
+    if not rpc_url:
+        return {}
+
+    now = time.time()
+
+    # Which mints need a fresh fetch?
+    stale = [m for m in mints if now - _helius_px_cache.get(m, (0.0, 0.0))[1] > _HELIUS_PX_TTL]
+    if not stale:
+        return {m: _helius_px_cache[m][0] for m in mints if m in _helius_px_cache}
+
+    try:
+        async with _aio.ClientSession() as _sess:
+            # Fetch SOL price (cached separately)
+            sol_usd = _helius_sol_px_cache[0]
+            if not sol_usd or now - _helius_sol_px_cache[1] > _HELIUS_SOL_TTL:
+                async with _sess.post(
+                    rpc_url,
+                    json={"jsonrpc": "2.0", "id": 1, "method": "getAsset",
+                          "params": {"id": _HELIUS_SOL_MINT}},
+                    timeout=_aio.ClientTimeout(total=3),
+                ) as r:
+                    if r.status == 200:
+                        d = await r.json()
+                        pi = (((d.get("result") or {}).get("token_info") or {})
+                              .get("price_info") or {})
+                        sol_usd = float(pi.get("price_per_token") or 0)
+                        if sol_usd:
+                            _helius_sol_px_cache = (sol_usd, now)
+
+            if not sol_usd:
+                return {m: _helius_px_cache.get(m, (0.0, 0.0))[0] for m in mints}
+
+            # Batch fetch all stale token mints in one call
+            async with _sess.post(
+                rpc_url,
+                json={"jsonrpc": "2.0", "id": 2, "method": "getAssetBatch",
+                      "params": {"ids": stale}},
+                timeout=_aio.ClientTimeout(total=4),
+            ) as r:
+                if r.status != 200:
+                    return {m: _helius_px_cache.get(m, (0.0, 0.0))[0] for m in mints}
+                d = await r.json()
+                results = d.get("result") or []
+                for item, mint in zip(results, stale):
+                    if not item:
+                        continue
+                    pi = ((item.get("token_info") or {}).get("price_info") or {})
+                    token_usd = float(pi.get("price_per_token") or 0)
+                    if token_usd and sol_usd:
+                        price_sol = token_usd / sol_usd
+                        _helius_px_cache[mint] = (price_sol, now)
+
+    except Exception:
+        pass  # Return whatever is cached; monitor loop is the safety net
+
+    return {m: _helius_px_cache.get(m, (0.0, 0.0))[0] for m in mints}
+
+
 # ── Module-level queue for startup/system alerts ──────────────────────────────
 # Any code can call push_system_alert() and the message will appear in the
 # Jarvis chat window on the next WebSocket broadcast cycle (~2s delay).
@@ -141,15 +225,19 @@ async def _get_current_prices(runtime: AgentRuntime, mints: list[str]) -> dict[s
     return prices
 
 
-def _serialize_monster_position(mint: str, mp: dict[str, Any]) -> dict[str, Any]:
+def _serialize_monster_position(mint: str, mp: dict[str, Any],
+                                 fresh_price: float = 0.0) -> dict[str, Any]:
     """Serialize a strategy_e_monster position into the dashboard schema.
 
     The dashboard OPEN POSITIONS table consumes the same fields pos_mgr emits,
     so we project monster state onto that schema. Monster-only fields are added
     as extra keys (source, tp1_fired, locked_sol) — frontend ignores unknown keys.
+
+    fresh_price: Helius DAS real-time price (SOL). When non-zero, used in place
+    of the stale DexScreener price stored in mp["current_price"].
     """
     entry = float(mp.get("entry_price") or 0.0)
-    cur   = float(mp.get("current_price") or entry)
+    cur   = fresh_price if fresh_price > 0 else float(mp.get("current_price") or entry)
     sol_spent = float(mp.get("sol_spent") or 0.0)
     remaining = float(mp.get("remaining_fraction", 1.0))
     pnl_pct = ((cur / entry) - 1.0) * 100 if entry > 0 else 0.0
@@ -303,8 +391,13 @@ def register_dashboard_routes(app: web.Application, runtime: AgentRuntime) -> No
         # this, but the frontend reads /api/status for first paint.
         try:
             from elizaos.plugins.solana import strategy_e_monster as _mon
-            for mint, mp in _mon.open_positions().items():
-                positions[mint] = _serialize_monster_position(mint, mp)
+            _mon_positions = _mon.open_positions()
+            if _mon_positions:
+                _helius_px = await _helius_prices_batch(list(_mon_positions.keys()))
+                for mint, mp in _mon_positions.items():
+                    positions[mint] = _serialize_monster_position(
+                        mint, mp, fresh_price=_helius_px.get(mint, 0.0)
+                    )
         except Exception:
             pass
 
@@ -344,8 +437,13 @@ def register_dashboard_routes(app: web.Application, runtime: AgentRuntime) -> No
         # panel surfaces them alongside the legacy pos_mgr positions.
         try:
             from elizaos.plugins.solana import strategy_e_monster as _mon
-            for mint, mp in _mon.open_positions().items():
-                positions[mint] = _serialize_monster_position(mint, mp)
+            _mon_positions = _mon.open_positions()
+            if _mon_positions:
+                _helius_px = await _helius_prices_batch(list(_mon_positions.keys()))
+                for mint, mp in _mon_positions.items():
+                    positions[mint] = _serialize_monster_position(
+                        mint, mp, fresh_price=_helius_px.get(mint, 0.0)
+                    )
         except Exception:
             pass
 

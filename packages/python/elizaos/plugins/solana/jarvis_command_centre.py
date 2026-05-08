@@ -28,8 +28,10 @@ from typing import TYPE_CHECKING, Any
 _wallet_cache: dict[str, float] = {"sol": 0.0, "ts": 0.0}
 
 async def _get_cached_wallet(wallet_svc) -> float:
-    """Return wallet SOL balance, re-fetching at most once per 60s."""
-    if time.time() - _wallet_cache["ts"] < 60.0:
+    """Return wallet SOL balance, re-fetching at most once per 10s.
+    Falls back to Helius RPC directly if wallet service fails — prevents
+    stale balance persisting indefinitely after an RPC error."""
+    if time.time() - _wallet_cache["ts"] < 10.0:
         return _wallet_cache["sol"]
     try:
         bal = float(await asyncio.wait_for(wallet_svc.get_sol_balance(), timeout=5.0))
@@ -37,7 +39,27 @@ async def _get_cached_wallet(wallet_svc) -> float:
         _wallet_cache["ts"] = time.time()
         return bal
     except Exception:
-        return _wallet_cache["sol"]  # return stale value on failure
+        # Try Helius RPC directly as fallback before returning stale value
+        try:
+            import aiohttp as _aio
+            _rpc_url = __import__('os').getenv("SOLANA_RPC_URL", "")
+            if _rpc_url:
+                _pubkey = __import__('os').getenv("WALLET_PUBLIC_KEY", "")
+                if _pubkey:
+                    async with _aio.ClientSession() as _s:
+                        async with _s.post(_rpc_url,
+                            json={"jsonrpc":"2.0","id":1,"method":"getBalance","params":[_pubkey]},
+                            timeout=_aio.ClientTimeout(total=3)) as _r:
+                            if _r.status == 200:
+                                _d = await _r.json()
+                                _lam = (_d.get("result") or {}).get("value", 0)
+                                bal = _lam / 1e9
+                                _wallet_cache["sol"] = bal
+                                _wallet_cache["ts"] = time.time()
+                                return bal
+        except Exception:
+            pass
+        return _wallet_cache["sol"]  # last resort: stale value
 
 if TYPE_CHECKING:
     from elizaos.runtime import AgentRuntime
@@ -3114,33 +3136,43 @@ async def _execute_tool(name: str, inputs: dict, runtime) -> str:
 
     if name == "get_wallet_balance":
         try:
-            from elizaos.plugins.solana.services.wallet import SolanaWalletService
-            wallet_svc = runtime.get_service("wallet") if runtime else None
-            if not isinstance(wallet_svc, SolanaWalletService):
-                return "Wallet service unavailable."
-            sol_balance = await wallet_svc.get_sol_balance()
-            lines = [f"Real wallet balance: {sol_balance:.4f} SOL"]
-            # Copy trade exposure
+            # Always fetch live on-chain balance — never use cache for tool calls
+            import os as _os_wb
+            _rpc_wb = _os_wb.getenv("SOLANA_RPC_URL", "")
+            _pk_wb  = _os_wb.getenv("WALLET_PUBLIC_KEY", "")
+            sol_balance = 0.0
+            if _rpc_wb and _pk_wb:
+                import aiohttp as _aio_wb
+                async with _aio_wb.ClientSession() as _swb:
+                    async with _swb.post(_rpc_wb,
+                        json={"jsonrpc":"2.0","id":1,"method":"getBalance","params":[_pk_wb]},
+                        timeout=_aio_wb.ClientTimeout(total=4)) as _rwb:
+                        if _rwb.status == 200:
+                            _dwb = await _rwb.json()
+                            sol_balance = ((_dwb.get("result") or {}).get("value") or 0) / 1e9
+            lines = [f"Live on-chain wallet: {sol_balance:.4f} SOL"]
+            # Monster lifecycle open positions
             try:
-                from elizaos.plugins.solana.axiom_copy_trader import _paper_positions
-                if _paper_positions:
-                    deployed = sum(p.get("sol_spent", 0) for p in _paper_positions.values())
-                    lines.append(f"Copy trade deployed: {deployed:.4f} SOL across {len(_paper_positions)} position(s)")
-                    for mint, p in _paper_positions.items():
-                        pnl = p.get("pnl_pct")
-                        pnl_s = f" {pnl:+.1f}%" if pnl is not None else ""
-                        lines.append(f"  • {p.get('token_name', mint[:10])}: {p.get('sol_spent',0):.3f} SOL{pnl_s}")
+                from elizaos.plugins.solana import strategy_e_monster as _mon_wb
+                _mon_open = _mon_wb.open_positions()
+                if _mon_open:
+                    _deployed = sum(float(p.get("sol_spent", 0)) for p in _mon_open.values())
+                    lines.append(f"Monster deployed: {_deployed:.4f} SOL across {len(_mon_open)} position(s)")
+                    for _mint, _p in _mon_open.items():
+                        _entry = float(_p.get("entry_price") or 0)
+                        _cur   = float(_p.get("current_price") or _entry)
+                        _pnl   = ((_cur / _entry) - 1) * 100 if _entry > 0 else 0
+                        _peak  = float(_p.get("peak_pnl_pct") or 0)
+                        lines.append(
+                            f"  • {_p.get('token_name', _mint[:10])}: "
+                            f"{float(_p.get('sol_spent',0)):.3f} SOL "
+                            f"pnl={_pnl:+.1f}% peak={_peak:+.1f}%"
+                        )
                 else:
-                    lines.append("Copy trade: no open positions")
-            except Exception:
-                pass
-            # Strategy position exposure
-            pos_mgr = runtime.get_service("position_manager") if runtime else None
-            if pos_mgr:
-                strat_pos = {k: v for k, v in getattr(pos_mgr, "positions", {}).items() if not getattr(v, "is_reconciled", False)}
-                if strat_pos:
-                    strat_deployed = sum(getattr(p, "entry_sol_spent", 0) for p in strat_pos.values())
-                    lines.append(f"Strategy deployed: {strat_deployed:.4f} SOL across {len(strat_pos)} position(s)")
+                    lines.append("Monster: no open positions")
+                lines.append(f"Liquid (approx): {sol_balance - sum(float(p.get('sol_spent',0)) for p in _mon_open.values()):.4f} SOL")
+            except Exception as _mex:
+                lines.append(f"(monster position lookup error: {_mex})")
             return "\n".join(lines)
         except Exception as exc:
             return f"Error fetching wallet balance: {exc}"

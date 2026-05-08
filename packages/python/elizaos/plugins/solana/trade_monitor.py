@@ -504,6 +504,7 @@ class AIDecision:
     reason: str
     urgency: str       # "low" | "medium" | "high"
     tier: str          # "groq" | "gemini" | "sonnet" | "opus"
+    risk_level: str = "MEDIUM"  # "LOW" | "MEDIUM" | "HIGH" — code-driven exit on HIGH
     ts: float = field(default_factory=time.time)
     triggered_exit: bool = False  # True if this decision caused the position to close
 
@@ -1470,8 +1471,14 @@ def _parse_ai_decision(raw: str, tier: str) -> AIDecision | None:
         if action not in ("HOLD", "SELL", "REDUCE", "WATCH"):
             action = "HOLD"
         confidence = max(0.0, min(1.0, confidence))
+        # Risk level — prefer explicit field, fall back to action mapping.
+        # HIGH = code triggers exit. MEDIUM = monitor. LOW = hold confidently.
+        raw_risk = str(d.get("risk", d.get("risk_level", ""))).upper()
+        if raw_risk not in ("LOW", "MEDIUM", "HIGH"):
+            raw_risk = {"SELL": "HIGH", "WATCH": "MEDIUM", "HOLD": "LOW",
+                        "REDUCE": "HIGH"}.get(action, "MEDIUM")
         return AIDecision(action=action, confidence=confidence, reason=reason,
-                          urgency=urgency, tier=tier)
+                          urgency=urgency, tier=tier, risk_level=raw_risk)
     except Exception:
         return None
 
@@ -1548,8 +1555,13 @@ TWO SCENARIOS you will see in this range:
     back to breakeven or worse. Do not wait for a recovery that isn't coming.
     Be decisive — a 30% exit is far better than a -25% floor exit.
 
-SELL threshold: confidence ≥ 0.75 → execute immediately. One shot, no hesitation.
-HOLD threshold: anything below 0.75 SELL confidence → HOLD. When in doubt, hold.
+RISK LEVELS — your primary output. Code acts on risk, not on "should I sell?":
+  HIGH   = observable danger: liq draining + holders fleeing + sell pressure. Code exits immediately.
+  MEDIUM = mixed signals, one gate concerning but not confirmed. Code monitors.
+  LOW    = all gates healthy, momentum intact. Code holds. Do NOT output HIGH on vague concern.
+
+SELL threshold: risk=HIGH with confidence ≥ 0.75 → code exits immediately.
+HOLD threshold: risk=LOW or MEDIUM → hold. When in doubt, MEDIUM not HIGH.
 
 EVALUATION GATES (assess each independently before deciding):
 
@@ -1574,21 +1586,21 @@ FEW-SHOT EXAMPLES:
 
 Example A — clear HOLD:
   context: pnl=+18%, bsr=0.62, holder_delta_5min=+34, liq_chg_5min_pct=+6.1, chg_5min_pct=+2.4, tp1_hit=false, bounce_pct_from_local_low=+8, local_low_pnl_pct=+9
-  output: {{"reasoning":{{"G1_HOLDER_FLOW":"delta=+34 = accumulation","G2_LIQUIDITY":"+6.1% = growing","G3_BUY_PRESSURE":"bsr 0.62 = buying dominant","G4_PRICE_ACTION":"+2.4% with growing liq = active","G5_PHASE":"pre-TP, primary decider","G6_PULLBACK_SHAPE":"already +8% above local low and accumulating = constructive"}},"action":"HOLD","confidence":0.80,"reason":"5 of 6 gates positive, no distribution signal","urgency":"low"}}
+  output: {{"reasoning":{{"G1_HOLDER_FLOW":"delta=+34 = accumulation","G2_LIQUIDITY":"+6.1% = growing","G3_BUY_PRESSURE":"bsr 0.62 = buying dominant","G4_PRICE_ACTION":"+2.4% with growing liq = active","G5_PHASE":"pre-TP, primary decider","G6_PULLBACK_SHAPE":"already +8% above local low and accumulating = constructive"}},"risk":"LOW","action":"HOLD","confidence":0.80,"reason":"5 of 6 gates positive, no distribution signal","urgency":"low"}}
 
-Example B — clear SELL (real dump):
+Example B — clear danger (real dump):
   context: pnl=+12%, bsr=0.31, holder_delta_5min=-87, holder_delta_30s=-22, liq_chg_5min_pct=-22.4, liq_chg_30s_pct=-8.2, chg_5min_pct=-9.1, bounce_pct_from_local_low=0, tp1_hit=false
-  output: {{"reasoning":{{"G1_HOLDER_FLOW":"delta=-87 (5m) and -22 (30s) = exodus","G2_LIQUIDITY":"-22.4% (5m) and -8.2% (30s) = active drain","G3_BUY_PRESSURE":"bsr 0.31 = mass selling","G4_PRICE_ACTION":"-9.1% no bounce = dying","G5_PHASE":"pre-TP, exit decisively","G6_PULLBACK_SHAPE":"no bounce + holders fleeing + liq draining = real dump"}},"action":"SELL","confidence":0.90,"reason":"holders fleeing + liq actively draining + sell pressure dominant + no bounce","urgency":"high"}}
+  output: {{"reasoning":{{"G1_HOLDER_FLOW":"delta=-87 (5m) and -22 (30s) = exodus","G2_LIQUIDITY":"-22.4% (5m) and -8.2% (30s) = active drain","G3_BUY_PRESSURE":"bsr 0.31 = mass selling","G4_PRICE_ACTION":"-9.1% no bounce = dying","G5_PHASE":"pre-TP, exit decisively","G6_PULLBACK_SHAPE":"no bounce + holders fleeing + liq draining = real dump"}},"risk":"HIGH","action":"SELL","confidence":0.90,"reason":"holders fleeing + liq actively draining + sell pressure dominant + no bounce","urgency":"high"}}
 
-Example C — false pullback (HOLD through dip):
+Example C — false pullback (hold through dip):
   context: pnl=-8%, bsr=0.58, holder_delta_5min=-3, holder_delta_30s=+5, liq_chg_5min_pct=-2.1, liq_chg_30s_pct=+1.4, chg_5min_pct=-4.2, bounce_pct_from_local_low=+5.8, local_low_pnl_pct=-13, peak_pnl_pct=+11, tp1_hit=false
-  output: {{"reasoning":{{"G1_HOLDER_FLOW":"5m -3 but 30s +5 = base holders absorbing dip","G2_LIQUIDITY":"5m -2.1% but 30s +1.4% = stabilising","G3_BUY_PRESSURE":"bsr 0.58 = buyers stepping in","G4_PRICE_ACTION":"-4.2% but rebounding","G5_PHASE":"pre-TP","G6_PULLBACK_SHAPE":"already +5.8% off local -13% low with positive 30s flow = false pullback, recovery in progress"}},"action":"HOLD","confidence":0.74,"reason":"dip absorbed, holders/liq stabilising, ride the recovery","urgency":"low"}}
+  output: {{"reasoning":{{"G1_HOLDER_FLOW":"5m -3 but 30s +5 = base holders absorbing dip","G2_LIQUIDITY":"5m -2.1% but 30s +1.4% = stabilising","G3_BUY_PRESSURE":"bsr 0.58 = buyers stepping in","G4_PRICE_ACTION":"-4.2% but rebounding","G5_PHASE":"pre-TP","G6_PULLBACK_SHAPE":"already +5.8% off local -13% low with positive 30s flow = false pullback, recovery in progress"}},"risk":"LOW","action":"HOLD","confidence":0.74,"reason":"dip absorbed, holders/liq stabilising, ride the recovery","urgency":"low"}}
 
 POSITION DATA:
 {context}
 
-Respond with JSON only — same shape as examples above. Be honest in `reasoning`; the JSON is parsed for `action`/`confidence`/`reason`/`urgency` but the reasoning is logged for retrospective analysis.
-{{"reasoning": {{"G1_HOLDER_FLOW":"...","G2_LIQUIDITY":"...","G3_BUY_PRESSURE":"...","G4_PRICE_ACTION":"...","G5_PHASE":"...","G6_PULLBACK_SHAPE":"...","G7_WHALE_PATTERN":"..."}}, "action": "HOLD"|"SELL"|"WATCH", "confidence": 0.0-1.0, "reason": "one sentence", "urgency": "low"|"medium"|"high"}}"""
+Respond with JSON only — same shape as examples above. The `risk` field is the primary signal the code acts on. Be precise: only HIGH when multiple gates confirm danger simultaneously.
+{{"reasoning": {{"G1_HOLDER_FLOW":"...","G2_LIQUIDITY":"...","G3_BUY_PRESSURE":"...","G4_PRICE_ACTION":"...","G5_PHASE":"...","G6_PULLBACK_SHAPE":"...","G7_WHALE_PATTERN":"..."}}, "risk": "LOW"|"MEDIUM"|"HIGH", "action": "HOLD"|"SELL"|"WATCH", "confidence": 0.0-1.0, "reason": "one sentence", "urgency": "low"|"medium"|"high"}}"""
 
 
 _METEORA_HOLD_SELL_PROMPT = """You are a quant trader managing a Meteora DLMM meme-coin position. Think precisely.
