@@ -2158,6 +2158,18 @@ async def lifecycle_scout_loop(runtime: Any,
                         print(f"[monster-lifecycle] 👁 {mint[:8]} {shape} — {shape_reason} (watchlist)")
                         continue
                     if priority_rec and shape != "good":
+                        # Never bypass OVERHEATED shape for creator_alpha — if the token
+                        # is mid-spike we're entering at the peak regardless of wallet signal.
+                        # OrbCoin: lag=2741s (46min), h1=+781%, entered at the top of the
+                        # spike then hit -30% floor. Pullback/postpeak are safe to bypass
+                        # (token has already moved, wallet signal is the edge). Overheated
+                        # means it's still pumping — that edge is gone.
+                        if shape == "overheated":
+                            cycle_rejects["ca_overheated"] = cycle_rejects.get("ca_overheated", 0) + 1
+                            _creator_alpha_priority_mints.pop(mint, None)
+                            print(f"[monster-lifecycle] 🔥 {mint[:8]} creator-alpha BLOCKED "
+                                  f"shape=overheated h1={h1_change:.0f}% — spike in progress, not bypassing")
+                            continue
                         print(f"[monster-lifecycle] ⭐ {mint[:8]} CREATOR-ALPHA-PRIORITY: "
                               f"src={priority_rec['source']} bypassing shape={shape}, age={age_secs/60:.1f}min, "
                               f"liq=${liq_usd:,.0f}, h1={h1_change:.0f}%")
