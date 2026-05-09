@@ -1809,9 +1809,9 @@ async def _serial_after_graduation(runtime: Any, session: aiohttp.ClientSession,
 # cool-off: $25K-$300K MC, real liquidity, buyers still present.
 LIFECYCLE_MIN_LIQ_USD       = 15_000   # was 30K — winning trades needed ≥$14K
 LIFECYCLE_MAX_LIQ_USD       = 300_000
-LIFECYCLE_MIN_MC_USD        = 25_000   # was 250K — CATASTROPHICALLY WRONG.
-                                        # 21 winning trades: median $115K, min $30K.
-                                        # 250K waited until tokens already 5-10x.
+LIFECYCLE_MIN_MC_USD        = 45_000   # raised from 25K — 10-winner/10-loser cross-reference:
+                                        # 7/10 losers entered below $55K; $45K preserves winners
+                                        # (Aura $47K, X $44K) while blocking weakest tokens.
 LIFECYCLE_MAX_MC_USD        = 300_000  # was 3M — focus early-stage $25K-$300K
 LIFECYCLE_MIN_LIQ_MC_RATIO  = 0.04
 LIFECYCLE_MAX_LIQ_MC_RATIO  = 0.60    # was 0.30 — 0.30 contradicted min_liq for MC < $50K (impossible zone)
@@ -1819,8 +1819,13 @@ LIFECYCLE_MIN_AGE_SECS         = 30 * 60  # 30min floor — Kabina at 21min prov
 LIFECYCLE_WEBHOOK_MIN_AGE_SECS = 15 * 60  # 15min for Helius webhook grads — UFO at 6min proved 5min too hot
 LIFECYCLE_MAX_AGE_SECS         = 90 * 60  # 90min ceiling — tokens >90min already had their move
 LIFECYCLE_TOP1_MAX_PCT      = 10.0
+LIFECYCLE_TOP10_MAX_PCT     = 22.0    # new — 10-winner/10-loser analysis: 7/10 losers had top10>21%;
+                                        # winners averaged 17.6%. Uses lifecycle-specific cap separate
+                                        # from MONSTER_TOP10_MAX_PCT (35%) used by other strategies.
 LIFECYCLE_BUY_RATIO_MIN     = 48.0
-LIFECYCLE_BUY_RATIO_MAX     = 80.0    # was 65 — allow strongly buy-heavy tokens
+LIFECYCLE_BUY_RATIO_MAX     = 72.0    # lowered from 80 — 10-winner/10-loser: no winner had BR>71% at
+                                        # entry; mama (79%) and UNFAZED (75%) were losers. BR>72% = buying
+                                        # exhausted, pump peak. Winners averaged 57.9%.
 LIFECYCLE_H1_CHANGE_MAX_PCT = 200.0   # was 100 — allow larger initial moves
 LIFECYCLE_H1_CHANGE_MIN_PCT = -30.0   # was -10 — allow healthy pullbacks
 LIFECYCLE_M5_CHANGE_MAX_PCT = 20.0    # was 15 — slightly looser
@@ -2289,9 +2294,9 @@ async def lifecycle_scout_loop(runtime: Any,
                     if t1 is None or t1 >= LIFECYCLE_TOP1_MAX_PCT:
                         cycle_rejects["top1"] += 1
                         continue
-                    if t10 is not None and t10 >= MONSTER_TOP10_MAX_PCT:
+                    if t10 is not None and t10 >= LIFECYCLE_TOP10_MAX_PCT:
                         cycle_rejects["top10"] += 1
-                        continue  # TRADE-class: insiders hold >35% → dump liquidity
+                        continue  # top10 > 22% — coordinated dump risk (10-trade analysis 2026-05-09)
                     # Bounce-path holder cap — top1 only. The top10 aggregate
                     # (13.5% ceiling from 2 trades) was blocking ideal entries:
                     # alein had top10=21% across 10 wallets (avg 2.1% each, no
