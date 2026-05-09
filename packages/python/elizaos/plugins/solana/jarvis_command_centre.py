@@ -1486,19 +1486,8 @@ async def _build_context(runtime: AgentRuntime) -> str:
     # Live bot activity — last 50 activity lines (HTTP poll noise filtered out)
     log_tail = _tail_log(50, activity_only=True)
 
-    # Paper trading — show paper wallet balance not real wallet
-    paper_mode = cfg.get("paper_trading", False) or os.getenv("PAPER_TRADING", "false").lower() not in ("false", "0", "no")
-    paper_wallet_sol = float(os.getenv("PAPER_WALLET_SOL", "0.0"))
-    if paper_mode and paper_wallet_sol > 0:
-        # Estimate remaining paper balance: starting balance minus open positions' buy sizes
-        open_positions_sol = 0.0
-        try:
-            open_positions_sol = sum(getattr(p, "buy_sol", 0) for p in (pos_mgr.positions.values() if pos_mgr else []))
-        except Exception:
-            pass
-        wallet_display = f"{paper_wallet_sol:.4f} SOL (PAPER — real wallet: {wallet_sol:.4f} SOL)"
-    else:
-        wallet_display = f"{wallet_sol:.4f} SOL"
+    # Always show real on-chain balance — paper/copy-trade is disabled
+    wallet_display = f"{wallet_sol:.4f} SOL"
 
     live_positions_block = _gather_live_positions_direct()
     monster_positions_block = _gather_monster_positions_direct()
@@ -1636,9 +1625,7 @@ async def _cmd_status(runtime: AgentRuntime) -> str:
     except Exception:
         pass
 
-    paper_mode = cfg.get("paper_trading", False) or os.getenv("PAPER_TRADING", "false").lower() not in ("false", "0", "no")
-    paper_sol  = float(os.getenv("PAPER_WALLET_SOL", "0.0"))
-    wallet_str = f"{paper_sol:.4f} SOL (paper)" if (paper_mode and paper_sol > 0) else f"{wallet_sol:.4f} SOL"
+    wallet_str = f"{wallet_sol:.4f} SOL"  # always real on-chain — paper mode stripped
 
     # ── Strategies ────────────────────────────────────────────────────────────
     strategies_on  = [name for k, name in _STRATEGY_NAMES.items() if cfg.get(k, False)]
@@ -3139,7 +3126,9 @@ async def _execute_tool(name: str, inputs: dict, runtime) -> str:
             # Always fetch live on-chain balance — never use cache for tool calls
             import os as _os_wb
             _rpc_wb = _os_wb.getenv("SOLANA_RPC_URL", "")
-            _pk_wb  = _os_wb.getenv("WALLET_PUBLIC_KEY", "")
+            # Try both key names — env may use either
+            _pk_wb  = (_os_wb.getenv("WALLET_PUBLIC_KEY") or
+                       _os_wb.getenv("SOLANA_PUBLIC_KEY", ""))
             sol_balance = 0.0
             if _rpc_wb and _pk_wb:
                 import aiohttp as _aio_wb

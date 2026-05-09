@@ -218,12 +218,9 @@ export default function CopyTradePositions({ selectedMint, onSelectMint }: CopyT
       </div>
 
       {positions.length === 0 ? (
-        <div className="text-center py-6 text-zinc-600 text-sm">
-          <div className="text-2xl mb-2">👁</div>
-          <div>Watching 6 wallets — waiting for entry signal…</div>
-          <div className="text-[11px] mt-1 text-zinc-700">
-            When a watched whale buys, we enter within 3 seconds
-          </div>
+        <div className="text-center py-8 text-zinc-700 text-sm">
+          <div className="text-2xl mb-2">⬡</div>
+          <div className="text-zinc-600">No open positions</div>
         </div>
       ) : (
         <div className="overflow-x-auto">

@@ -162,8 +162,8 @@ export default function App() {
   return (
     <DashboardLayout>
 
-      {/* ── Row 0: Status banner + pause button ───────────────────────── */}
-      <div className="col-span-12 flex items-center gap-3">
+      {/* ── Row 0: Status banner + pause button (copy-trade only) ───── */}
+      {copyTradeEnabled && <div className="col-span-12 flex items-center gap-3">
         {ctStats?.live_mode ? (
           <div className="flex-1 bg-red-500/10 border border-red-500/40 rounded-lg px-4 py-2 flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
@@ -208,7 +208,7 @@ export default function App() {
             ? <span className="animate-spin text-base">⟳</span>
             : ctStats?.paused ? <>▶ RESUME</> : <>⏸ PAUSE</>}
         </button>
-      </div>
+      </div>}
 
       {/* ── Row 1: Summary bar ────────────────────────────────────────────── */}
       {ctStats && (
@@ -218,21 +218,23 @@ export default function App() {
           trades={ctStats.trades}
           wins={ctStats.wins}
           openCount={ctStats.open_count}
-          maxSlots={ctStats.max_positions ?? 2}
+          maxSlots={Number(config?.monster_max_concurrent ?? 1)}
           signalsToday={ctStats.signals_today ?? 0}
           watchedWallets={ctStats.watched_wallets}
-          tradeSize={ctStats.trade_size}
+          tradeSize={Number(config?.monster_default_size_sol ?? 0.45)}
           liveMode={ctStats.live_mode}
         />
       )}
 
-      <ZoneHeader label="Command" hint="Live positions · Jarvis voice interface · click a position to focus brains" />
+      <ZoneHeader label="Command" hint={copyTradeEnabled ? "Live positions · Jarvis voice interface · click a position to focus brains" : "Jarvis voice interface · brain decisions"} />
 
-      {/* ── Row 2: Copy Trade Positions (left) + Jarvis chat (right) ───── */}
-      <div className="col-span-12 lg:col-span-7">
-        <CopyTradePositions selectedMint={selectedMint} onSelectMint={setSelectedMint} />
-      </div>
-      <div className="col-span-12 lg:col-span-5 h-[460px]">
+      {/* ── Row 2: Copy Trade Positions (copy-trade only) + Jarvis chat ── */}
+      {copyTradeEnabled && (
+        <div className="col-span-12 lg:col-span-7">
+          <CopyTradePositions selectedMint={selectedMint} onSelectMint={setSelectedMint} />
+        </div>
+      )}
+      <div className={`col-span-12 ${copyTradeEnabled ? 'lg:col-span-5' : ''} h-[460px]`}>
         <BotChat sendCommand={sendCommand} />
       </div>
 
@@ -250,18 +252,20 @@ export default function App() {
         <PositionsTable />
       </div>
 
-      {/* ── Row 3: Live charts ────────────────────────────────────────────── */}
-      <div className="col-span-12">
-        <div className="flex items-center gap-2 mb-3 px-1">
-          <span className="text-xs font-semibold text-zinc-400 uppercase tracking-widest">Live Charts</span>
-          {positions.length > 0 && (
-            <span className="text-zinc-600 text-xs normal-case">
-              — {positions.length} open position{positions.length !== 1 ? 's' : ''} · auto-updates every 2s
-            </span>
-          )}
+      {/* ── Row 3: Live charts (copy-trade only) ───────────────────────── */}
+      {copyTradeEnabled && (
+        <div className="col-span-12">
+          <div className="flex items-center gap-2 mb-3 px-1">
+            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-widest">Live Charts</span>
+            {positions.length > 0 && (
+              <span className="text-zinc-600 text-xs normal-case">
+                — {positions.length} open position{positions.length !== 1 ? 's' : ''} · auto-updates every 2s
+              </span>
+            )}
+          </div>
+          <CopyTradeLiveCharts positions={positions} />
         </div>
-        <CopyTradeLiveCharts positions={positions} />
-      </div>
+      )}
 
       <ZoneHeader label="Performance" hint={copyTradeEnabled ? "Wallet promotion · Trade history · Activity feed" : "Monster history · Activity feed"} />
 

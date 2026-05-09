@@ -55,7 +55,6 @@ export default function CopyTradeSummaryBar({
             title="Compounding: 20% of balance ÷ 5 slots" />
         )}
         <Stat label="Signals Today" value={String(signalsToday)} valueClass="text-zinc-300" />
-        <Stat label="Watching" value={`${watchedWallets.length} wallets`} valueClass="text-zinc-400" />
       </div>
     </div>
   )
