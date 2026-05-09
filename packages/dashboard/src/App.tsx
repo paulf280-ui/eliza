@@ -13,7 +13,6 @@ import CopyTradeHistoryTable from './components/copytrade/CopyTradeHistoryTable'
 import WalletPromotionPanel from './components/wallets/WalletPromotionPanel'
 import BrainPanel from './components/brains/BrainPanel'
 import PositionConfigPanel from './components/diagnostics/PositionConfigPanel'
-import CreatorAlphaPanel from './components/diagnostics/CreatorAlphaPanel'
 import CreatorAlphaPnLPanel from './components/diagnostics/CreatorAlphaPnLPanel'
 import PhantomTerminalPanel from './components/phantom/PhantomTerminalPanel'
 
@@ -296,18 +295,15 @@ export default function App() {
         <CreatorAlphaPnLPanel />
       </div>
 
-      {/* ── Creator-alpha live panel — operator/child/pending feed ──────── */}
-      <div className="col-span-12 h-[420px]">
-        <CreatorAlphaPanel />
-      </div>
-
-      <ZoneHeader label="Terminal & Controls" hint="Phantom trade terminal · live position-sizing controls" />
-
-      {/* ── Phantom Terminal (left) + Position Config (right) ────────────── */}
-      <div className="col-span-12 lg:col-span-7 h-[560px]">
+      {/* ── Phantom Terminal — full width, replaces operator feed ─────────── */}
+      <div className="col-span-12 h-[480px]">
         <PhantomTerminalPanel />
       </div>
-      <div className="col-span-12 lg:col-span-5 h-[560px]">
+
+      <ZoneHeader label="Controls" hint="Live position-sizing · no restart required" />
+
+      {/* ── Position Config — standalone ────────────────────────────────── */}
+      <div className="col-span-12 lg:col-span-5">
         <PositionConfigPanel
           solBalance={wallet?.sol_balance ?? 0}
           currentMaxConcurrent={Number(config?.monster_max_concurrent ?? 1)}
