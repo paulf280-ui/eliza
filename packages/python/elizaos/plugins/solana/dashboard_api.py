@@ -2529,6 +2529,20 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
     app.router.add_get("/api/brain-memory", handle_brain_memory)
 
+    # ── Wake Groq: force immediate analysis on all active monitors ────────
+    async def handle_wake_groq(request: web.Request) -> web.Response:
+        try:
+            from elizaos.plugins.solana.trade_monitor import _active_monitors
+            woken = []
+            for mint, mon in _active_monitors.items():
+                mon._last_groq = 0.0
+                woken.append(mint[:8])
+            return web.json_response({"ok": True, "woken": woken, "count": len(woken)})
+        except Exception as exc:
+            return web.json_response({"ok": False, "error": str(exc)}, status=500)
+
+    app.router.add_post("/api/brain/wake-groq", handle_wake_groq)
+
     # ── Helius webhook receiver: fresh PumpSwap pool creations ────────────
     # When a token graduates from the pump.fun bonding curve, a CREATE_POOL
     # event fires on the PumpSwap program. Helius pushes the event to this
