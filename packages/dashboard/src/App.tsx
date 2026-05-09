@@ -12,11 +12,10 @@ import CopyTradeLiveCharts from './components/copytrade/CopyTradeLiveCharts'
 import CopyTradeHistoryTable from './components/copytrade/CopyTradeHistoryTable'
 import WalletPromotionPanel from './components/wallets/WalletPromotionPanel'
 import BrainPanel from './components/brains/BrainPanel'
-import LifecycleRejectsPanel from './components/diagnostics/LifecycleRejectsPanel'
 import PositionConfigPanel from './components/diagnostics/PositionConfigPanel'
 import CreatorAlphaPanel from './components/diagnostics/CreatorAlphaPanel'
 import CreatorAlphaPnLPanel from './components/diagnostics/CreatorAlphaPnLPanel'
-import PerformanceBySourcePanel from './components/diagnostics/PerformanceBySourcePanel'
+import PhantomTerminalPanel from './components/phantom/PhantomTerminalPanel'
 
 interface CopyTradeStats {
   balance: number
@@ -302,18 +301,13 @@ export default function App() {
         <CreatorAlphaPanel />
       </div>
 
-      {/* ── Performance-by-source — all-strategy comparison ─────────────── */}
-      <div className="col-span-12 h-[420px]">
-        <PerformanceBySourcePanel />
-      </div>
+      <ZoneHeader label="Terminal & Controls" hint="Phantom trade terminal · live position-sizing controls" />
 
-      <ZoneHeader label="Diagnostics" hint="Scout reject reasons · live position-sizing controls" />
-
-      {/* ── Row 5: Lifecycle reject histogram + position config ──────────── */}
-      <div className="col-span-12 lg:col-span-7">
-        <LifecycleRejectsPanel />
+      {/* ── Phantom Terminal (left) + Position Config (right) ────────────── */}
+      <div className="col-span-12 lg:col-span-7 h-[560px]">
+        <PhantomTerminalPanel />
       </div>
-      <div className="col-span-12 lg:col-span-5">
+      <div className="col-span-12 lg:col-span-5 h-[560px]">
         <PositionConfigPanel
           solBalance={wallet?.sol_balance ?? 0}
           currentMaxConcurrent={Number(config?.monster_max_concurrent ?? 1)}
