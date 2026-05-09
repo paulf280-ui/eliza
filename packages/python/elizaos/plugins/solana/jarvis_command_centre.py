@@ -3278,6 +3278,144 @@ async def _execute_tool(name: str, inputs: dict, runtime) -> str:
     return f"Unknown tool: {name}"
 
 
+def _get_groq_brain_context() -> str:
+    """Pull the latest Groq brain decision for any open monster position.
+    Injected into Gemini's system prompt so it always knows what the trade
+    brain is seeing without the user having to ask."""
+    try:
+        from elizaos.plugins.solana import strategy_e_monster as _mon_gc
+        open_pos = _mon_gc.open_positions()
+        if not open_pos:
+            return "Groq brain: no open positions."
+        lines = []
+        for mint, pos in open_pos.items():
+            name = pos.get("token_name", mint[:8])
+            cur   = float(pos.get("current_price") or pos.get("entry_price") or 0)
+            entry = float(pos.get("entry_price") or 1)
+            pnl   = (cur / entry - 1) * 100 if entry > 0 else 0
+            peak  = float(pos.get("peak_pnl_pct") or 0)
+            lines.append(f"  {name}: pnl={pnl:+.1f}% peak={peak:+.1f}%")
+        try:
+            from elizaos.plugins.solana import brain_memory as _bm_gc
+            for mint in open_pos:
+                name  = open_pos[mint].get("token_name", mint[:8])
+                recent = _bm_gc.get_recent_decisions(mint, limit=1)
+                if recent:
+                    d = recent[0]
+                    risk = d.get("risk_level") or d.get("action", "?")
+                    conf = float(d.get("confidence") or 0)
+                    rsn  = (d.get("reason") or "")[:80]
+                    lines.append(f"  Groq on {name}: risk={risk} conf={conf:.2f} — {rsn}")
+        except Exception:
+            pass
+        return "Live position + Groq brain:\n" + "\n".join(lines)
+    except Exception:
+        return ""
+
+
+async def _gemini_chat_loop(
+    text: str,
+    runtime,
+    system: str,
+    history_msgs: list[dict],
+    api_key: str,
+) -> str:
+    """Gemini 2.5 Flash primary chat with function calling — up to 5 iterations.
+
+    Mirrors _claude_tool_use_loop but uses the google-genai SDK. Gemini handles
+    all tool execution (wallet, positions, config changes, logs, close position)
+    with full context about the running bot state and Groq brain decisions.
+    Returns the final plain-text response or '' on failure.
+    """
+    try:
+        from google import genai as _genai
+        from google.genai import types as _gtypes
+    except ImportError:
+        return ""
+
+    _client = _genai.Client(api_key=api_key)
+
+    # Build FunctionDeclarations from existing JARVIS_TOOLS definitions
+    _fn_decls: list = []
+    for _tool in JARVIS_TOOLS:
+        _schema_d = _tool.get("input_schema", {})
+        _props: dict = {}
+        for _pname, _pdef in _schema_d.get("properties", {}).items():
+            _ptype = _pdef.get("type", "string").upper()
+            _gtype = getattr(_gtypes.Type, _ptype, _gtypes.Type.STRING)
+            _props[_pname] = _gtypes.Schema(type=_gtype, description=_pdef.get("description", ""))
+        _fn_decls.append(_gtypes.FunctionDeclaration(
+            name=_tool["name"],
+            description=_tool["description"],
+            parameters=_gtypes.Schema(
+                type=_gtypes.Type.OBJECT,
+                properties=_props,
+                required=_schema_d.get("required", []),
+            ) if _props else None,
+        ))
+    _gemini_tools = [_gtypes.Tool(function_declarations=_fn_decls)]
+
+    # Build conversation history in Gemini Content format
+    _contents: list = []
+    for _msg in history_msgs:
+        _role = "user" if _msg.get("role") == "user" else "model"
+        _ct = _msg.get("content", "")
+        if isinstance(_ct, list):
+            _ct = " ".join(b.get("text", "") for b in _ct if isinstance(b, dict))
+        if _ct:
+            _contents.append(_gtypes.Content(role=_role, parts=[_gtypes.Part.from_text(text=str(_ct))]))
+    _contents.append(_gtypes.Content(role="user", parts=[_gtypes.Part.from_text(text=text)]))
+
+    _config = _gtypes.GenerateContentConfig(
+        tools=_gemini_tools,
+        system_instruction=system,
+        temperature=0.2,
+        max_output_tokens=1500,
+    )
+
+    import functools as _ft
+    loop = asyncio.get_event_loop()
+
+    for _iter in range(5):
+        try:
+            _response = await asyncio.wait_for(
+                loop.run_in_executor(None, _ft.partial(
+                    _client.models.generate_content,
+                    model="gemini-2.5-flash",
+                    contents=_contents,
+                    config=_config,
+                )),
+                timeout=35.0,
+            )
+        except Exception as _ge:
+            print(f"[gemini-chat] API error iter={_iter}: {_ge}")
+            return ""
+
+        if not _response.candidates:
+            return ""
+        _cand = _response.candidates[0]
+        _parts = _cand.content.parts if _cand.content and _cand.content.parts else []
+
+        _fn_calls = [p.function_call for p in _parts if getattr(p, "function_call", None)]
+        _text_parts = [p.text for p in _parts if getattr(p, "text", None)]
+
+        if not _fn_calls:
+            return " ".join(_text_parts).strip()
+
+        # Append assistant turn, execute tools, feed results back
+        _contents.append(_cand.content)
+        _fn_results = []
+        for _fc in _fn_calls:
+            _result = await _execute_tool(_fc.name, dict(_fc.args or {}), runtime)
+            print(f"[gemini-chat] tool={_fc.name} → {str(_result)[:80]}")
+            _fn_results.append(_gtypes.Part.from_function_response(
+                name=_fc.name, response={"result": _result}
+            ))
+        _contents.append(_gtypes.Content(role="user", parts=_fn_results))
+
+    return ""
+
+
 async def _claude_tool_use_loop(
     text: str,
     runtime,
@@ -3754,7 +3892,27 @@ async def _cmd_free_chat(text: str, runtime: AgentRuntime) -> str:
         + "\n\n== CURRENT TRADING STATE (re-read from disk this message) ==\n" + context
     )
 
-    # ── Brain 0: Claude Sonnet 4.6 (PRIMARY — real tool-use, agentic loop) ───────
+    # ── Brain 0: Gemini 2.5 Flash (PRIMARY — fastest, function calling) ────────
+    _gemini_key = os.getenv("GEMINI_API_KEY", "")
+    if _gemini_key and not reply_text:
+        _history = _history_messages()
+        # Inject live Groq brain context so Gemini always knows the trade state
+        _groq_ctx = _get_groq_brain_context()
+        _gemini_system = (
+            _claude_system.replace(
+                "You are Claude Sonnet 4.6 — the primary intelligence brain. ",
+                "You are J.A.R.V.I.S. powered by Gemini 2.5 Flash — the primary intelligence brain. ",
+            )
+            + (f"\n\n== GROQ BRAIN (live — updated every 30s) ==\n{_groq_ctx}" if _groq_ctx else "")
+        )
+        reply_text = await _gemini_chat_loop(
+            text, runtime, _gemini_system, _history, _gemini_key
+        )
+        if reply_text:
+            _history_append(text, reply_text)
+            return reply_text
+
+    # ── Brain 1: Claude Sonnet 4.6 (fallback if Gemini unavailable) ─────────
     _anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
     if _anthropic_key and not reply_text:
         _history = _history_messages()
