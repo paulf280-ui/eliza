@@ -71,36 +71,46 @@ class MonsterStrategyService(Service):
         from elizaos.plugins.solana import monster_signals, monster_social_monitor
         from elizaos.plugins.solana import strategy_e_monster as monster
 
+        import os as _os_ms
+        _ca_enabled     = _os_ms.getenv("CREATOR_ALPHA_ENABLED",     "true").lower()  not in ("false","0","no")
+        _serial_enabled = _os_ms.getenv("SERIAL_DEPLOYER_ENABLED",   "true").lower()  not in ("false","0","no")
+        _cluster_enabled= _os_ms.getenv("MONSTER_CLUSTER_CONFIRM_ENABLED","false").lower() not in ("false","0","no")
+        _breakout_enabled=_os_ms.getenv("MONSTER_BREAKOUT_ENABLED",  "false").lower() not in ("false","0","no")
+
         svc._tasks = [
             asyncio.create_task(
                 monster.monitor_positions_loop(runtime, svc._session),
                 name="monster_position_monitor",
             ),
             asyncio.create_task(
-                monster_signals.cluster_confirm_scout_loop(runtime, svc._session),
-                name="monster_cluster_confirm",
-            ),
-            asyncio.create_task(
-                monster_signals.serial_deployer_sniper_loop(runtime, svc._session),
-                name="monster_serial_deployer",
-            ),
-            asyncio.create_task(
                 monster_signals.lifecycle_scout_loop(runtime, svc._session),
                 name="monster_lifecycle",
             ),
-            asyncio.create_task(
+        ]
+        if _cluster_enabled:
+            svc._tasks.append(asyncio.create_task(
+                monster_signals.cluster_confirm_scout_loop(runtime, svc._session),
+                name="monster_cluster_confirm",
+            ))
+        if _serial_enabled:
+            svc._tasks.append(asyncio.create_task(
+                monster_signals.serial_deployer_sniper_loop(runtime, svc._session),
+                name="monster_serial_deployer",
+            ))
+        if _breakout_enabled:
+            svc._tasks.append(asyncio.create_task(
                 monster_signals.breakout_candle_scout_loop(runtime, svc._session),
                 name="monster_breakout",
-            ),
-            asyncio.create_task(
+            ))
+        if _ca_enabled:
+            svc._tasks.append(asyncio.create_task(
                 monster_signals.creator_alpha_scout_loop(runtime, svc._session),
                 name="monster_creator_alpha",
-            ),
-            asyncio.create_task(
-                monster_social_monitor.monster_social_monitor_loop(runtime, svc._session),
-                name="monster_social_monitor",
-            ),
-        ]
+            ))
+        svc._tasks.append(asyncio.create_task(
+            monster_social_monitor.monster_social_monitor_loop(runtime, svc._session),
+            name="monster_social_monitor",
+        ))
         mode = "PAPER" if monster.MONSTER_PAPER_ONLY else "LIVE"
         runtime.logger.info(
             f"MonsterStrategyService started — mode={mode}, "
