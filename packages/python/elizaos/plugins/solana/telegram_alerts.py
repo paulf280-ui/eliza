@@ -137,29 +137,38 @@ def fmt_circuit_breaker_off(reason: str = "") -> str:
 
 
 def fmt_startup(wallet_sol: float = 0.0) -> str:
+    import os as _os_tg
     from datetime import datetime, timezone
     utc = datetime.now(timezone.utc).strftime("%H:%M UTC")
     try:
         from elizaos.plugins.solana import live_config as _lc_tg
         _strats = []
-        if _lc_tg.get("strategy_a2_enabled", False): _strats.append("A2")
-        if _lc_tg.get("strategy_b_enabled", False):  _strats.append("B")
-        if _lc_tg.get("strategy_c_enabled", False):  _strats.append("C")
-        if _lc_tg.get("strategy_d_enabled", False):  _strats.append("D")
-        if _lc_tg.get("strategy_e_enabled", False):  _strats.append("E")
-        strat_str  = " + ".join(_strats) if _strats else "none"
-        copy_live  = bool(_lc_tg.get("copy_trade_enabled", False))
-        copy_str   = "LIVE" if copy_live else "paper"
-        strat_paper = bool(_lc_tg.get("paper_trading", False))
-        strat_mode  = "paper" if strat_paper else "LIVE"
+        # Monster lifecycle strategy (primary)
+        _monster_on = _os_tg.getenv("MONSTER_STRATEGY_ENABLED", "false").lower() in ("true", "1", "yes")
+        if _monster_on:
+            _paper_only = _os_tg.getenv("MONSTER_PAPER_ONLY", "false").lower() in ("true", "1", "yes")
+            _strats.append(f"Monster{'(paper)' if _paper_only else ''}")
+        # Creator-alpha strategy
+        _ca_on = _os_tg.getenv("CREATOR_ALPHA_ENABLED", "false").lower() in ("true", "1", "yes")
+        if _ca_on:
+            _strats.append("Creator-Alpha")
+        # Legacy strategies
+        if _lc_tg.get("strategy_b_enabled", False): _strats.append("B")
+        if _lc_tg.get("strategy_c_enabled", False): _strats.append("C")
+        if _lc_tg.get("strategy_d_enabled", False): _strats.append("D")
+
+        strat_str = " + ".join(_strats) if _strats else "none"
+
+        # Mode: LIVE unless explicitly in paper mode
+        _paper = _os_tg.getenv("MONSTER_PAPER_ONLY", "false").lower() in ("true", "1", "yes")
+        mode_str = "PAPER" if _paper else "LIVE"
     except Exception:
-        strat_str  = "none"
-        copy_str   = "unknown"
-        strat_mode = "unknown"
+        strat_str = "unknown"
+        mode_str  = "unknown"
     return (
         f"🤖 <b>TraderBot started</b> — {utc}\n"
         f"Real wallet: <b>{_sol(wallet_sol)}</b>\n"
-        f"Copy trade: <b>{copy_str}</b>  •  Strategies: <b>{strat_mode}</b>\n"
+        f"Mode: <b>{mode_str}</b>\n"
         f"Active strategies: {strat_str}"
     )
 
