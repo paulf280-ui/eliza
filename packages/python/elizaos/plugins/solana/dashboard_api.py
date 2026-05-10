@@ -205,31 +205,26 @@ async def _rpc_get_sol_balance(address: str) -> float:
 
 
 async def _get_wallet_data(runtime: AgentRuntime) -> dict[str, Any]:
-    # Env-var address is always the ground truth for display
+    # Address: env var is ground truth (wallet service sometimes returns empty)
     env_address = os.getenv("SOLANA_PUBLIC_KEY", "") or os.getenv("WALLET_PUBLIC_KEY", "")
 
+    # SOL balance: always fetch live from RPC — wallet service cache can be stale/zero
+    sol_balance = await _rpc_get_sol_balance(env_address)
+
+    # Token balances: try wallet service if available
+    token_balances: list = []
     wallet_svc = _get_wallet_svc(runtime)
     if wallet_svc is not None:
         try:
-            sol_balance = await wallet_svc.get_sol_balance()
             token_balances = await wallet_svc.get_token_balances()
-            svc_address = wallet_svc.get_public_key() or env_address
-            return {
-                "address": svc_address,
-                "sol_balance": round(sol_balance, 6),
-                "token_balances": token_balances,
-                "read_only": wallet_svc.is_read_only(),
-            }
         except Exception:
             pass
 
-    # Wallet service unavailable — fetch balance directly from RPC
-    sol_balance = await _rpc_get_sol_balance(env_address)
     return {
         "address": env_address,
         "sol_balance": sol_balance,
-        "token_balances": [],
-        "read_only": True,
+        "token_balances": token_balances,
+        "read_only": False,
     }
 
 
