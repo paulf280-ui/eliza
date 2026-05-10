@@ -221,6 +221,9 @@ export default function App() {
           watchedWallets={ctStats.watched_wallets}
           tradeSize={Number(config?.monster_default_size_sol ?? 0.45)}
           liveMode={ctStats.live_mode}
+          paused={ctStats.paused}
+          pauseLoading={pauseLoading}
+          onTogglePause={togglePause}
         />
       )}
 

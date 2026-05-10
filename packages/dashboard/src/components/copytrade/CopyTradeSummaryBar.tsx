@@ -9,10 +9,14 @@ interface Props {
   watchedWallets: string[]
   tradeSize?: number
   liveMode?: boolean
+  paused?: boolean
+  pauseLoading?: boolean
+  onTogglePause?: () => void
 }
 
 export default function CopyTradeSummaryBar({
-  balance, netPnl, trades, wins, openCount, maxSlots, signalsToday, watchedWallets, tradeSize, liveMode
+  balance, netPnl, trades, wins, openCount, maxSlots, signalsToday, watchedWallets, tradeSize, liveMode,
+  paused, pauseLoading, onTogglePause,
 }: Props) {
   const wr = trades > 0 ? Math.round((wins / trades) * 100) : 0
   const pnlPos = netPnl >= 0
@@ -22,7 +26,7 @@ export default function CopyTradeSummaryBar({
       className="col-span-12 rounded-xl px-5 py-3 flex flex-wrap items-center justify-between gap-4"
       style={{ background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.2)' }}
     >
-      {/* Left: title */}
+      {/* Left: title + pause button */}
       <div className="flex items-center gap-3">
         <div className="w-2.5 h-2.5 rounded-full bg-orange-400 animate-pulse"
           style={{ boxShadow: '0 0 8px rgba(249,115,22,0.8)' }} />
@@ -35,6 +39,29 @@ export default function CopyTradeSummaryBar({
             LIVE
           </span>
         )}
+        {paused && (
+          <span className="text-[10px] font-bold text-amber-400 animate-pulse">⏸ PAUSED</span>
+        )}
+
+        {/* Pause / Resume — always visible emergency control */}
+        <button
+          onClick={onTogglePause}
+          disabled={pauseLoading}
+          className="flex items-center gap-1.5 px-3 py-1 rounded-lg font-bold text-xs tracking-wide transition-all duration-150 disabled:opacity-50 ml-1"
+          style={paused ? {
+            background: 'rgba(52,211,153,0.15)',
+            border: '1px solid rgba(52,211,153,0.5)',
+            color: '#6ee7b7',
+          } : {
+            background: 'rgba(239,68,68,0.12)',
+            border: '1px solid rgba(239,68,68,0.4)',
+            color: '#f87171',
+          }}
+        >
+          {pauseLoading
+            ? <span className="animate-spin">⟳</span>
+            : paused ? <>▶ RESUME</> : <>⏸ PAUSE</>}
+        </button>
       </div>
 
       {/* Stats */}
@@ -51,8 +78,7 @@ export default function CopyTradeSummaryBar({
         )}
         <Stat label="Open Slots" value={`${openCount}/${maxSlots ?? 2}`} valueClass="text-orange-300" />
         {tradeSize != null && (
-          <Stat label="Trade Size" value={`${tradeSize.toFixed(3)} SOL`} valueClass="text-orange-400"
-            title="Compounding: 20% of balance ÷ 5 slots" />
+          <Stat label="Trade Size" value={`${tradeSize.toFixed(3)} SOL`} valueClass="text-orange-400" />
         )}
         <Stat label="Signals Today" value={String(signalsToday)} valueClass="text-zinc-300" />
       </div>
