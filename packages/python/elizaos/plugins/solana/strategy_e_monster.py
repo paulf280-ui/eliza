@@ -36,8 +36,8 @@ import aiohttp
 # Clean data gathering for 2-position scaling validation.
 # Every 0.2 SOL trade hitting +100% = +0.2 SOL profit (doubled stake).
 # 30-40% range tokens: Groq evaluates MC/holders/liq trends, auto-exits if declining.
-MONSTER_TP1_GAIN_PCT     = 100.0   # Hard TP at +100% — exit entire position
-MONSTER_TP1_SELL_FRACTION = 1.0    # sell 100% at TP, close position cleanly
+MONSTER_TP1_GAIN_PCT     = 20.0    # Hard TP at +20% — full exit, bank the profit
+MONSTER_TP1_SELL_FRACTION = 1.0    # sell 100% at TP, no moonbag
 MONSTER_PRE_TP1_FLOOR_PCT = -25.0  # catastrophic floor only — safety rail
 MONSTER_BE_TRAIL_ACTIVATE_PCT = 20.0  # legacy — unused
 MONSTER_BE_TRAIL_TARGET_PCT   = 10.0  # legacy — unused
