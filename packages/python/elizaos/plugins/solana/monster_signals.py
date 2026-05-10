@@ -2058,7 +2058,7 @@ async def lifecycle_scout_loop(runtime: Any,
                         cycle_rejects["liq"] += 1
                         continue
                     mc_usd = float(p.get("marketCap") or p.get("fdv") or 0)
-                    if not (LIFECYCLE_MIN_MC_USD <= mc_usd <= LIFECYCLE_MAX_MC_USD):
+                    if not (LIFECYCLE_MIN_MC_USD <= mc_usd <= LIFECYCLE_MAX_MC_USD):  # MC-GATE
                         cycle_rejects["mc"] += 1
                         continue
                     liq_mc = (liq_usd / mc_usd) if mc_usd > 0 else 0

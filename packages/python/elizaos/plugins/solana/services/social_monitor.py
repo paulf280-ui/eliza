@@ -107,6 +107,15 @@ class SocialMonitorService(Service):
         service._grok_api_key = os.getenv("GROK_API_KEY", "")
         service._gemini_api_key = os.getenv("GOOGLE_GENERATIVE_AI_API_KEY", "")
 
+        if os.getenv("SOCIAL_MONITOR_ENABLED", "true").lower() in ("false", "0", "no"):
+            runtime.logger.info(
+                "SocialMonitorService disabled via SOCIAL_MONITOR_ENABLED=false",
+                src="service:social_monitor",
+            )
+            service._enabled = False
+            service._task = asyncio.create_task(asyncio.sleep(0))
+            return service
+
         if service._grok_api_key:
             service._enabled = True
             runtime.logger.info(

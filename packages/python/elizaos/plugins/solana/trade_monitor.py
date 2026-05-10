@@ -617,18 +617,15 @@ class AICascade:
         now = time.time()
         age_secs = now - pos.get("entry_ts", now)
 
-        # Guard: evaluate AI for tokens in 15-80% PnL range.
-        # Below 15%: still developing or heading to -25% floor — no brain needed.
+        # Guard: evaluate AI from entry (0%) up to 80% PnL.
+        # Below 0%: Groq watches for early dump signals — can exit before -25% floor.
         # Above 80%: 20% from 100% TP — let it fly, don't interrupt a runner.
-        # In 15-80%: Groq watches for stagnation and distribution signals.
-        # Genuine monsters blast THROUGH this range in minutes — Groq never fires.
-        # Stagnant tokens sit here — Groq detects the flat/declining on-chain data and exits.
         current_price = (feed.latest_price() or 0.0) if feed else 0.0
         entry_price = pos.get("entry_price", 0.0)
         if entry_price > 0 and current_price > 0:
             pnl_pct = ((current_price / entry_price) - 1.0) * 100
-            if not (15.0 <= pnl_pct <= 80.0):
-                # Outside evaluation band — let hard TP (+100%) and floor (-25%) handle
+            if pnl_pct > 80.0:
+                # Runner — let hard TP handle it, don't interrupt
                 return None
 
         # Probe single-whale concentration from on-chain swap history (cached

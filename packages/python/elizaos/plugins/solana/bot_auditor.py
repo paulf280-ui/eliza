@@ -117,8 +117,8 @@ async def run_audit(session: aiohttp.ClientSession | None = None) -> dict:
             passed.append("Claude brain DISABLED ✓")
         else:
             failed.append("BRAIN: Claude may be enabled — expected CLAUDE_ENABLED = False")
-        if "15.0 <= pnl_pct <= 80.0" in monitor_code or "15.0 <= pnl_pct" in monitor_code:
-            passed.append("Groq evaluation window 15-80% ✓")
+        if "pnl_pct > 80.0" in monitor_code:
+            passed.append("Groq evaluation window 0-80% (from entry) ✓")
         else:
             warnings.append("BRAIN: Groq evaluation window may have changed — check trade_monitor.py")
     except Exception as e:
