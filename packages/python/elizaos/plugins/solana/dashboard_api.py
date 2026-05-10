@@ -2543,6 +2543,79 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
     app.router.add_post("/api/brain/wake-groq", handle_wake_groq)
 
+    # ── Jarvis Agent: streaming Claude Opus 4.7 with full tool access ─────
+    async def handle_jarvis_agent(request: web.Request) -> web.StreamResponse:
+        """POST /api/jarvis  {"message":"...", "history":[...]} → SSE stream
+
+        Runs a Claude Opus 4.7 agentic loop with bash / read_file / write_file
+        tools that execute directly on this server.  Streams SSE events:
+          data: {"type":"text","content":"..."}
+          data: {"type":"tool_call","name":"bash","cmd":"..."}
+          data: {"type":"tool_result","name":"bash","preview":"..."}
+          data: {"type":"done"}
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "invalid JSON"}, status=400)
+
+        message = (body.get("message") or "").strip()
+        history = body.get("history") or []
+        if not message:
+            return web.json_response({"error": "message required"}, status=400)
+
+        # Build live status context to inject into system prompt
+        status_lines = []
+        try:
+            wallet_sol = await _fetch_wallet_balance()
+            status_lines.append(f"Wallet: {wallet_sol:.4f} SOL")
+        except Exception:
+            pass
+        try:
+            from elizaos.plugins.solana import strategy_e_monster as _mon
+            positions = _mon.open_positions()
+            if positions:
+                status_lines.append(f"Open positions: {len(positions)} — {', '.join(m[:8] for m in list(positions)[:5])}")
+            else:
+                status_lines.append("Open positions: none")
+        except Exception:
+            pass
+        try:
+            from elizaos.plugins.solana import live_config as _lc_agent
+            cfg = _lc_agent.get_all()
+            strategy = "MONSTER" if cfg.get("monster_strategy_enabled") else "OFF"
+            trade_size = cfg.get("monster_default_size_sol", "?")
+            max_conc = cfg.get("monster_max_concurrent", "?")
+            status_lines.append(f"Strategy: {strategy} | size={trade_size} SOL | max={max_conc} slots")
+        except Exception:
+            pass
+        status_context = "\n".join(status_lines) if status_lines else "Status unavailable"
+
+        # Prepare SSE response
+        sse_response = web.StreamResponse(
+            headers={
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            }
+        )
+        await sse_response.prepare(request)
+
+        try:
+            from elizaos.plugins.solana.jarvis_agent import stream_jarvis
+            async for event in stream_jarvis(message, history, status_context):
+                data = json.dumps(event, ensure_ascii=False)
+                await sse_response.write(f"data: {data}\n\n".encode())
+        except Exception as exc:
+            err = json.dumps({"type": "error", "message": str(exc)})
+            await sse_response.write(f"data: {err}\n\n".encode())
+            done = json.dumps({"type": "done"})
+            await sse_response.write(f"data: {done}\n\n".encode())
+
+        return sse_response
+
+    app.router.add_post("/api/jarvis", handle_jarvis_agent)
+
     # ── Helius webhook receiver: fresh PumpSwap pool creations ────────────
     # When a token graduates from the pump.fun bonding curve, a CREATE_POOL
     # event fires on the PumpSwap program. Helius pushes the event to this
