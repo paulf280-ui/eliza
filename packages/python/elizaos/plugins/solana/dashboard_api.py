@@ -181,33 +181,56 @@ def _get_token_monitor(runtime: AgentRuntime):
         return None
 
 
-async def _get_wallet_data(runtime: AgentRuntime) -> dict[str, Any]:
-    wallet_svc = _get_wallet_svc(runtime)
-    if wallet_svc is None:
-        return {"address": "", "sol_balance": 0, "token_balances": [], "read_only": True}
+async def _rpc_get_sol_balance(address: str) -> float:
+    """Fetch SOL balance directly from Helius RPC — used as fallback when wallet service is unavailable."""
+    import aiohttp as _aio
+    rpc_url = os.getenv("SOLANA_RPC_URL", "")
+    if not rpc_url or not address:
+        return 0.0
     try:
-        sol_balance = await wallet_svc.get_sol_balance()
-        token_balances = await wallet_svc.get_token_balances()
-        return {
-            "address": wallet_svc.get_public_key(),
-            "sol_balance": round(sol_balance, 6),
-            "token_balances": token_balances,
-            "read_only": wallet_svc.is_read_only(),
-        }
-    except Exception as exc:
-        import logging
-        logging.getLogger(__name__).exception("_get_wallet_data failed: %s", exc)
-        sol_balance = 0.0
+        async with _aio.ClientSession() as _sess:
+            async with _sess.post(
+                rpc_url,
+                json={"jsonrpc": "2.0", "id": 1, "method": "getBalance",
+                      "params": [address, {"commitment": "confirmed"}]},
+                timeout=_aio.ClientTimeout(total=5),
+            ) as r:
+                if r.status == 200:
+                    d = await r.json()
+                    lamports = (d.get("result") or {}).get("value", 0)
+                    return round(lamports / 1e9, 6)
+    except Exception:
+        pass
+    return 0.0
+
+
+async def _get_wallet_data(runtime: AgentRuntime) -> dict[str, Any]:
+    # Env-var address is always the ground truth for display
+    env_address = os.getenv("SOLANA_PUBLIC_KEY", "") or os.getenv("WALLET_PUBLIC_KEY", "")
+
+    wallet_svc = _get_wallet_svc(runtime)
+    if wallet_svc is not None:
         try:
             sol_balance = await wallet_svc.get_sol_balance()
+            token_balances = await wallet_svc.get_token_balances()
+            svc_address = wallet_svc.get_public_key() or env_address
+            return {
+                "address": svc_address,
+                "sol_balance": round(sol_balance, 6),
+                "token_balances": token_balances,
+                "read_only": wallet_svc.is_read_only(),
+            }
         except Exception:
             pass
-        return {
-            "address": getattr(wallet_svc, "get_public_key", lambda: "")(),
-            "sol_balance": round(sol_balance, 6),
-            "token_balances": [],
-            "read_only": wallet_svc.is_read_only() if hasattr(wallet_svc, "is_read_only") else True,
-        }
+
+    # Wallet service unavailable — fetch balance directly from RPC
+    sol_balance = await _rpc_get_sol_balance(env_address)
+    return {
+        "address": env_address,
+        "sol_balance": sol_balance,
+        "token_balances": [],
+        "read_only": True,
+    }
 
 
 async def _get_current_prices(runtime: AgentRuntime, mints: list[str]) -> dict[str, float]:

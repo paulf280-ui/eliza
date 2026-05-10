@@ -8,6 +8,7 @@ interface AddressLinkProps {
 
 export function AddressLink({ address, truncate = true, type = 'account' }: AddressLinkProps) {
   const [copied, setCopied] = useState(false)
+  if (!address) return null
   const display = truncate ? `${address.slice(0, 4)}...${address.slice(-4)}` : address
   const url = type === 'tx'
     ? `https://solscan.io/tx/${address}`
