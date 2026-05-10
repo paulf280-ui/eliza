@@ -1809,9 +1809,9 @@ async def _serial_after_graduation(runtime: Any, session: aiohttp.ClientSession,
 # cool-off: $25K-$300K MC, real liquidity, buyers still present.
 LIFECYCLE_MIN_LIQ_USD       = 15_000   # was 30K — winning trades needed ≥$14K
 LIFECYCLE_MAX_LIQ_USD       = 300_000
-LIFECYCLE_MIN_MC_USD        = 45_000   # raised from 25K — 10-winner/10-loser cross-reference:
-                                        # 7/10 losers entered below $55K; $45K preserves winners
-                                        # (Aura $47K, X $44K) while blocking weakest tokens.
+LIFECYCLE_MIN_MC_USD        = 55_000   # raised from 25K — 10-winner/10-loser cross-reference:
+                                        # 7/10 losers entered below $55K MC. $55K is the exact
+                                        # threshold from the analysis — blocks danger zone.
 LIFECYCLE_MAX_MC_USD        = 300_000  # was 3M — focus early-stage $25K-$300K
 LIFECYCLE_MIN_LIQ_MC_RATIO  = 0.04
 LIFECYCLE_MAX_LIQ_MC_RATIO  = 0.60    # was 0.30 — 0.30 contradicted min_liq for MC < $50K (impossible zone)
@@ -1819,7 +1819,7 @@ LIFECYCLE_MIN_AGE_SECS         = 30 * 60  # 30min floor — Kabina at 21min prov
 LIFECYCLE_WEBHOOK_MIN_AGE_SECS = 15 * 60  # 15min for Helius webhook grads — UFO at 6min proved 5min too hot
 LIFECYCLE_MAX_AGE_SECS         = 90 * 60  # 90min ceiling — tokens >90min already had their move
 LIFECYCLE_TOP1_MAX_PCT      = 10.0
-LIFECYCLE_TOP10_MAX_PCT     = 22.0    # new — 10-winner/10-loser analysis: 7/10 losers had top10>21%;
+LIFECYCLE_TOP10_MAX_PCT     = 21.0    # 10-winner/10-loser analysis: 7/10 losers had top10>20%;
                                         # winners averaged 17.6%. Uses lifecycle-specific cap separate
                                         # from MONSTER_TOP10_MAX_PCT (35%) used by other strategies.
 LIFECYCLE_BUY_RATIO_MIN     = 48.0
