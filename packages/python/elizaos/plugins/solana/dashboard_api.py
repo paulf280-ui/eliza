@@ -2589,8 +2589,10 @@ When adjusting a filter, always explain your reasoning based on the data above."
         # Build live status context to inject into system prompt
         status_lines = []
         try:
-            wallet_sol = await _fetch_wallet_balance()
-            status_lines.append(f"Wallet: {wallet_sol:.4f} SOL")
+            _wd = await _get_wallet_data(runtime)
+            _addr = _wd.get("address") or os.getenv("SOLANA_PUBLIC_KEY", "")
+            _bal  = _wd.get("sol_balance", 0.0)
+            status_lines.append(f"Bot wallet: {_addr[:8]}…{_addr[-4:]} — {_bal:.4f} SOL")
         except Exception:
             pass
         try:
