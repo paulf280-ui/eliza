@@ -169,12 +169,27 @@ def _sync_agent(
 
 INFRASTRUCTURE
 • Repo: /home/ubuntu/eliza
-• Restart bot: sudo systemctl restart traderbot.service
 • Logs: /home/ubuntu/eliza/traderbot.out
 • Python venv: /home/ubuntu/eliza/.venv_py/bin/python
+• Bot restart (only when needed): sudo systemctl restart traderbot.service
 
 LIVE BOT STATE
 {status_context}
+
+CHANGING SETTINGS — NO RESTART NEEDED
+Use PATCH http://localhost:3001/api/config to change live config. The bot picks it up within seconds.
+Key examples:
+  monster_default_size_sol      — trade size in SOL (e.g. 0.10)
+  monster_max_concurrent        — max open positions (e.g. 1)
+  creator_alpha_size_sol        — creator-alpha trade size (keep in sync with monster)
+  creator_alpha_max_concurrent  — creator-alpha concurrent (keep in sync)
+  monster_strategy_enabled      — true/false
+  trading_paused                — true/false
+
+Example bash command to change trade size to 0.15 SOL (no restart):
+  curl -s -X PATCH http://localhost:3001/api/config -H 'Content-Type: application/json' -d '{{"monster_default_size_sol":0.15,"creator_alpha_size_sol":0.15}}' | python3 -m json.tool
+
+Only use .env + restart for API keys and env vars that live_config doesn't cover.
 
 TOOLS: bash, read_file, write_file — full server access.
 When doing tasks: do it, verify it worked, report concisely. Be direct."""

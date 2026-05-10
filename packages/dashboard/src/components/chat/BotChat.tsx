@@ -308,13 +308,19 @@ export default function BotChat({ sendCommand: _sendCommand }: BotChatProps) {
 
     } catch (err: unknown) {
       if ((err as Error)?.name === 'AbortError') {
+        // User hit Stop — keep whatever partial content exists
         setMessages(prev => prev.map(m =>
           m.timestamp === botIdx / 1000 ? { ...m, content: m.content || '(cancelled)', streaming: false } : m
         ))
       } else {
-        setMessages(prev => prev.map(m =>
-          m.timestamp === botIdx / 1000 ? { ...m, content: `Error: ${String(err)}`, streaming: false } : m
-        ))
+        // Network error — keep any content Jarvis produced (e.g. bot restarted mid-stream)
+        setMessages(prev => prev.map(m => {
+          if (m.timestamp !== botIdx / 1000) return m
+          const note = m.content
+            ? '\n\n[Connection dropped — the bot may have restarted]'
+            : `Error: ${String(err)}`
+          return { ...m, content: m.content + note, streaming: false }
+        }))
       }
     } finally {
       setSending(false)
