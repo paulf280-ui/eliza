@@ -8567,18 +8567,37 @@ async def run_startup_health_check(runtime: Any) -> None:
 
     # ── 3. Wallet balance ─────────────────────────────────────────────────────
     try:
+        _bal = 0.0
         _wallet_svc = runtime.get_service(_SvcReg.WALLET)
-        if _wallet_svc is None:
-            issues.append("WalletService not running — cannot read balance")
+        if _wallet_svc is not None:
+            try:
+                _bal = await _wallet_svc.get_sol_balance()
+            except Exception:
+                pass
+        # Wallet service may return 0 when in read-only mode — always verify via RPC
+        if _bal == 0.0:
+            try:
+                import aiohttp as _aio_hc
+                _rpc_hc = os.getenv("SOLANA_RPC_URL", "")
+                _pk_hc  = os.getenv("WALLET_PUBLIC_KEY") or os.getenv("SOLANA_PUBLIC_KEY", "")
+                if _rpc_hc and _pk_hc:
+                    async with _aio_hc.ClientSession() as _s_hc:
+                        async with _s_hc.post(_rpc_hc,
+                            json={"jsonrpc":"2.0","id":1,"method":"getBalance",
+                                  "params":[_pk_hc,{"commitment":"confirmed"}]},
+                            timeout=_aio_hc.ClientTimeout(total=5)) as _r_hc:
+                            if _r_hc.status == 200:
+                                _d_hc = await _r_hc.json()
+                                _bal = (_d_hc.get("result") or {}).get("value", 0) / 1e9
+            except Exception:
+                pass
+        _min_trade = live_config.get("buy_sol", 0.05)
+        if _bal <= 0:
+            issues.append(f"Wallet balance is 0 SOL — insufficient funds")
+        elif _bal < _min_trade:
+            issues.append(f"Wallet balance {_bal:.4f} SOL is below minimum trade size {_min_trade} SOL")
         else:
-            _bal = await _wallet_svc.get_sol_balance()
-            _min_trade = live_config.get("buy_sol", 0.05)
-            if _bal <= 0:
-                issues.append(f"Wallet balance is 0 SOL — insufficient funds")
-            elif _bal < _min_trade:
-                issues.append(f"Wallet balance {_bal:.4f} SOL is below minimum trade size {_min_trade} SOL")
-            else:
-                ok_items.append(f"Wallet balance: {_bal:.4f} SOL ✓")
+            ok_items.append(f"Wallet balance: {_bal:.4f} SOL ✓")
     except Exception as _bal_exc:
         issues.append(f"Wallet balance check failed: {_bal_exc}")
 
