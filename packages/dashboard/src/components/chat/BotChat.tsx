@@ -198,21 +198,65 @@ export default function BotChat({ sendCommand: _sendCommand }: BotChatProps) {
 
   // ── TTS ─────────────────────────────────────────────────────────────────────
 
-  const speakAsJarvis = useCallback(async (text: string) => {
-    try {
-      const trimmed = text.length > 400 ? text.slice(0, 380).replace(/\s+\S*$/, '') + '…' : text
-      const res = await fetch('/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: trimmed }) })
-      if (!res.ok) return
-      const blob = await res.blob(); const url = URL.createObjectURL(blob)
-      if (audioRef.current) { audioRef.current.pause(); URL.revokeObjectURL(audioRef.current.src) }
-      const audio = new Audio(url); audioRef.current = audio; setTtsPlaying(true)
-      audio.onended = () => { setTtsPlaying(false); URL.revokeObjectURL(url) }
-      audio.onerror = () => setTtsPlaying(false)
-      await audio.play()
-    } catch { setTtsPlaying(false) }
+  // Ref to signal stop to the TTS playback loop
+  const ttsStopRef = useRef(false)
+
+  // Split text into speakable chunks — sentences and line-breaks
+  const splitForSpeech = useCallback((text: string): string[] => {
+    return text
+      // strip markdown code fences, inline code, tool output markers
+      .replace(/```[\s\S]*?```/g, 'code block omitted.')
+      .replace(/`[^`]+`/g, '')
+      .replace(/\[.*?\]\(.*?\)/g, '')   // markdown links
+      .replace(/#+\s/g, '')             // headings
+      // split on sentence endings followed by whitespace+capital, or on newlines
+      .split(/(?<=[.!?])\s+(?=[A-Z"'])|(?<=\n)\s*(?=[A-Z•\-\d])|\n{2,}/)
+      .map(s => s.replace(/[•\-*]\s*/g, '').trim())
+      .filter(s => s.length > 3)
   }, [])
 
-  const stopTts = useCallback(() => { if (audioRef.current) { audioRef.current.pause(); setTtsPlaying(false) } }, [])
+  const speakAsJarvis = useCallback(async (text: string) => {
+    ttsStopRef.current = false
+    const chunks = splitForSpeech(text)
+    if (chunks.length === 0) return
+
+    setTtsPlaying(true)
+
+    // Pre-fetch all chunks in parallel — they'll be ready by the time we need them
+    const fetches = chunks.map(chunk =>
+      fetch('/api/speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: chunk }),
+      })
+        .then(r => r.ok ? r.blob() : null)
+        .catch(() => null)
+    )
+
+    for (const blobPromise of fetches) {
+      if (ttsStopRef.current) break
+      const blob = await blobPromise
+      if (!blob || ttsStopRef.current) continue
+
+      const url = URL.createObjectURL(blob)
+      await new Promise<void>(resolve => {
+        const audio = new Audio(url)
+        audioRef.current = audio
+        audio.onended  = () => { URL.revokeObjectURL(url); resolve() }
+        audio.onerror  = () => { URL.revokeObjectURL(url); resolve() }
+        audio.play().catch(() => resolve())
+      })
+    }
+
+    setTtsPlaying(false)
+    audioRef.current = null
+  }, [splitForSpeech])
+
+  const stopTts = useCallback(() => {
+    ttsStopRef.current = true
+    if (audioRef.current) { audioRef.current.pause() }
+    setTtsPlaying(false)
+  }, [])
 
   // ── Core send — streams from /api/jarvis ─────────────────────────────────────
 

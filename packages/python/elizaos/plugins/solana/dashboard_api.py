@@ -1679,8 +1679,7 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
     async def handle_speak(request: web.Request) -> web.Response:
         """POST /api/speak — Jarvis voice TTS.
-        Prefers ElevenLabs (ELEVENLABS_API_KEY) for authentic deep British voice.
-        Falls back to OpenAI onyx if ElevenLabs key not set.
+        Priority: edge-tts (en-GB-RyanNeural, free) → ElevenLabs → OpenAI onyx.
         Body: {"text": "..."}
         Returns: audio/mpeg
         """
@@ -1692,9 +1691,32 @@ When adjusting a filter, always explain your reasoning based on the data above."
         if not text:
             return web.json_response({"error": "text required"}, status=400)
 
+        # ── Path 1: edge-tts — free, neural, <1s latency, British male ────────
+        try:
+            import edge_tts as _edge_tts
+            import io as _io
+            _comm = _edge_tts.Communicate(
+                text,
+                voice="en-GB-RyanNeural",
+                rate="-8%",    # slightly slower = more measured Jarvis delivery
+                pitch="-5Hz",  # slightly deeper
+            )
+            _buf = _io.BytesIO()
+            async for _chunk in _comm.stream():
+                if _chunk["type"] == "audio":
+                    _buf.write(_chunk["data"])
+            if _buf.tell() > 0:
+                return web.Response(
+                    body=_buf.getvalue(),
+                    content_type="audio/mpeg",
+                    headers={"Cache-Control": "no-cache", "Access-Control-Allow-Origin": "*"},
+                )
+        except Exception:
+            pass  # fall through to next provider
+
         elevenlabs_key = os.getenv("ELEVENLABS_API_KEY", "").strip()
 
-        # ── Path 1: ElevenLabs (preferred — authentic Jarvis voice) ──────────
+        # ── Path 2: ElevenLabs (if key is set) ────────────────────────────────
         if elevenlabs_key:
             import aiohttp as _aiohttp_tts
             try:
