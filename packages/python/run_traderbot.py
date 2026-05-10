@@ -8604,11 +8604,13 @@ async def run_startup_health_check(runtime: Any) -> None:
     # ── 4. Strategy enables ───────────────────────────────────────────────────
     _strats_on = []
     for _env_key, _label in [
-        ("STRATEGY_A_ENABLED",  "A"),
-        ("STRATEGY_A2_ENABLED", "A2"),
-        ("STRATEGY_B_ENABLED",  "B"),
-        ("STRATEGY_C_ENABLED",  "C"),
-        ("STRATEGY_D_ENABLED",  "D"),
+        ("MONSTER_STRATEGY_ENABLED", "Monster"),
+        ("CREATOR_ALPHA_ENABLED",    "Creator-Alpha"),
+        ("STRATEGY_A_ENABLED",       "A"),
+        ("STRATEGY_A2_ENABLED",      "A2"),
+        ("STRATEGY_B_ENABLED",       "B"),
+        ("STRATEGY_C_ENABLED",       "C"),
+        ("STRATEGY_D_ENABLED",       "D"),
     ]:
         if os.getenv(_env_key, "false").lower() not in ("false", "0", "no"):
             _strats_on.append(_label)
