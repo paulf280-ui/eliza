@@ -1,66 +1,23 @@
-"""Jarvis Agent — Gemini 2.5 Flash with full shell/file access to the trading server.
+"""Jarvis Agent — Gemini 1.5 Flash with full shell/file access to the trading server.
 
-Uses google.genai function calling + streaming. The async generator yields SSE-friendly
-event dicts; the HTTP handler in dashboard_api.py serialises them to text/event-stream.
+Uses the installed google-generativeai SDK (0.8.x).
+The async generator yields SSE-friendly event dicts that the dashboard_api.py
+handler serialises to text/event-stream.
 """
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import subprocess
 import threading
 from pathlib import Path
-from typing import Generator
 
-REPO_ROOT  = Path('/home/ubuntu/eliza')
+REPO_ROOT   = Path('/home/ubuntu/eliza')
 _GEMINI_KEY = os.getenv('GOOGLE_GENERATIVE_AI_API_KEY', '') or os.getenv('GEMINI_API_KEY', '')
-MODEL      = 'gemini-2.5-flash'
-MAX_ROUNDS = 8   # max tool-use rounds per request
+MODEL       = 'gemini-1.5-flash'
+MAX_ROUNDS  = 8
 
-# ── Tool definitions (OpenAPI-ish schema, converted to Gemini at call time) ────
-
-TOOLS = [
-    {
-        "name": "bash",
-        "description": (
-            "Execute a shell command on the Frankfurt trading server. "
-            "Working directory is /home/ubuntu/eliza. "
-            "Use for: tailing logs (tail -n 50 traderbot.out), checking git, "
-            "restarting the bot (sudo systemctl restart traderbot.service), "
-            "checking systemctl status, editing .env, deploying files, etc."
-        ),
-        "properties": {
-            "command": ("string", "Shell command to execute"),
-            "timeout": ("number", "Timeout seconds (default 30, max 120)"),
-        },
-        "required": ["command"],
-    },
-    {
-        "name": "read_file",
-        "description": (
-            "Read a file from the server. Path can be absolute or relative to "
-            "/home/ubuntu/eliza. Use offset/limit for large files."
-        ),
-        "properties": {
-            "path":   ("string", "File path"),
-            "offset": ("number", "Start line (0-indexed, default 0)"),
-            "limit":  ("number", "Max lines (default 300)"),
-        },
-        "required": ["path"],
-    },
-    {
-        "name": "write_file",
-        "description": "Write or overwrite a file on the server. Creates parent directories.",
-        "properties": {
-            "path":    ("string", "File path"),
-            "content": ("string", "Full content to write"),
-        },
-        "required": ["path", "content"],
-    },
-]
-
-# ── Tool execution (synchronous — runs in a thread) ──────────────────────────────
+# ── Tool execution (synchronous) ────────────────────────────────────────────────
 
 def _bash(command: str, timeout: int = 30) -> str:
     timeout = min(max(int(timeout or 30), 5), 120)
@@ -119,29 +76,57 @@ def _run_tool(name: str, inputs: dict) -> str:
         return _write_file(inputs.get("path", ""), inputs.get("content", ""))
     return f"[unknown tool: {name}]"
 
-# ── Gemini schema conversion ─────────────────────────────────────────────────────
+# ── Tool schema (OpenAPI dict — google-generativeai accepts this directly) ───────
 
-def _make_gemini_tools():
-    from google.genai import types as gt
-    _TYPE = {"string": gt.Type.STRING, "number": gt.Type.NUMBER, "boolean": gt.Type.BOOLEAN}
-    decls = []
-    for t in TOOLS:
-        props = {
-            k: gt.Schema(type=_TYPE.get(vtype, gt.Type.STRING), description=desc)
-            for k, (vtype, desc) in t["properties"].items()
-        }
-        decls.append(gt.FunctionDeclaration(
-            name=t["name"],
-            description=t["description"],
-            parameters=gt.Schema(
-                type=gt.Type.OBJECT,
-                properties=props,
-                required=t["required"],
-            ),
-        ))
-    return [gt.Tool(function_declarations=decls)]
+_TOOL_DEFS = [
+    {
+        "name": "bash",
+        "description": (
+            "Execute a shell command on the Frankfurt trading server. "
+            "Working directory is /home/ubuntu/eliza. "
+            "Use for: tailing logs, checking git, restarting the bot "
+            "(sudo systemctl restart traderbot.service), editing .env, etc."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {"type": "string", "description": "Shell command to execute"},
+                "timeout": {"type": "number", "description": "Timeout seconds (default 30, max 120)"},
+            },
+            "required": ["command"],
+        },
+    },
+    {
+        "name": "read_file",
+        "description": (
+            "Read a file from the server. Path absolute or relative to /home/ubuntu/eliza. "
+            "Use offset/limit for large files."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path":   {"type": "string",  "description": "File path"},
+                "offset": {"type": "number",  "description": "Start line (0-indexed, default 0)"},
+                "limit":  {"type": "number",  "description": "Max lines to read (default 300)"},
+            },
+            "required": ["path"],
+        },
+    },
+    {
+        "name": "write_file",
+        "description": "Write or overwrite a file on the server. Creates parent directories.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path":    {"type": "string", "description": "File path"},
+                "content": {"type": "string", "description": "Full content to write"},
+            },
+            "required": ["path", "content"],
+        },
+    },
+]
 
-# ── Synchronous streaming agent (runs in a thread) ──────────────────────────────
+# ── Synchronous agent (runs in background thread) ────────────────────────────────
 
 def _sync_agent(
     message: str,
@@ -150,7 +135,8 @@ def _sync_agent(
     event_queue: "asyncio.Queue[dict | None]",
     loop: asyncio.AbstractEventLoop,
 ) -> None:
-    """Run the Gemini agentic loop in a background thread, posting events to the queue."""
+    """Run Gemini agentic loop, posting events to the async queue."""
+
     def emit(ev: dict) -> None:
         loop.call_soon_threadsafe(event_queue.put_nowait, ev)
 
@@ -159,24 +145,32 @@ def _sync_agent(
 
     if not _GEMINI_KEY:
         emit({"type": "error", "message": "GOOGLE_GENERATIVE_AI_API_KEY not set on server."})
-        done(); return
+        done()
+        return
 
     try:
-        from google import genai as _gai
-        from google.genai import types as gt
-    except ImportError:
-        emit({"type": "error", "message": "google-genai package not installed."})
-        done(); return
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            import google.generativeai as genai  # type: ignore
+            from google.generativeai.types import FunctionDeclaration, Tool  # type: ignore
+    except ImportError as e:
+        emit({"type": "error", "message": f"Import error: {e}"})
+        done()
+        return
 
-    client = _gai.Client(api_key=_GEMINI_KEY)
-    gemini_tools = _make_gemini_tools()
+    genai.configure(api_key=_GEMINI_KEY)
+
+    # Build tool declarations
+    fn_decls = [FunctionDeclaration(**t) for t in _TOOL_DEFS]
+    tool = Tool(function_declarations=fn_decls)
 
     system = f"""You are J.A.R.V.I.S. — autonomous trading assistant with full server access (AWS Frankfurt).
 
 INFRASTRUCTURE
 • Repo: /home/ubuntu/eliza
 • Restart bot: sudo systemctl restart traderbot.service
-• Logs: /home/ubuntu/eliza/traderbot.out (tail for recent activity)
+• Logs: /home/ubuntu/eliza/traderbot.out
 • Python venv: /home/ubuntu/eliza/.venv_py/bin/python
 
 LIVE BOT STATE
@@ -185,68 +179,77 @@ LIVE BOT STATE
 TOOLS: bash, read_file, write_file — full server access.
 When doing tasks: do it, verify it worked, report concisely. Be direct."""
 
-    # Build conversation history
-    contents: list = []
+    # Build Gemini history format
+    gemini_history: list[dict] = []
     for h in history[-12:]:
         role = "user" if h.get("role") == "user" else "model"
-        text = h.get("content", "")
-        if text:
-            contents.append(gt.Content(role=role, parts=[gt.Part.from_text(text=str(text))]))
-    contents.append(gt.Content(role="user", parts=[gt.Part.from_text(text=message)]))
+        content = h.get("content", "")
+        if content:
+            gemini_history.append({"role": role, "parts": [content]})
 
-    cfg = gt.GenerateContentConfig(
-        tools=gemini_tools,
+    model = genai.GenerativeModel(
+        model_name=MODEL,
         system_instruction=system,
-        temperature=0.2,
-        max_output_tokens=4096,
+        tools=[tool],
     )
+    chat = model.start_chat(history=gemini_history)
+
+    current_message: object = message  # first turn is the user's text; subsequent are function responses
 
     for _round in range(MAX_ROUNDS):
-        # Collect the streamed response
-        fn_calls: list[tuple[str, dict]] = []
-        text_buf = ""
-
         try:
-            stream = client.models.generate_content_stream(
-                model=MODEL, contents=contents, config=cfg,
-            )
-            for chunk in stream:
-                if not chunk.candidates:
-                    continue
-                for part in chunk.candidates[0].content.parts:
-                    if getattr(part, "text", None):
-                        emit({"type": "text", "content": part.text})
-                        text_buf += part.text
-                    fc = getattr(part, "function_call", None)
-                    if fc:
-                        args = dict(fc.args) if fc.args else {}
-                        cmd_hint = args.get("command") or args.get("path", "")
-                        emit({"type": "tool_call", "name": fc.name, "cmd": cmd_hint})
-                        fn_calls.append((fc.name, args))
+            response = chat.send_message(current_message, stream=True)
         except Exception as e:
             emit({"type": "error", "message": f"Gemini error: {e}"})
             break
 
+        fn_calls: list = []
+        text_buf = ""
+
+        # Stream chunks
+        try:
+            for chunk in response:
+                # Stream text
+                try:
+                    if chunk.text:
+                        emit({"type": "text", "content": chunk.text})
+                        text_buf += chunk.text
+                except Exception:
+                    pass
+                # Collect function calls from this chunk
+                try:
+                    for part in chunk.parts:
+                        fc = getattr(part, "function_call", None)
+                        if fc and getattr(fc, "name", None):
+                            args = dict(fc.args) if fc.args else {}
+                            cmd_hint = args.get("command") or args.get("path", "")
+                            emit({"type": "tool_call", "name": fc.name, "cmd": cmd_hint})
+                            fn_calls.append(fc)
+                except Exception:
+                    pass
+        except Exception as e:
+            emit({"type": "error", "message": f"Stream error: {e}"})
+            break
+
         if not fn_calls:
-            break   # no tool calls — we're done
+            break   # no tool calls — done
 
-        # Build the model turn to add to history
-        model_parts: list = []
-        if text_buf:
-            model_parts.append(gt.Part.from_text(text=text_buf))
-        for fname, fargs in fn_calls:
-            model_parts.append(gt.Part.from_function_call(name=fname, args=fargs))
-        contents.append(gt.Content(role="model", parts=model_parts))
-
-        # Execute tools and build function response turn
-        result_parts: list = []
-        for fname, fargs in fn_calls:
-            result = _run_tool(fname, fargs)
-            emit({"type": "tool_result", "name": fname, "preview": result[:400]})
-            result_parts.append(gt.Part.from_function_response(
-                name=fname, response={"output": result},
+        # Execute tools and build function response parts
+        import google.generativeai.protos as protos  # type: ignore
+        response_parts: list = []
+        for fc in fn_calls:
+            args = dict(fc.args) if fc.args else {}
+            result = _run_tool(fc.name, args)
+            emit({"type": "tool_result", "name": fc.name, "preview": result[:400]})
+            response_parts.append(protos.Part(
+                function_response=protos.FunctionResponse(
+                    name=fc.name,
+                    response={"result": result},
+                )
             ))
-        contents.append(gt.Content(role="user", parts=result_parts))
+
+        # Next iteration sends the function results back as a Content message
+        current_message = protos.Content(parts=response_parts)
 
     done()
 
@@ -257,16 +260,8 @@ async def stream_jarvis(
     history: list[dict],
     status_context: str,
 ):
-    """Yield SSE-friendly event dicts.
-
-    Event shapes:
-      {"type": "text",        "content": "..."}
-      {"type": "tool_call",   "name": "bash",  "cmd": "..."}
-      {"type": "tool_result", "name": "bash",  "preview": "..."}
-      {"type": "error",       "message": "..."}
-      {"type": "done"}
-    """
-    loop  = asyncio.get_event_loop()
+    """Yield SSE-friendly event dicts for the dashboard HTTP handler."""
+    loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
     queue: asyncio.Queue[dict | None] = asyncio.Queue()
 
     t = threading.Thread(
@@ -280,7 +275,7 @@ async def stream_jarvis(
         try:
             event = await asyncio.wait_for(queue.get(), timeout=90.0)
         except asyncio.TimeoutError:
-            yield {"type": "error", "message": "Agent timed out."}
+            yield {"type": "error", "message": "Agent timed out after 90s."}
             break
         if event is None:
             break
