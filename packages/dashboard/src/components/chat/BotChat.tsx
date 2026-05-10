@@ -337,7 +337,7 @@ export default function BotChat({ sendCommand: _sendCommand }: BotChatProps) {
                 : <span>say "Hey Jarvis"</span>}
             </span>
           )}
-          <span className="text-[9px] text-purple-400/60 ml-1">Gemini 2.0 Flash</span>
+          <span className="text-[9px] text-purple-400/60 ml-1">Gemini 2.5 Flash</span>
         </div>
         <div className="flex items-center gap-1.5">
           {sending && (
