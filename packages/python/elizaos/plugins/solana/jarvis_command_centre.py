@@ -44,7 +44,8 @@ async def _get_cached_wallet(wallet_svc) -> float:
             import aiohttp as _aio
             _rpc_url = __import__('os').getenv("SOLANA_RPC_URL", "")
             if _rpc_url:
-                _pubkey = __import__('os').getenv("WALLET_PUBLIC_KEY", "")
+                _os = __import__('os')
+                _pubkey = _os.getenv("WALLET_PUBLIC_KEY") or _os.getenv("SOLANA_PUBLIC_KEY", "")
                 if _pubkey:
                     async with _aio.ClientSession() as _s:
                         async with _s.post(_rpc_url,

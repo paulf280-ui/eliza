@@ -399,7 +399,23 @@ async def open_monster_position(
                     wallet_sol = await wallet_svc_pre.get_sol_balance()
                 except Exception as _bal_err:
                     print(f"[monster] wallet balance fetch error pre-buy: {_bal_err}")
-                    return False
+            # Wallet service in read-only mode returns 0 — fall back to direct RPC
+            if wallet_sol == 0.0:
+                try:
+                    import aiohttp as _aio_wb, os as _os_wb
+                    _rpc = _os_wb.getenv("SOLANA_RPC_URL", "")
+                    _pk  = _os_wb.getenv("WALLET_PUBLIC_KEY") or _os_wb.getenv("SOLANA_PUBLIC_KEY", "")
+                    if _rpc and _pk:
+                        async with _aio_wb.ClientSession() as _s:
+                            async with _s.post(_rpc,
+                                json={"jsonrpc":"2.0","id":1,"method":"getBalance","params":[_pk,{"commitment":"confirmed"}]},
+                                timeout=_aio_wb.ClientTimeout(total=5)) as _r:
+                                if _r.status == 200:
+                                    _d = await _r.json()
+                                    wallet_sol = (_d.get("result") or {}).get("value", 0) / 1e9
+                                    print(f"[monster] 💰 RPC balance fallback: {wallet_sol:.4f} SOL")
+                except Exception as _rpc_err:
+                    print(f"[monster] RPC balance fallback failed: {_rpc_err}")
             BUFFER_SOL = 0.02  # rent + Jito tip + signature fees + margin
             affordable = wallet_sol - BUFFER_SOL
             if affordable < sol_size:

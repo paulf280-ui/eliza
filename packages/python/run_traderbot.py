@@ -8794,10 +8794,25 @@ async def main():
     try:
         _tg_wallet_svc = runtime.get_service("wallet")
         if _tg_wallet_svc:
-            # Always show real on-chain wallet balance — never paper override
             _tg_wallet_sol = await asyncio.wait_for(_tg_wallet_svc.get_sol_balance(), timeout=8)
     except Exception:
         pass
+    # Wallet service may be in read-only mode (SOLANA_PRIVATE_KEY error) and return 0 — fall back to RPC
+    if _tg_wallet_sol == 0.0:
+        try:
+            import aiohttp as _aio_tg
+            _rpc_tg = os.getenv("SOLANA_RPC_URL", "")
+            _pk_tg  = os.getenv("WALLET_PUBLIC_KEY") or os.getenv("SOLANA_PUBLIC_KEY", "")
+            if _rpc_tg and _pk_tg:
+                async with _aio_tg.ClientSession() as _s_tg:
+                    async with _s_tg.post(_rpc_tg,
+                        json={"jsonrpc":"2.0","id":1,"method":"getBalance","params":[_pk_tg,{"commitment":"confirmed"}]},
+                        timeout=_aio_tg.ClientTimeout(total=5)) as _r_tg:
+                        if _r_tg.status == 200:
+                            _d_tg = await _r_tg.json()
+                            _tg_wallet_sol = (_d_tg.get("result") or {}).get("value", 0) / 1e9
+        except Exception:
+            pass
     try:
         from elizaos.plugins.solana.telegram_alerts import start_telegram_bot
         _tg_task = await start_telegram_bot(runtime, wallet_sol=_tg_wallet_sol)
