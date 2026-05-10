@@ -14,7 +14,7 @@ from pathlib import Path
 
 REPO_ROOT   = Path('/home/ubuntu/eliza')
 _GEMINI_KEY = os.getenv('GOOGLE_GENERATIVE_AI_API_KEY', '') or os.getenv('GEMINI_API_KEY', '')
-MODEL       = 'gemini-1.5-flash'
+MODEL       = 'gemini-2.0-flash'
 MAX_ROUNDS  = 8
 
 # ── Tool execution (synchronous) ────────────────────────────────────────────────
