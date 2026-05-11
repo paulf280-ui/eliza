@@ -176,26 +176,40 @@ def fmt_startup(wallet_sol: float = 0.0) -> str:
 # ── Command handlers ─────────────────────────────────────────────────────────
 
 async def _cmd_status() -> str:
+    import os as _os_st, aiohttp as _aio_st
     if _runtime_ref is None:
         return "Bot not initialised."
     try:
         from elizaos.plugins.solana import live_config as lc
         pos_mgr = _runtime_ref.get_service("position_manager")
-        wallet_svc = _runtime_ref.get_service("wallet")
 
+        # Always use RPC for balance — wallet service returns 0 in read-only mode
         balance = 0.0
-        if wallet_svc:
-            try:
-                balance = await asyncio.wait_for(wallet_svc.get_sol_balance(), timeout=5)
-            except Exception:
-                pass
+        try:
+            _rpc = _os_st.getenv("SOLANA_RPC_URL", "")
+            _pk  = _os_st.getenv("WALLET_PUBLIC_KEY") or _os_st.getenv("SOLANA_PUBLIC_KEY", "")
+            if _rpc and _pk:
+                async with _aio_st.ClientSession() as _s:
+                    async with _s.post(_rpc,
+                        json={"jsonrpc":"2.0","id":1,"method":"getBalance","params":[_pk,{"commitment":"confirmed"}]},
+                        timeout=_aio_st.ClientTimeout(total=5)) as _r:
+                        if _r.status == 200:
+                            _d = await _r.json()
+                            balance = (_d.get("result") or {}).get("value", 0) / 1e9
+        except Exception:
+            pass
 
         risk = pos_mgr.get_risk_summary() if pos_mgr else {}
         open_count = risk.get("open_position_count", 0)
         daily_pnl  = risk.get("daily_pnl_sol", 0.0)
         consec     = risk.get("consecutive_losses", 0)
         broken     = risk.get("circuit_broken", False)
-        status_str = "🚨 PAUSED" if broken else "✅ TRADING"
+        paused     = bool(lc.get("trading_paused", False))
+        status_str = "🚨 PAUSED" if (broken or paused) else "✅ TRADING"
+
+        # Monster strategy config
+        trade_size  = lc.get("monster_default_size_sol") or 0.2
+        max_slots   = lc.get("monster_max_concurrent") or 1
 
         return (
             f"📊 <b>TraderBot Status</b>\n\n"
@@ -204,7 +218,8 @@ async def _cmd_status() -> str:
             f"Open positions: {open_count}\n"
             f"Daily P&L: <b>{daily_pnl:+.4f} SOL</b>\n"
             f"Consecutive losses: {consec}\n"
-            f"Buy size: A2={_sol(lc.get('a2_buy_sol',0.24))}  B={_sol(lc.get('strategy_b_buy_sol',0.24))}"
+            f"Strategy: Monster Lifecycle\n"
+            f"Trade size: {_sol(trade_size)}  Max slots: {max_slots}"
         )
     except Exception as exc:
         return f"Status error: {exc}"

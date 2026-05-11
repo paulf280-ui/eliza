@@ -1978,16 +1978,22 @@ When adjusting a filter, always explain your reasoning based on the data above."
             # Last 50 signals for the live feed (most recent first)
             stats["recent_signals"] = list(reversed(_signal_log[-50:]))
 
-            # In live mode: replace paper balance with real wallet SOL balance
-            if stats.get("live_mode"):
+            # Always replace balance with real on-chain SOL balance via RPC
+            # (wallet service returns 0 in read-only mode — bypass it entirely)
+            _env_addr = os.getenv("SOLANA_PUBLIC_KEY", "") or os.getenv("WALLET_PUBLIC_KEY", "")
+            _real_bal = await _rpc_get_sol_balance(_env_addr)
+            if _real_bal > 0:
+                stats["balance"] = round(_real_bal, 4)
+            elif stats.get("live_mode"):
+                # secondary fallback: try wallet service
                 try:
                     wallet_svc = runtime.get_service("wallet") if runtime else None
                     if wallet_svc:
                         real_bal = await wallet_svc.get_sol_balance()
-                        if real_bal is not None:
+                        if real_bal:
                             stats["balance"] = round(real_bal, 4)
                 except Exception:
-                    pass  # fall back to paper balance if RPC fails
+                    pass
 
             return web.json_response(stats)
         except Exception as exc:
