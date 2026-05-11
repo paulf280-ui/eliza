@@ -67,6 +67,24 @@ def _write_file(path: str, content: str) -> str:
         return f"[write error: {e}]"
 
 
+def _web_fetch(url: str, parse_json: bool = False) -> str:
+    try:
+        import urllib.request, json as _json
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            raw = r.read().decode("utf-8", errors="replace")
+        if parse_json:
+            try:
+                data = _json.loads(raw)
+                out = _json.dumps(data, indent=2)
+                return (out[:8000] + f"\n[truncated]") if len(out) > 8000 else out
+            except Exception:
+                pass
+        return (raw[:8000] + f"\n[truncated]") if len(raw) > 8000 else raw
+    except Exception as e:
+        return f"[fetch error: {e}]"
+
+
 def _run_tool(name: str, inputs: dict) -> str:
     if name == "bash":
         return _bash(inputs.get("command", ""), inputs.get("timeout", 30))
@@ -74,6 +92,8 @@ def _run_tool(name: str, inputs: dict) -> str:
         return _read_file(inputs.get("path", ""), int(inputs.get("offset", 0)), int(inputs.get("limit", 300)))
     if name == "write_file":
         return _write_file(inputs.get("path", ""), inputs.get("content", ""))
+    if name == "web_fetch":
+        return _web_fetch(inputs.get("url", ""), bool(inputs.get("parse_json", False)))
     return f"[unknown tool: {name}]"
 
 # ── Tool schema (OpenAPI dict — google-generativeai accepts this directly) ───────
@@ -122,6 +142,23 @@ _TOOL_DEFS = [
                 "content": {"type": "string", "description": "Full content to write"},
             },
             "required": ["path", "content"],
+        },
+    },
+    {
+        "name": "web_fetch",
+        "description": (
+            "Fetch any URL and return the content. Use for real-time data: "
+            "DexScreener token info, CoinGecko prices, Solscan on-chain data, "
+            "news, documentation, or any public API/webpage. "
+            "Set parse_json=true for JSON APIs to get formatted output."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url":        {"type": "string",  "description": "Full URL to fetch"},
+                "parse_json": {"type": "boolean", "description": "Parse and format as JSON (default false)"},
+            },
+            "required": ["url"],
         },
     },
 ]
@@ -191,7 +228,15 @@ Example bash command to change trade size to 0.15 SOL (no restart):
 
 Only use .env + restart for API keys and env vars that live_config doesn't cover.
 
-TOOLS: bash, read_file, write_file — full server access.
+REAL-TIME DATA — use web_fetch for any live information:
+• Token price/chart:  https://api.dexscreener.com/latest/dex/tokens/MINT_ADDRESS
+• Token search:       https://api.dexscreener.com/latest/dex/search?q=TOKEN_NAME
+• SOL price:          https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd
+• Any price/news:     just fetch the URL directly
+• On-chain balance:   use bash with curl to the Helius RPC (SOLANA_RPC_URL in .env)
+You have full internet access. Never say you can't get real-time data — use web_fetch.
+
+TOOLS: bash, read_file, write_file, web_fetch — full server + internet access.
 When doing tasks: do it, verify it worked, report concisely. Be direct."""
 
     # Build Gemini history format
