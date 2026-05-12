@@ -1809,9 +1809,9 @@ async def _serial_after_graduation(runtime: Any, session: aiohttp.ClientSession,
 # cool-off: $25K-$300K MC, real liquidity, buyers still present.
 LIFECYCLE_MIN_LIQ_USD       = 15_000   # was 30K — winning trades needed ≥$14K
 LIFECYCLE_MAX_LIQ_USD       = 300_000
-LIFECYCLE_MIN_MC_USD        = 45_000   # raised from 25K — 10-winner/10-loser analysis.
-                                        # $55K was over-correcting: Aura ($47K, +39%) and X ($44K, +21%)
-                                        # are winners that would be blocked. $45K is the right balance.
+LIFECYCLE_MIN_MC_USD        = 55_000   # raised from 25K — 10-winner/10-loser cross-reference:
+                                        # 7/10 losers entered below $55K MC. $45K change was made
+                                        # while key was corrupted (no trades) — restored to $55K.
 LIFECYCLE_MAX_MC_USD        = 300_000  # was 3M — focus early-stage $25K-$300K
 LIFECYCLE_MIN_LIQ_MC_RATIO  = 0.04
 LIFECYCLE_MAX_LIQ_MC_RATIO  = 0.60    # was 0.30 — 0.30 contradicted min_liq for MC < $50K (impossible zone)
