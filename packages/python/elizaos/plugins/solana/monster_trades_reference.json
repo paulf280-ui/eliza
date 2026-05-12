@@ -1,6 +1,6 @@
 {
   "_note": "Monster trades sent by trader \u2014 use these to tune filters to catch similar setups",
-  "_summary": "13 confirmed monster tokens (8 original + 5 new May-2026 additions). Common DNA: buy_ratio 45-65%, PumpSwap native post-graduation, liq 0k-15k, h24 100%+ (most 1000%+). KEY INSIGHT: 3 of 5 new tokens were NEVER IN THE CANDIDATE POOL \u2014 graduated but liq too low or outside webhook window. 1 was always overheated (never gave quiet entry). 1 was key-broken victim. PATTERN: top runners have buy_ratio 45-57%, NOT >65%. Silent grinders that reach 30-90min WITHOUT pumping massively first are the target profile.",
+  "_summary": "17 confirmed monster tokens. Common DNA: buy_ratio 45-65%, PumpSwap post-graduation, liq $30K-$115K at entry, h24 100%+ (most 1000%+).",
   "trades": [
     {
       "symbol": "NoHat",
@@ -164,6 +164,62 @@
       "scanner_saw": true,
       "multiplier_approx": 23,
       "notes": "Scanner worked perfectly \u2014 correctly identified mid-spike every time. This token ran WITHOUT a clean pullback, something our bounce/m5 gate filters out. The +2315% h24 means it ran through the overheating rather than cooling. Possible future signal: if h1 consolidation after a spike stays flat for 3+ cycles, consider entry despite prior overheating."
+    },
+    {
+      "symbol": "REMILIO",
+      "name": "remilio",
+      "mint": "remiG7sGaHWgrY7o6SXJW5CYi5A7kmKutyJz6x6hUsp",
+      "dex": "raydium",
+      "pair_created": "2024-04-10 17:42 UTC",
+      "age_hours": 18290,
+      "mc_usd_now": 118285,
+      "liq_usd_now": 82429,
+      "vol_h24_usd": 830106,
+      "h24_pct": 36,
+      "buy_ratio_pct": 54.2,
+      "notes": "Raydium native (not pump.fun). Long-lived token 2yr+ age. Buy ratio 54.2%, liq $82K, vol $830K/day. Steady performer."
+    },
+    {
+      "symbol": "PAIN",
+      "name": "Max Pain",
+      "mint": "2N9BXbRtyZM4YHzj9wvteW1Nuq6B5DzDwh57dDmZpump",
+      "dex": "pumpswap",
+      "pair_created": "2026-05-11 16:02 UTC",
+      "age_hours": 28.3,
+      "mc_usd_now": 632807,
+      "liq_usd_now": 69077,
+      "vol_h24_usd": 895393,
+      "h24_pct": 226,
+      "buy_ratio_pct": 51.6,
+      "notes": "PumpSwap. h6=+346% \u2014 big move in 6h. Buy ratio 51.6% (balanced). Liq $69K. Classic quiet grinder that accelerated."
+    },
+    {
+      "symbol": "PAC",
+      "name": "Public Asset Control",
+      "mint": "B5xwCQUKfx8BJZsgvuBvW6XgrxtkqLTrDEAYjpLJpump",
+      "dex": "pumpswap",
+      "pair_created": "2026-05-11 03:01 UTC",
+      "age_hours": 41.3,
+      "mc_usd_now": 850164,
+      "liq_usd_now": 78140,
+      "vol_h24_usd": 725100,
+      "h24_pct": 181,
+      "buy_ratio_pct": 74.6,
+      "notes": "PumpSwap. h24=+181%. Buy ratio 74.6% \u2014 above our 72% cap at current snapshot but may have been lower at entry. Liq $78K."
+    },
+    {
+      "symbol": "HANTA",
+      "name": "Hantavirus",
+      "mint": "2tXpgu2DLTsPUf9zFmuZmA4xrYxXKBTpVq9wAM7hzs9y",
+      "dex": "pumpswap",
+      "pair_created": "2026-05-03 21:27 UTC",
+      "age_hours": 214.9,
+      "mc_usd_now": 4593960,
+      "liq_usd_now": 302224,
+      "vol_h24_usd": 1634469,
+      "h24_pct": 31.64,
+      "buy_ratio_pct": 35.4,
+      "notes": "PumpSwap. 214h old, MC $4.6M \u2014 major runner over 9 days. Buy ratio now 35.4% (distribution phase). Vol $1.6M/day. Established token."
     }
   ],
   "critical_patterns": [
