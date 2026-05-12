@@ -296,6 +296,100 @@ async def run_audit(session: aiohttp.ClientSession | None = None) -> dict:
     except Exception as e:
         warnings.append(f"Open positions check error: {e}")
 
+    # ── 10. KEYPAIR VALIDITY (catches corrupted/wrong private key) ─────────────
+    _keypair_ok = False
+    try:
+        import base58 as _b58
+        from solders.keypair import Keypair as _KP
+        _raw_key   = os.getenv("SOLANA_PRIVATE_KEY", "")
+        _pub_key   = os.getenv("SOLANA_PUBLIC_KEY", "")
+        if not _raw_key:
+            failed.append("KEYPAIR: SOLANA_PRIVATE_KEY not set — bot cannot sign transactions!")
+        elif not _pub_key:
+            failed.append("KEYPAIR: SOLANA_PUBLIC_KEY not set — wallet address unknown!")
+        else:
+            _kb = _b58.b58decode(_raw_key)
+            try:
+                _kp = _KP.from_bytes(_kb)
+                _derived = str(_kp.pubkey())
+            except Exception:
+                _kp = _KP.from_seed(_kb[:32])
+                _derived = str(_kp.pubkey())
+            if _derived == _pub_key:
+                passed.append(f"Keypair valid — pubkey matches SOLANA_PUBLIC_KEY ✓")
+                _keypair_ok = True
+            else:
+                failed.append(
+                    f"KEYPAIR MISMATCH: private key derives to {_derived[:12]}… "
+                    f"but SOLANA_PUBLIC_KEY={_pub_key[:12]}… — bot cannot sign transactions!"
+                )
+    except Exception as _kp_err:
+        failed.append(f"KEYPAIR: validation error — {_kp_err}")
+
+    # ── 11. BUY FAILURE DETECTION ─────────────────────────────────────────────
+    try:
+        import subprocess as _sp
+        _log_path = Path("/home/ubuntu/eliza/traderbot.out")
+        if _log_path.exists():
+            _recent_lines = _sp.run(
+                ["tail", "-n", "500", str(_log_path)],
+                capture_output=True, text=True
+            ).stdout.splitlines()
+            _buy_fails = [l for l in _recent_lines if "buy failed" in l or "keypair not available" in l]
+            _openings  = [l for l in _recent_lines if "OPENING (LIVE)" in l]
+            if _buy_fails and not _keypair_ok:
+                failed.append(
+                    f"BUY FAILURES: {len(_buy_fails)} failed buy attempts in last 500 log lines "
+                    f"— keypair invalid (see KEYPAIR check above)"
+                )
+            elif _buy_fails:
+                warnings.append(f"BUY FAILURES: {len(_buy_fails)} in last 500 lines — investigate")
+            elif _openings:
+                passed.append(f"No buy failures in last 500 log lines ✓")
+    except Exception as _bf_err:
+        warnings.append(f"Buy failure check error: {_bf_err}")
+
+    # ── 12. TRADE DROUGHT DETECTION + AUTO-FIX trading_paused ─────────────────
+    try:
+        _closed_path = _DIR / "monster_closed_trades.json"
+        _drought_hours = 0
+        if _closed_path.exists():
+            _closed = json.loads(_closed_path.read_text())
+            if _closed:
+                _last_trade_ts = max(t.get("close_ts", 0) for t in _closed)
+                _drought_hours = (time.time() - _last_trade_ts) / 3600
+
+        if _drought_hours > 48:
+            from elizaos.plugins.solana import live_config as _lc_d
+            _is_paused = _lc_d.get("trading_paused", False)
+            if _is_paused:
+                # Auto-fix: clear the pause flag
+                _lc_d.set_value("trading_paused", False, changed_by="daily_audit", reason="auto-cleared stale pause during drought")
+                failed.append(f"DROUGHT AUTO-FIX: No trades for {_drought_hours:.0f}h — trading_paused was True, cleared automatically")
+            else:
+                warnings.append(f"DROUGHT: No closed trades in {_drought_hours:.0f}h — scanner may be stuck or gates too tight")
+        elif _drought_hours > 0:
+            passed.append(f"Last trade {_drought_hours:.1f}h ago ✓")
+    except Exception as _dr_err:
+        warnings.append(f"Drought check error: {_dr_err}")
+
+    # ── 13. SCANNER ACTIVITY ──────────────────────────────────────────────────
+    try:
+        import subprocess as _sp2
+        _log_path = Path("/home/ubuntu/eliza/traderbot.out")
+        if _log_path.exists():
+            _recent = _sp2.run(
+                ["tail", "-n", "200", str(_log_path)],
+                capture_output=True, text=True
+            ).stdout.splitlines()
+            _cycles = [l for l in _recent if "monster-lifecycle] cycle" in l]
+            if _cycles:
+                passed.append(f"Lifecycle scanner active — {len(_cycles)} cycles in last 200 log lines ✓")
+            else:
+                failed.append("SCANNER DEAD: No lifecycle cycles in last 200 log lines — service may have crashed!")
+    except Exception as _sc_err:
+        warnings.append(f"Scanner activity check error: {_sc_err}")
+
     # ── Summary ────────────────────────────────────────────────────────────────
     if owns_session:
         await session.close()
@@ -335,12 +429,75 @@ def get_last_audit() -> dict:
     return _last_audit_result
 
 
+async def _send_audit_telegram(result: dict) -> None:
+    """Send audit summary to Telegram if there are failures or it's a daily report."""
+    try:
+        from elizaos.plugins.solana.telegram_alerts import send_alert as _tg_send
+        failed   = result.get("failed", [])
+        warnings = result.get("warnings", [])
+        status   = result.get("status", "?")
+        score    = result.get("score", "?")
+
+        if not failed and not warnings:
+            return  # All clear — no need to spam Telegram
+
+        emoji = "🚨" if failed else "⚠️"
+        lines = [f"{emoji} <b>Bot Self-Audit</b> — {status} ({score})"]
+        if failed:
+            lines.append("")
+            lines.append("<b>❌ Critical issues:</b>")
+            for f in failed[:5]:
+                lines.append(f"• {f}")
+        if warnings:
+            lines.append("")
+            lines.append("<b>⚠️ Warnings:</b>")
+            for w in warnings[:3]:
+                lines.append(f"• {w}")
+        await _tg_send("\n".join(lines))
+    except Exception as e:
+        print(f"[audit] Telegram alert failed: {e}")
+
+
 async def audit_loop() -> None:
-    """Background task: run audit every 60 minutes."""
+    """Background task: run audit every 60 minutes, full Telegram report once daily."""
     await asyncio.sleep(30)  # small delay after startup before first audit
+    _last_daily_report = 0.0
+
     while True:
         try:
-            await run_audit()
+            result = await run_audit()
+
+            # Send Telegram alert if there are failures or warnings
+            await _send_audit_telegram(result)
+
+            # Full daily Telegram summary at 09:00 UTC regardless of status
+            _now = time.time()
+            from datetime import datetime as _dt, timezone as _tz
+            _utc_hour = _dt.now(tz=_tz.utc).hour
+            if _utc_hour == 9 and _now - _last_daily_report > 3600:
+                _last_daily_report = _now
+                try:
+                    from elizaos.plugins.solana.telegram_alerts import send_message as _tg_daily
+                    _passed = result.get("passed", [])
+                    _failed = result.get("failed", [])
+                    _warn   = result.get("warnings", [])
+                    _status = result.get("status", "?")
+                    _score  = result.get("score", "?")
+                    _emoji  = "✅" if _status == "PASS" else ("⚠️" if _status == "WARN" else "🚨")
+                    _msg = (
+                        f"{_emoji} <b>Daily Bot Audit — {_status}</b>\n"
+                        f"Score: {_score} checks passed\n"
+                    )
+                    if _failed:
+                        _msg += f"\n❌ {len(_failed)} issue(s):\n" + "\n".join(f"• {f}" for f in _failed[:5])
+                    if _warn:
+                        _msg += f"\n⚠️ {len(_warn)} warning(s):\n" + "\n".join(f"• {w}" for w in _warn[:3])
+                    if not _failed and not _warn:
+                        _msg += "\nAll systems nominal 🟢"
+                    await _tg_daily(_msg)
+                except Exception as _de:
+                    print(f"[audit] Daily report error: {_de}")
+
         except Exception as exc:
             print(f"[audit] audit run failed: {exc}")
         await asyncio.sleep(3600)  # 1 hour
