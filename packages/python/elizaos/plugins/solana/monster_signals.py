@@ -1807,7 +1807,7 @@ async def _serial_after_graduation(runtime: Any, session: aiohttp.ClientSession,
 # Previous MIN_MC_USD=250K was 5-10x past the optimal entry — that's why the
 # lifecycle scout kept missing opportunities. Correct entry is POST-graduation
 # cool-off: $25K-$300K MC, real liquidity, buyers still present.
-LIFECYCLE_MIN_LIQ_USD       = 15_000   # was 30K — winning trades needed ≥$14K
+LIFECYCLE_MIN_LIQ_USD       = 30_000   # raised from 15K — all 17 reference winners had ≥$60K at peak; sub-$30K = rug zone
 LIFECYCLE_MAX_LIQ_USD       = 300_000
 LIFECYCLE_MIN_MC_USD        = 55_000   # raised from 25K — 10-winner/10-loser cross-reference:
                                         # 7/10 losers entered below $55K MC. $45K change was made
@@ -1823,11 +1823,11 @@ LIFECYCLE_TOP10_MAX_PCT     = 21.0    # 10-winner/10-loser analysis: 7/10 losers
                                         # winners averaged 17.6%. Uses lifecycle-specific cap separate
                                         # from MONSTER_TOP10_MAX_PCT (35%) used by other strategies.
 LIFECYCLE_BUY_RATIO_MIN     = 48.0
-LIFECYCLE_BUY_RATIO_MAX     = 72.0    # lowered from 80 — 10-winner/10-loser: no winner had BR>71% at
+LIFECYCLE_BUY_RATIO_MAX     = 65.0    # lowered from 72 — winner sweet spot 45-57%; Gemini + own data agree; 65 gives buffer
                                         # entry; mama (79%) and UNFAZED (75%) were losers. BR>72% = buying
                                         # exhausted, pump peak. Winners averaged 57.9%.
 LIFECYCLE_H1_CHANGE_MAX_PCT = 200.0   # was 100 — allow larger initial moves
-LIFECYCLE_H1_CHANGE_MIN_PCT = -30.0   # was -10 — allow healthy pullbacks
+LIFECYCLE_H1_CHANGE_MIN_PCT = 0.0     # raised from -30 — all winners had positive h1 at entry; negative h1 = dying token
 LIFECYCLE_M5_CHANGE_MAX_PCT = 20.0    # was 15 — slightly looser
 
 
