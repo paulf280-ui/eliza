@@ -29,27 +29,27 @@ _DIR = Path(__file__).parent
 _last_audit_result: dict = {}
 _last_audit_ts: float = 0.0
 
-# ── Expected values for the current strategy (hard-TP era, 2026-05-04+) ──
+# ── Expected values for the current strategy (May 2026 — Monster Lifecycle) ──
 _EXPECTED = {
-    "monster_default_size_sol":      (0.1,    "0.1 SOL per trade (reduced for BC price impact)"),
-    "creator_alpha_size_sol":        (0.1,    "0.1 SOL per trade (halved — BC slippage fix)"),
-    "monster_max_concurrent":        (1,      "1 concurrent position (low wallet, conservative)"),
-    "creator_alpha_max_concurrent":  (1,      "1 concurrent position (low wallet, conservative)"),
-    "creator_alpha_floor_pct":       (-25.0,  "-25% catastrophic floor"),
+    "monster_default_size_sol":      (0.2,    "0.2 SOL per trade"),
+    "creator_alpha_size_sol":        (0.2,    "0.2 SOL per trade (in sync with monster)"),
+    "monster_max_concurrent":        (1,      "1 concurrent position"),
+    "creator_alpha_max_concurrent":  (1,      "1 concurrent position"),
+    "creator_alpha_floor_pct":       (-25.0,  "-25% stop loss floor"),
     "creator_alpha_tp1_mult":        (2.0,    "+100% TP target"),
     "creator_alpha_tp1_sell_frac":   (1.0,    "100% full exit at TP"),
-    "creator_alpha_min_entry_mc_usd":  (6_000, "$6K MC floor — no organic buying below this"),
-    "creator_alpha_max_entry_mc_usd": (20_000, "$20K MC ceiling — already pumped above this"),
+    "creator_alpha_min_entry_mc_usd":  (6_000, "$6K MC floor"),
+    "creator_alpha_max_entry_mc_usd": (20_000, "$20K MC ceiling"),
     "trading_paused":                (False,  "trading must NOT be paused"),
 }
 
 _EXPECTED_PLAYBOOK = {
-    "operators":        46,
-    "direct_creators":  25,
+    "operators":        45,   # current playbook count
+    "direct_creators":  24,   # current playbook count
     "playbook_version": 2,
 }
 
-_MIN_WALLET_SOL = 0.42  # 2 trades × 0.2 SOL × 1.05 buffer
+_MIN_WALLET_SOL = 0.30  # 1 active trade × 0.2 SOL × 1.5 slippage buffer
 
 
 async def run_audit(session: aiohttp.ClientSession | None = None) -> dict:
