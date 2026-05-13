@@ -29,27 +29,30 @@ _DIR = Path(__file__).parent
 _last_audit_result: dict = {}
 _last_audit_ts: float = 0.0
 
-# ── Expected values for the current strategy (May 2026 — Monster Lifecycle) ──
+# ── Expected values — only check CRITICAL invariants that must never drift ──
+# Non-critical config (trade size, playbook counts) is no longer checked here
+# because it changes legitimately and caused constant false alarms.
 _EXPECTED = {
-    "monster_default_size_sol":      (0.2,    "0.2 SOL per trade"),
-    "creator_alpha_size_sol":        (0.2,    "0.2 SOL per trade (in sync with monster)"),
-    "monster_max_concurrent":        (1,      "1 concurrent position"),
-    "creator_alpha_max_concurrent":  (1,      "1 concurrent position"),
-    "creator_alpha_floor_pct":       (-25.0,  "-25% stop loss floor"),
-    "creator_alpha_tp1_mult":        (2.0,    "+100% TP target"),
-    "creator_alpha_tp1_sell_frac":   (1.0,    "100% full exit at TP"),
-    "creator_alpha_min_entry_mc_usd":  (6_000, "$6K MC floor"),
-    "creator_alpha_max_entry_mc_usd": (20_000, "$20K MC ceiling"),
-    "trading_paused":                (False,  "trading must NOT be paused"),
+    "trading_paused": (False, "trading must NOT be paused — auto-fix clears this"),
 }
 
 _EXPECTED_PLAYBOOK = {
-    "operators":        45,   # current playbook count
-    "direct_creators":  24,   # current playbook count
     "playbook_version": 2,
+    # Operator/creator counts removed — they drift legitimately as playbook evolves
 }
 
 _MIN_WALLET_SOL = 0.30  # 1 active trade × 0.2 SOL × 1.5 slippage buffer
+
+# ── Critical env flags that must never drift ──────────────────────────────────
+# HOLDER_GUARD_ENFORCE must stay false — bundle_bot fires on ~100% of pump.fun
+# tokens. Enforcing it blocks every entry silently. Confirmed broken twice.
+_CRITICAL_ENV = {
+    "HOLDER_GUARD_ENFORCE":       ("false", "bundle_bot blocks all entries when enforced"),
+    "MONSTER_STRATEGY_ENABLED":   ("true",  "primary trading strategy"),
+    "COPY_TRADE_ENABLED":         ("false", "copy trade permanently disabled"),
+    "CREATOR_ALPHA_ENABLED":      ("false", "creator alpha permanently disabled"),
+    "SOCIAL_MONITOR_ENABLED":     ("false", "social monitor disabled (credits exhausted)"),
+}
 
 
 async def run_audit(session: aiohttp.ClientSession | None = None) -> dict:
@@ -79,7 +82,36 @@ async def run_audit(session: aiohttp.ClientSession | None = None) -> dict:
     except Exception as e:
         failed.append(f"Config audit error: {e}")
 
-    # ── 2. ENVIRONMENT FLAGS ───────────────────────────────────────────────────
+    # ── 2. CRITICAL ENV FLAG DRIFT CHECK + AUTO-FIX ───────────────────────────
+    _env_path = Path("/home/ubuntu/eliza/.env")
+    for _env_key, (_expected_val, _reason) in _CRITICAL_ENV.items():
+        _actual_val = os.getenv(_env_key, "").strip().lower()
+        if _actual_val != _expected_val.lower():
+            # Auto-fix by rewriting the .env line
+            try:
+                if _env_path.exists():
+                    _content = _env_path.read_text()
+                    import re as _re
+                    if _re.search(rf'^{_env_key}=', _content, _re.MULTILINE):
+                        _content = _re.sub(
+                            rf'^{_env_key}=.*$',
+                            f'{_env_key}={_expected_val}',
+                            _content, flags=_re.MULTILINE
+                        )
+                    else:
+                        _content += f'\n{_env_key}={_expected_val}\n'
+                    _env_path.write_text(_content)
+                    failed.append(
+                        f"ENV DRIFT AUTO-FIXED: {_env_key} was '{_actual_val}' → "
+                        f"'{_expected_val}' ({_reason}). Bot restart needed to apply."
+                    )
+                else:
+                    failed.append(f"ENV DRIFT: {_env_key}='{_actual_val}' (expected '{_expected_val}') — {_reason}")
+            except Exception as _fix_err:
+                failed.append(f"ENV DRIFT: {_env_key}='{_actual_val}' (expected '{_expected_val}'), auto-fix failed: {_fix_err}")
+        else:
+            passed.append(f"{_env_key}={_expected_val} ✓")
+
     monster_enabled = os.getenv("MONSTER_STRATEGY_ENABLED", "false").lower() in ("true","1","yes")
     paper_only      = os.getenv("MONSTER_PAPER_ONLY", "true").lower() in ("true","1","yes")
     groq_key        = os.getenv("GROQ_API_KEY", "")
@@ -156,13 +188,14 @@ async def run_audit(session: aiohttp.ClientSession | None = None) -> dict:
         creators = sum(len(v) for v in playbook.get("direct_creators", {}).values())
         version  = playbook.get("playbook_version", 0)
 
-        if ops < _EXPECTED_PLAYBOOK["operators"]:
-            failed.append(f"Playbook: only {ops} operators (expected {_EXPECTED_PLAYBOOK['operators']}) — may have regressed!")
+        # Only flag SEVERE drops (>10 lost) — small count changes are normal playbook evolution
+        if ops < 30:
+            failed.append(f"Playbook: only {ops} operators — critically low, may have been wiped!")
         else:
             passed.append(f"Playbook: {ops} operators ✓")
 
-        if creators < _EXPECTED_PLAYBOOK["direct_creators"]:
-            failed.append(f"Playbook: only {creators} direct creators (expected {_EXPECTED_PLAYBOOK['direct_creators']})")
+        if creators < 15:
+            failed.append(f"Playbook: only {creators} direct creators — critically low!")
         else:
             passed.append(f"Playbook: {creators} direct creators ✓")
 

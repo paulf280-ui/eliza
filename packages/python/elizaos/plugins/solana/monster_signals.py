@@ -1807,7 +1807,9 @@ async def _serial_after_graduation(runtime: Any, session: aiohttp.ClientSession,
 # Previous MIN_MC_USD=250K was 5-10x past the optimal entry — that's why the
 # lifecycle scout kept missing opportunities. Correct entry is POST-graduation
 # cool-off: $25K-$300K MC, real liquidity, buyers still present.
-LIFECYCLE_MIN_LIQ_USD       = 30_000   # raised from 15K — all 17 reference winners had ≥$60K at peak; sub-$30K = rug zone
+LIFECYCLE_MIN_LIQ_USD       = 22_000   # $22K — Aura (+39%) entered at $17K, RICH (+22%) at $23K.
+                                        # Reference file shows $60K+ at PEAK not at entry. $22K blocks
+                                        # true micro-cap rugs while keeping real early entries.
 LIFECYCLE_MAX_LIQ_USD       = 300_000
 LIFECYCLE_MIN_MC_USD        = 55_000   # raised from 25K — 10-winner/10-loser cross-reference:
                                         # 7/10 losers entered below $55K MC. $45K change was made
