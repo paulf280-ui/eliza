@@ -87,6 +87,11 @@ class MonsterStrategyService(Service):
                 name="monster_lifecycle",
             ),
         ]
+        # DexScreener backup poll — catches tokens missed by Helius webhooks
+        svc._tasks.append(asyncio.create_task(
+            monster_signals.dexscreener_backup_poll_loop(svc._session),
+            name="monster_ds_backup",
+        ))
         if _cluster_enabled:
             svc._tasks.append(asyncio.create_task(
                 monster_signals.cluster_confirm_scout_loop(runtime, svc._session),

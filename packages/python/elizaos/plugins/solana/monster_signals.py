@@ -1808,9 +1808,9 @@ async def _serial_after_graduation(runtime: Any, session: aiohttp.ClientSession,
 # Previous MIN_MC_USD=250K was 5-10x past the optimal entry — that's why the
 # lifecycle scout kept missing opportunities. Correct entry is POST-graduation
 # cool-off: $25K-$300K MC, real liquidity, buyers still present.
-LIFECYCLE_MIN_LIQ_USD       = 22_000   # $22K — Aura (+39%) entered at $17K, RICH (+22%) at $23K.
-                                        # Reference file shows $60K+ at PEAK not at entry. $22K blocks
-                                        # true micro-cap rugs while keeping real early entries.
+LIFECYCLE_MIN_LIQ_USD       = 18_000   # $18K — Aura (+39%) entered at $17K, RICH (+22%) at $23K.
+                                        # 3h watchdog confirmed 0/8 blocked tokens hit TP; liq is the
+                                        # dominant daily rejection. $18K still blocks true rugs (<$10K).
 LIFECYCLE_MAX_LIQ_USD       = 300_000
 LIFECYCLE_MIN_MC_USD        = 55_000   # raised from 25K — 10-winner/10-loser cross-reference:
                                         # 7/10 losers entered below $55K MC. $45K change was made
@@ -1924,6 +1924,65 @@ async def _recent_pumpswap_profiles(session: aiohttp.ClientSession) -> list[dict
         if not existing or liq > float((existing.get("liquidity") or {}).get("usd") or 0):
             by_mint[mint] = p
     return list(by_mint.values())
+
+
+async def dexscreener_backup_poll_loop(session: aiohttp.ClientSession) -> None:
+    """Secondary scanner: polls DexScreener every 5 minutes for new PumpSwap pairs.
+
+    Helius webhooks miss some quiet graduations (RoyalPop, CROWDCAM never appeared
+    in the webhook feed). This fills that gap by querying DexScreener directly and
+    injecting any new mints into the fresh_grad_queue so the lifecycle loop sees them.
+    Does NOT change any filters — just improves coverage.
+    """
+    import time as _t
+    _seen_mints: set = set()
+    print("[ds-backup] DexScreener backup poll started — every 5 min for missed PumpSwap grads")
+    await asyncio.sleep(60)  # let main loop warm up first
+
+    while True:
+        try:
+            async with session.get(
+                "https://api.dexscreener.com/token-profiles/latest/v1",
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as r:
+                if r.status == 200:
+                    profiles = await r.json()
+                    new_count = 0
+                    for tok in (profiles if isinstance(profiles, list) else []):
+                        if tok.get("chainId") != "solana":
+                            continue
+                        mint = tok.get("tokenAddress", "")
+                        if not mint or mint in _seen_mints:
+                            continue
+                        _seen_mints.add(mint)
+                        # Check if it's a PumpSwap pair not already in our queue
+                        try:
+                            async with session.get(
+                                f"https://api.dexscreener.com/latest/dex/tokens/{mint}",
+                                timeout=aiohttp.ClientTimeout(total=6),
+                            ) as r2:
+                                if r2.status == 200:
+                                    ds = await r2.json()
+                                    for p in (ds.get("pairs") or []):
+                                        if (p.get("chainId") == "solana" and
+                                                (p.get("dexId") or "").lower() in ("pumpswap", "pump-amm") and
+                                                mint not in _MONSTER_SKIP_MINTS):
+                                            pca = p.get("pairCreatedAt", 0)
+                                            age_min = (_t.time() * 1000 - pca) / 60000 if pca else 999
+                                            if 5 <= age_min <= 90:
+                                                pool = p.get("pairAddress", "")
+                                                _fresh_grad_queue.append({"mint": mint, "pool": pool,
+                                                                           "ts": int(_t.time()), "source": "ds_backup"})
+                                                new_count += 1
+                                                break
+                        except Exception:
+                            pass
+                        await asyncio.sleep(0.1)
+                    if new_count:
+                        print(f"[ds-backup] queued {new_count} new PumpSwap mints from DexScreener profiles")
+        except Exception as e:
+            print(f"[ds-backup] poll error: {e}")
+        await asyncio.sleep(5 * 60)  # every 5 minutes
 
 
 async def lifecycle_scout_loop(runtime: Any,
