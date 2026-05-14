@@ -883,9 +883,10 @@ LIFECYCLE_WATCHLIST_TTL_SECS    = 180 * 60   # drop deferred mints after 3h
 LIFECYCLE_WATCHLIST_MAX_AGE_SECS = 180 * 60  # extend age cap for deferred mints (vs 90min normal)
 LIFECYCLE_SNAPSHOT_WINDOW_SECS   = 30 * 60   # keep last 30min of price snapshots per mint
 LIFECYCLE_BOUNCE_MIN_PCT         = 3.0       # price must be ≥+3% above local low for bounce (lowered from 5% 2026-04-30 — fire earlier on the recovery leg, liq-stable check still gates dead-cat bounces)
-LIFECYCLE_M5_GOOD_LOW            = -5.0      # m5 in [-5%, +8%] = clean entry shape (widened from -3% 2026-04-30 — catch deeper consolidation-dip entries; bounce-watchlist still defers tokens with m5 < -5%)
-LIFECYCLE_M5_GOOD_HIGH           = 8.0
-LIFECYCLE_POSTPEAK_H1_THRESHOLD  = 30.0      # h1 ≥ +30% with m5 ≤ 0 = post-peak rollover, defer
+LIFECYCLE_M5_GOOD_LOW            = -5.0      # m5 in [-5%, +12%] = clean entry shape
+LIFECYCLE_M5_GOOD_HIGH           = 12.0      # raised from 8 — +8% was too tight; +10-12% is healthy momentum not top-chasing
+LIFECYCLE_POSTPEAK_H1_THRESHOLD  = 55.0      # raised from 30 — h1=30-55% with flat m5 is consolidation after moderate move,
+                                              # not necessarily rolling over. MEMEART h1=43% was still heading higher.
 LIFECYCLE_MAX_M5_VOL_LIQ         = 3.0       # vol_m5/liq cap — same gate breakout scout uses (CCP 2026-04-30: vol/liq=4x flagged WASH on raydium-scout but bypassed on lifecycle_bounce → bought a wash-driven dead-cat bounce, -10%)
 
 # ── Bounce-watchlist entry gates (calibrated 2026-05-01 from on-chain swap data
