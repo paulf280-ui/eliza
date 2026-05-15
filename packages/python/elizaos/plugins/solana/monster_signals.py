@@ -1829,7 +1829,9 @@ LIFECYCLE_BUY_RATIO_MIN     = 48.0
 LIFECYCLE_BUY_RATIO_MAX     = 65.0    # lowered from 72 — winner sweet spot 45-57%; Gemini + own data agree; 65 gives buffer
                                         # entry; mama (79%) and UNFAZED (75%) were losers. BR>72% = buying
                                         # exhausted, pump peak. Winners averaged 57.9%.
-LIFECYCLE_H1_CHANGE_MAX_PCT = 200.0   # was 100 — allow larger initial moves
+LIFECYCLE_H1_CHANGE_MAX_PCT = 120.0   # lowered from 200 — Bee had h1=200%, bounced, re-entered, hit -23% SL.
+                                        # Winners (RICH, Aura) had h1 ~30-80% at entry. 120% still allows
+                                        # genuine momentum entries without chasing exhausted movers.
 LIFECYCLE_H1_CHANGE_MIN_PCT = 0.0     # raised from -30 — all winners had positive h1 at entry; negative h1 = dying token
 LIFECYCLE_M5_CHANGE_MAX_PCT = 20.0    # was 15 — slightly looser
 
@@ -2375,6 +2377,9 @@ async def lifecycle_scout_loop(runtime: Any,
                             print(f"[monster-lifecycle] 🪦 {mint[:8]} bounce-reject "
                                   f"max_h1_seen={_max_h1:.0f}% — big move already happened, we're late")
                             _lifecycle_deferred.pop(mint, None)
+                            # CRITICAL: add to skip set so the standard lifecycle path
+                            # can't re-evaluate this token and enter late (Bee -23% lesson)
+                            _MONSTER_SKIP_MINTS.add(mint)
                             cycle_rejects["late_to_party"] = cycle_rejects.get("late_to_party", 0) + 1
                             continue
                         if t1 is not None and t1 >= LIFECYCLE_BOUNCE_TOP1_MAX_PCT:
