@@ -653,7 +653,18 @@ class AICascade:
                 self._last_groq = now
                 self._record(d)
                 if d.action == "SELL" and d.confidence >= 0.75:
-                    decision = d  # confident exit — execute
+                    # Volume strength override: if h1 volume is high AND buy ratio
+                    # is healthy, the token has underlying demand — Groq is reacting
+                    # to short-term price noise, not the real trend.
+                    # Diamond lesson: $484K h1 vol, 58% BR, Groq said sell → ran +80%
+                    _vol_h1 = float((feed.latest_pair_data() or {}).get("volume", {}).get("h1") or 0) if feed else 0
+                    _br_h1  = getattr(feed, "_last_buy_ratio", None)
+                    _override = _vol_h1 > 200_000 and (_br_h1 is None or _br_h1 > 55.0)
+                    if _override:
+                        print(f"[monitor] 💪 Groq SELL overridden — vol_h1=${_vol_h1:,.0f} "
+                              f"shows underlying strength (Diamond lesson)")
+                    else:
+                        decision = d  # confident exit — execute
                 elif d.action == "HOLD" and not decision:
                     decision = d  # propagate HOLD for logging
 

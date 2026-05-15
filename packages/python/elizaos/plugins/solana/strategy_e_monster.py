@@ -632,16 +632,27 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
     tp1_sell_frac = get_tp1_sell_frac_for_source(src)
     floor_pct = get_floor_for_source(src)
 
-    # ── Hard TP1 → partial exit (creator_alpha=50%, default=full) ────────
-    if not tp1_fired and pnl_pct >= tp1_gain_pct:
+    # ── Trailing stop: once peak > +20%, trail at peak - 15% ─────────────
+    # This replaces the hard +20% TP. Instead of capping gains at +20%,
+    # we let winners run and only exit when they pull back 15% from the peak.
+    # Diamond lesson: was manually closed at -14% then ran to +80%+.
+    # With trailing stop: -14% is still above -25% hard floor, position stays
+    # open, eventually exits after the run at peak-15%.
+    peak_pnl = float(pos.get("peak_pnl_pct") or 0.0)
+    if peak_pnl >= 20.0:
+        trailing_floor = peak_pnl - 15.0  # e.g. peak=40% → floor=25%
+        floor_pct = max(floor_pct, trailing_floor)
+        if pnl_pct <= trailing_floor:
+            tag = f"tp_trail_{int(peak_pnl)}pct_peak_exit{int(pnl_pct)}pct"
+            return tag, 1.0
+
+    # Hard TP only fires as a backstop when no trailing yet (shouldn't reach here
+    # for most positions, trailing stop fires first once peak > 20%)
+    if not tp1_fired and pnl_pct >= tp1_gain_pct and peak_pnl < 20.0:
         tag = f"tp_hard_{int(tp1_gain_pct)}pct"
         return tag, tp1_sell_frac
 
-    # ── Stalled-winner exit: DISABLED in new +100% TP strategy
-    # With lottery TP, we don't need artificial stall exits.
-
-    # ── Catastrophic floor → full exit (brains rule above this) ─────────
-    # creator_alpha uses -75% (wide), default uses -25%
+    # ── Catastrophic floor → full exit (below -25% hard stop) ───────────
     if not tp1_fired and pnl_pct <= floor_pct:
         return f"pre_tp1_floor_{pnl_pct:.0f}pct", 1.0
 

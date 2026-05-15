@@ -969,10 +969,24 @@ def _lifecycle_cleanup_deferred() -> None:
         _lifecycle_deferred.pop(m, None)
 
 
-def _lifecycle_classify_entry_shape(m5: float, h1: float) -> tuple[str, str]:
-    """Returns (shape, reason). shape ∈ {good, pullback, postpeak, overheated}."""
-    if m5 > LIFECYCLE_M5_GOOD_HIGH:
-        return "overheated", f"m5=+{m5:.1f}% > +{LIFECYCLE_M5_GOOD_HIGH:.0f}% — mid-spike chase"
+def _lifecycle_classify_entry_shape(m5: float, h1: float,
+                                     first_seen: float = 0.0) -> tuple[str, str]:
+    """Returns (shape, reason). shape ∈ {good, pullback, postpeak, overheated}.
+
+    Staircase detection: tokens that have been in the watchlist for 60+ minutes
+    without dumping are confirmed grinders. Allow m5 up to +20% (vs +12% for
+    standard entries) — they are always mid-step on the staircase, never truly
+    quiet. DUST is the reference case.
+    """
+    import time as _t
+    _minutes_watched = (_t.time() - first_seen) / 60 if first_seen > 0 else 0
+    _is_staircase = _minutes_watched >= 60
+    _m5_ceiling = 20.0 if _is_staircase else LIFECYCLE_M5_GOOD_HIGH
+
+    if m5 > _m5_ceiling:
+        tag = "staircase-overheated" if _is_staircase else "overheated"
+        return tag, (f"m5=+{m5:.1f}% > +{_m5_ceiling:.0f}% — "
+                     f"{'staircase grinder still hot' if _is_staircase else 'mid-spike chase'}")
     if m5 < LIFECYCLE_M5_GOOD_LOW:
         return "pullback", f"m5={m5:.1f}% < {LIFECYCLE_M5_GOOD_LOW:.0f}% — actively falling"
     if h1 >= LIFECYCLE_POSTPEAK_H1_THRESHOLD and m5 <= 0:
@@ -2214,7 +2228,9 @@ async def lifecycle_scout_loop(runtime: Any,
                     # confirmed bounce off the local low, we enter.
                     cycle_passed_baseline += 1
                     price_native = float(p.get("priceNative") or p.get("priceUsd") or 0)
-                    shape, shape_reason = _lifecycle_classify_entry_shape(m5_change, h1_change)
+                    _first_seen = (_lifecycle_deferred.get(mint) or {}).get("first_seen", 0.0)
+                    shape, shape_reason = _lifecycle_classify_entry_shape(
+                        m5_change, h1_change, first_seen=_first_seen)
 
                     # ── Watchlist-first gate ─────────────────────────────────
                     # If h1 > 30% and the token has never been on our watchlist,
