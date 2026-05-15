@@ -2373,15 +2373,18 @@ async def lifecycle_scout_loop(runtime: Any,
                         # on an already-pumped token — we'd be late to the party.
                         # "If we're late, stay late. Don't enter." — AREA51/alein lesson.
                         _max_h1 = (_lifecycle_deferred.get(mint) or {}).get("max_h1_seen", 0.0)
-                        if _max_h1 >= 50.0:
+                        # Tiered: 50-150% = bounce allowed (6veQU7HD had 129%, was genuine)
+                        #          >150%  = hard skip (Bee had 200%, entered late, -23%)
+                        if _max_h1 >= 150.0:
                             print(f"[monster-lifecycle] 🪦 {mint[:8]} bounce-reject "
-                                  f"max_h1_seen={_max_h1:.0f}% — big move already happened, we're late")
+                                  f"max_h1_seen={_max_h1:.0f}% — exhausted mover, hard skip")
                             _lifecycle_deferred.pop(mint, None)
-                            # CRITICAL: add to skip set so the standard lifecycle path
-                            # can't re-evaluate this token and enter late (Bee -23% lesson)
                             _MONSTER_SKIP_MINTS.add(mint)
                             cycle_rejects["late_to_party"] = cycle_rejects.get("late_to_party", 0) + 1
                             continue
+                        if _max_h1 >= 50.0:
+                            print(f"[monster-lifecycle] 🪦 {mint[:8]} bounce-reject "
+                                  f"max_h1_seen={_max_h1:.0f}% — big move but bounce still allowed")
                         if t1 is not None and t1 >= LIFECYCLE_BOUNCE_TOP1_MAX_PCT:
                             print(f"[monster-lifecycle] 🪦 {mint[:8]} bounce-reject "
                                   f"top1={t1}% > {LIFECYCLE_BOUNCE_TOP1_MAX_PCT}% (single wallet dump risk)")
