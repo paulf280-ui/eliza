@@ -882,7 +882,16 @@ def _persist_reject_snapshot(snapshot: dict) -> None:
 LIFECYCLE_WATCHLIST_TTL_SECS    = 180 * 60   # drop deferred mints after 3h
 LIFECYCLE_WATCHLIST_MAX_AGE_SECS = 180 * 60  # extend age cap for deferred mints (vs 90min normal)
 LIFECYCLE_SNAPSHOT_WINDOW_SECS   = 30 * 60   # keep last 30min of price snapshots per mint
-LIFECYCLE_BOUNCE_MIN_PCT         = 3.0       # price must be ≥+3% above local low for bounce (lowered from 5% 2026-04-30 — fire earlier on the recovery leg, liq-stable check still gates dead-cat bounces)
+# Tiered bounce minimums — higher liquidity = more committed capital = less bounce proof needed.
+# Validated against trade history:
+#   Diamond $38K liq → tier 3 (4%) → +4.3% bounce PASSES  (ran to +344%)
+#   MAGA    $19.7K liq → tier 1 (8%) → +3.6% bounce BLOCKED (was noise)
+#   LADA    $21K liq → tier 1 (8%) → +21% bounce PASSES    (ran +11,446%)
+#   USP     $27K liq → tier 2 (6%) → +69% bounce PASSES    (ran +68%)
+LIFECYCLE_BOUNCE_MIN_PCT_LOW     = 8.0       # liq < $25K  — thin pool, need strong bounce signal
+LIFECYCLE_BOUNCE_MIN_PCT_MID     = 6.0       # liq $25K-35K — moderate commitment
+LIFECYCLE_BOUNCE_MIN_PCT_HIGH    = 4.0       # liq > $35K  — high commitment, less proof needed
+LIFECYCLE_BOUNCE_MIN_PCT         = 8.0       # default (used as fallback in old code paths)
 LIFECYCLE_M5_GOOD_LOW            = -5.0      # m5 in [-5%, +12%] = clean entry shape
 LIFECYCLE_M5_GOOD_HIGH           = 12.0      # raised from 8 — +8% was too tight; +10-12% is healthy momentum not top-chasing
 LIFECYCLE_POSTPEAK_H1_THRESHOLD  = 55.0      # raised from 30 — h1=30-55% with flat m5 is consolidation after moderate move,
@@ -948,7 +957,14 @@ def _lifecycle_bounce_confirmed(mint: str, current_price: float, current_m5: flo
     if not low or low <= 0:
         return False, 0.0
     bounce_pct = (current_price - low) / low * 100.0
-    if bounce_pct < LIFECYCLE_BOUNCE_MIN_PCT:
+    # Tiered bounce minimum based on liquidity depth
+    if current_liq >= 35_000:
+        min_bounce = LIFECYCLE_BOUNCE_MIN_PCT_HIGH   # 4% — high commitment pool
+    elif current_liq >= 25_000:
+        min_bounce = LIFECYCLE_BOUNCE_MIN_PCT_MID    # 6% — moderate pool
+    else:
+        min_bounce = LIFECYCLE_BOUNCE_MIN_PCT_LOW    # 8% — thin pool, needs strong signal
+    if bounce_pct < min_bounce:
         return False, bounce_pct
     if current_m5 < 0:
         return False, bounce_pct

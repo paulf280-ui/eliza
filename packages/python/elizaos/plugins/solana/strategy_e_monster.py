@@ -173,20 +173,34 @@ def get_size_for_source(source: str | None) -> float:
 
 
 def get_floor_for_source(source: str | None) -> float:
-    """Catastrophic floor (negative %)."""
+    """Catastrophic floor (negative %).
+
+    lifecycle_bounce entries get -45% SL — these are confirmed bounce setups
+    that need room to develop. LADA hit -22% then ran +11,446%. USP hit -20%
+    then ran +68%. The -25% SL was killing valid trades before the move.
+
+    Standard lifecycle entries keep -25% SL — these can die fast (Bee proved it).
+    """
     if _is_creator_alpha_source(source):
         try:
             from elizaos.plugins.solana import live_config as _lc
             return float(_lc.get("creator_alpha_floor_pct", -25.0))
         except Exception:
             return -25.0
-    if _is_lifecycle_source(source):
-        # Tighter floor for AMM — AMM tokens move more orderly than BC
+    if source and "bounce" in source:
+        # Bounce entries confirmed by real buying pressure — give them room
         try:
             from elizaos.plugins.solana import live_config as _lc
-            return float(_lc.get("lifecycle_floor_pct", -20.0))
+            return float(_lc.get("lifecycle_bounce_floor_pct", -45.0))
         except Exception:
-            return -20.0
+            return -45.0
+    if _is_lifecycle_source(source):
+        # Standard lifecycle — can die fast, keep tight floor
+        try:
+            from elizaos.plugins.solana import live_config as _lc
+            return float(_lc.get("lifecycle_floor_pct", -25.0))
+        except Exception:
+            return -25.0
     return MONSTER_PRE_TP1_FLOOR_PCT
 
 
@@ -632,27 +646,23 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
     tp1_sell_frac = get_tp1_sell_frac_for_source(src)
     floor_pct = get_floor_for_source(src)
 
-    # ── Trailing stop: once peak > +20%, trail at peak - 15% ─────────────
-    # This replaces the hard +20% TP. Instead of capping gains at +20%,
-    # we let winners run and only exit when they pull back 15% from the peak.
-    # Diamond lesson: was manually closed at -14% then ran to +80%+.
-    # With trailing stop: -14% is still above -25% hard floor, position stays
-    # open, eventually exits after the run at peak-15%.
+    # ── Volume-based distribution exit (primary TP mechanism) ───────────
+    # When sellers overwhelm buyers AND the token makes 3 consecutive lower lows,
+    # a distribution/peak event is confirmed. Exit immediately.
+    # This is what the circled areas on LADA/USP/Diamond charts represented.
+    # Normal consolidations (LADA's white-line pullbacks) recover quickly and
+    # don't trigger 3 consecutive lower lows — so we hold through those.
     peak_pnl = float(pos.get("peak_pnl_pct") or 0.0)
-    if peak_pnl >= 20.0:
-        trailing_floor = peak_pnl - 15.0  # e.g. peak=40% → floor=25%
-        floor_pct = max(floor_pct, trailing_floor)
-        if pnl_pct <= trailing_floor:
-            tag = f"tp_trail_{int(peak_pnl)}pct_peak_exit{int(pnl_pct)}pct"
-            return tag, 1.0
+    _sell_ratio = pos.get("_current_sell_ratio_m5")
+    _lower_lows = int(pos.get("_consecutive_lower_lows") or 0)
+    if (_sell_ratio is not None and _sell_ratio > 0.65
+            and _lower_lows >= 3 and pnl_pct > 5.0):
+        tag = f"distribution_exit_br{int(_sell_ratio*100)}pct_{_lower_lows}lows_pnl{int(pnl_pct)}pct"
+        return tag, 1.0
 
-    # Hard TP only fires as a backstop when no trailing yet (shouldn't reach here
-    # for most positions, trailing stop fires first once peak > 20%)
-    if not tp1_fired and pnl_pct >= tp1_gain_pct and peak_pnl < 20.0:
-        tag = f"tp_hard_{int(tp1_gain_pct)}pct"
-        return tag, tp1_sell_frac
-
-    # ── Catastrophic floor → full exit (below -25% hard stop) ───────────
+    # ── Catastrophic floor → full exit ────────────────────────────────────
+    # -45% for lifecycle_bounce (bounce entries need room to develop)
+    # -25% for standard lifecycle (can die fast — Bee proved this)
     if not tp1_fired and pnl_pct <= floor_pct:
         return f"pre_tp1_floor_{pnl_pct:.0f}pct", 1.0
 
@@ -1341,6 +1351,29 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                     if _used_helius_price:
                         print(f"[monster] 📡 helius price {pos.get('token_name', mint[:8])}: "
                               f"{current_price:.3e} SOL pnl={pnl_pct:+.1f}% (dexscreener blind)")
+
+                    # ── Volume exit signal tracking ──────────────────────────
+                    # Track consecutive lower lows + sell ratio for the
+                    # distribution detection exit (replaces trailing stop).
+                    # When sell_ratio_m5 > 65% AND 3 consecutive lower lows
+                    # AND we're in profit → distribution event confirmed, exit.
+                    try:
+                        _price_hist = pos.setdefault("_price_history", [])
+                        _price_hist.append(current_price)
+                        if len(_price_hist) > 6:
+                            _price_hist.pop(0)
+                        _lower_lows = 0
+                        for _idx in range(len(_price_hist)-1, 0, -1):
+                            if _price_hist[_idx] < _price_hist[_idx-1]:
+                                _lower_lows += 1
+                            else:
+                                break
+                        pos["_consecutive_lower_lows"] = _lower_lows
+                        # Sell ratio from buy_ratio (current_buy_ratio is buys/total)
+                        if current_buy_ratio is not None:
+                            pos["_current_sell_ratio_m5"] = round(1.0 - (current_buy_ratio / 100.0), 3)
+                    except Exception:
+                        pass
 
                 # ── 1. Deterministic rules (TP1, floor, flat, post-TP1 events) ──
                 reason, frac = evaluate_exit(pos, current_price, current_liq, current_buy_ratio)

@@ -646,27 +646,46 @@ class AICascade:
 
         decision: AIDecision | None = None
 
-        # ── Tier 1: Groq — SOLE brain (Gemini/Claude disabled) ───────────────
+        # ── Tier 1: Groq — OBSERVE ONLY mode ─────────────────────────────────
+        # Groq's exit authority has been removed. The volume-based distribution
+        # exit (sell_ratio > 65% + 3 consecutive lower lows) handles TP.
+        # Groq now ONLY observes and logs to the learning file so it builds
+        # pattern memory over time. Once the data-driven system is validated
+        # (2-3 weeks), Groq's observations can inform parameter tuning.
         if now - self._last_groq >= self.GROQ_INTERVAL and self._groq_key:
             d = await self._call_groq(ctx, session)
             if d:
                 self._last_groq = now
                 self._record(d)
-                if d.action == "SELL" and d.confidence >= 0.75:
-                    # Volume strength override: if h1 volume is high AND buy ratio
-                    # is healthy, the token has underlying demand — Groq is reacting
-                    # to short-term price noise, not the real trend.
-                    # Diamond lesson: $484K h1 vol, 58% BR, Groq said sell → ran +80%
-                    _vol_h1 = float((feed.latest_pair_data() or {}).get("volume", {}).get("h1") or 0) if feed else 0
-                    _br_h1  = getattr(feed, "_last_buy_ratio", None)
-                    _override = _vol_h1 > 200_000 and (_br_h1 is None or _br_h1 > 55.0)
-                    if _override:
-                        print(f"[monitor] 💪 Groq SELL overridden — vol_h1=${_vol_h1:,.0f} "
-                              f"shows underlying strength (Diamond lesson)")
-                    else:
-                        decision = d  # confident exit — execute
-                elif d.action == "HOLD" and not decision:
-                    decision = d  # propagate HOLD for logging
+                # LOG the recommendation but do NOT execute it
+                if d.action in ("SELL", "HOLD"):
+                    print(f"[monitor] 🧠 Groq OBSERVING {ctx.get('token','?')} — "
+                          f"{d.action} conf={d.confidence:.0%} | {(d.reason or '')[:80]}")
+                    # Write to Groq learning log
+                    try:
+                        import json as _json, os as _os
+                        _log_path = _os.path.join(_os.path.dirname(__file__), "groq_learning_log.json")
+                        _entry = {
+                            "ts": int(now), "mint": ctx.get("mint"), "token": ctx.get("token"),
+                            "action": d.action, "confidence": d.confidence,
+                            "reason": d.reason, "pnl_pct": ctx.get("pnl_pct"),
+                            "peak_pnl_pct": ctx.get("peak_pnl_pct"),
+                            "bsr": ctx.get("bsr"), "liq_usd": ctx.get("liq_usd"),
+                            "sell_ratio_m5": pos.get("_current_sell_ratio_m5"),
+                            "consecutive_lower_lows": pos.get("_consecutive_lower_lows"),
+                            "outcome": None,  # filled in when trade closes
+                        }
+                        _log = []
+                        if _os.path.exists(_log_path):
+                            try: _log = _json.load(open(_log_path))[-2000:]
+                            except: pass
+                        _log.append(_entry)
+                        with open(_log_path, "w") as _f:
+                            _json.dump(_log[-2000:], _f)
+                    except Exception:
+                        pass
+                if d.action == "HOLD" and not decision:
+                    decision = d  # propagate HOLD for logging only
 
         # ── Tier 2: Gemini Flash — DISABLED (2026-05-03)
         # Paused for fresh data gathering with Groq-only setup
