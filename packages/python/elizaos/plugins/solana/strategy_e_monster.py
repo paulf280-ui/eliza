@@ -670,11 +670,40 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
         print(f"[monster] 👥 HOLDER DECLINE EXIT — holders_5min={_holder_delta}, sell_ratio={_sell_ratio:.0%}")
         return tag, 1.0
 
-    # Path 3: Original confirmed distribution (sell ratio + 3 lower lows)
+    # Path 3: Confirmed distribution (sell ratio + 3 lower lows)
+    # Holder bypass: if holders are GROWING during the sell-off, this is a
+    # staircase consolidation, not distribution. The token is dipping to
+    # let weak hands out while strong hands accumulate — hold.
+    # MIRA: between steps 2 and 3, price fell 33% but holders kept growing.
+    # Path 3 would have fired on price action alone and missed the +383% run.
     if (_sell_ratio is not None and _sell_ratio > 0.65
             and _lower_lows >= 3 and pnl_pct > 5.0):
-        tag = f"distribution_exit_br{int(_sell_ratio*100)}pct_{_lower_lows}lows_pnl{int(pnl_pct)}pct"
-        return tag, 1.0
+        if _holder_delta is not None and _holder_delta > 0:
+            pass  # holders accumulating during dip — staircase, not distribution
+        else:
+            tag = f"distribution_exit_sr{int(_sell_ratio*100)}pct_{_lower_lows}lows_pnl{int(pnl_pct)}pct"
+            return tag, 1.0
+
+    # ── Trailing gain floor (staircase exit) ──────────────────────────────
+    # Activates once peak_pnl > 50%. Floor = 50% of peak.
+    # Fires ONLY when: floor breached + sell_ratio > 65% + holders declining.
+    # All three required — any single signal can be a normal staircase dip.
+    # MIRA from ideal entry ($86K):
+    #   Step 2 peak +220% → floor +110%. Dip to +115% = above floor → HOLD ✓
+    #   Step 3 peak +383% → floor +192%. Price drops from $416K, sell spikes,
+    #   holders start leaving → EXIT at ~$251K MC = +192% banked.
+    # From actual entry ($156K):
+    #   Peak +167% → floor +84%. Exit ~$286K = +84% on 0.4 SOL = 0.34 SOL.
+    if peak_pnl >= 50.0:
+        _tgf_floor = peak_pnl * 0.50
+        if (pnl_pct <= _tgf_floor
+                and pnl_pct > 5.0
+                and _sell_ratio is not None and _sell_ratio > 0.65
+                and (_holder_delta is None or _holder_delta < -10)):
+            tag = f"trailing_floor_pnl{pnl_pct:.0f}pct_peak{peak_pnl:.0f}pct"
+            print(f"[monster] 📉 TRAILING FLOOR — pnl={pnl_pct:+.1f}% "
+                  f"≤ floor={_tgf_floor:.1f}% (50% of peak +{peak_pnl:.0f}%)")
+            return tag, 1.0
 
     # ── Catastrophic floor → full exit ────────────────────────────────────
     # -45% for lifecycle_bounce (bounce entries need room to develop)
