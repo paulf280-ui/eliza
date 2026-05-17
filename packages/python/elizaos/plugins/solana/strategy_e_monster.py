@@ -1391,6 +1391,28 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                     except Exception:
                         pass
 
+                    # Holder count delta — powers exit Path 2 (holder_exit).
+                    # DexScreener info.holders updates every ~30s. Keep 10 min
+                    # of snapshots and compute the true 5-minute window delta.
+                    try:
+                        _h_raw = (_pair_snapshot.get("info") or {}).get("holders")
+                        if _h_raw is not None:
+                            _h_cur = int(_h_raw)
+                            _hsnaps = pos.setdefault("_holder_snapshots", [])
+                            _hnow = time.time()
+                            _hsnaps.append({"ts": _hnow, "h": _h_cur})
+                            pos["_holder_snapshots"] = [s for s in _hsnaps if _hnow - s["ts"] <= 600]
+                            # Compare against snapshot 4.5-5.5 min old for true 5-min delta
+                            _h5 = [s for s in pos["_holder_snapshots"] if _hnow - s["ts"] >= 270]
+                            if _h5:
+                                _h_oldest = min(_h5, key=lambda s: s["ts"])
+                                pos["_holder_delta_5min"] = _h_cur - _h_oldest["h"]
+                            elif len(pos["_holder_snapshots"]) >= 2:
+                                _h_oldest = pos["_holder_snapshots"][0]
+                                pos["_holder_delta_5min"] = _h_cur - _h_oldest["h"]
+                    except Exception:
+                        pass
+
                 # ── 1. Deterministic rules (TP1, floor, flat, post-TP1 events) ──
                 reason, frac = evaluate_exit(pos, current_price, current_liq, current_buy_ratio)
 

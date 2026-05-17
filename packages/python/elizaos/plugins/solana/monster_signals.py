@@ -2184,9 +2184,41 @@ async def lifecycle_scout_loop(runtime: Any,
                     pc = p.get("priceChange") or {}
                     h1_change = float(pc.get("h1") or 0)
                     m5_change = float(pc.get("m5") or 0)
+                    price_native = float(p.get("priceNative") or p.get("priceUsd") or 0)
                     h1_max = _CREATOR_ALPHA_PRIORITY_H1_MAX if priority_rec else LIFECYCLE_H1_CHANGE_MAX_PCT
+                    # Deep retest: watchlisted token whose h1 is still elevated from
+                    # an initial pump but has since pulled back ≥ 20% from its snapshot
+                    # high. MIRA pattern: pumped to h1=350% at 12:00, pulled back 30%
+                    # to $86K MC at 12:30 → standard path misses by ~1h waiting for
+                    # h1 to normalize below 120%. Deep retest enters at the bounce.
+                    _deep_retest = False
+                    _deep_retest_pullback = 0.0
+                    if (on_watch and not priority_rec and not viral_eligible
+                            and h1_change > h1_max and h1_change <= 300.0
+                            and price_native > 0):
+                        _dr_snaps = (_lifecycle_deferred.get(mint) or {}).get("snapshots", [])
+                        _dr_prices = [s["price"] for s in _dr_snaps if s.get("price", 0) > 0]
+                        _dr_max = max(_dr_prices) if _dr_prices else 0.0
+                        if _dr_max > 0:
+                            _dr_pb = (_dr_max - price_native) / _dr_max * 100
+                            if _dr_pb >= 20.0:
+                                _deep_retest = True
+                                _deep_retest_pullback = _dr_pb
+                                print(f"[monster-lifecycle] 🔄 {mint[:8]} DEEP RETEST: "
+                                      f"h1={h1_change:.0f}% but {_dr_pb:.0f}% below "
+                                      f"snapshot high — proceeding to bounce eval")
                     if h1_change > h1_max:
-                        if not viral_eligible:
+                        if not viral_eligible and not _deep_retest:
+                            # Track fresh tokens with elevated h1 so we catch the
+                            # normalization/pullback. MIRA pumped to h1=350% at 12:00,
+                            # was never watchlisted → missed the 12:30 entry at $86K MC.
+                            if not on_watch and not priority_rec and h1_change <= 300.0:
+                                _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
+                                print(f"[monster-lifecycle] 📋 {mint[:8]} h1={h1_change:.0f}% "
+                                      f"— watching for pullback/normalization")
+                            elif on_watch and h1_change <= 300.0:
+                                # Already watching — keep snapshots fresh so pullback is visible
+                                _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
                             cycle_rejects["h1_high"] += 1
                             continue
                     if h1_change < LIFECYCLE_H1_CHANGE_MIN_PCT:
@@ -2292,10 +2324,17 @@ async def lifecycle_scout_loop(runtime: Any,
                         # reason to defer. Same for creator_alpha priority mints —
                         # we trust the wallet signal more than the shape heuristic.
                         # Still falls through to safety gates below.
-                        _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
-                        cycle_added_to_watchlist += 1
-                        print(f"[monster-lifecycle] 👁 {mint[:8]} {shape} — {shape_reason} (watchlist)")
-                        continue
+                        # Deep retest bypass: price pullback is verified — an
+                        # "overheated" or "postpeak" shape here reflects the bounce
+                        # starting, not the original spike. Only block "pullback"
+                        # (m5 < -5% = actively dropping; bounce gate catches it too).
+                        if _deep_retest and shape != "pullback":
+                            pass  # bounce gate enforces m5 >= 0 + buyer count
+                        else:
+                            _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
+                            cycle_added_to_watchlist += 1
+                            print(f"[monster-lifecycle] 👁 {mint[:8]} {shape} — {shape_reason} (watchlist)")
+                            continue
                     if priority_rec and shape != "good":
                         # Never bypass OVERHEATED shape for creator_alpha — if the token
                         # is mid-spike we're entering at the peak regardless of wallet signal.
@@ -2429,7 +2468,11 @@ async def lifecycle_scout_loop(runtime: Any,
                         _max_h1 = (_lifecycle_deferred.get(mint) or {}).get("max_h1_seen", 0.0)
                         # Tiered: 50-150% = bounce allowed (6veQU7HD had 129%, was genuine)
                         #          >150%  = hard skip (Bee had 200%, entered late, -23%)
-                        if _max_h1 >= 150.0:
+                        # Exception: deep_retest bypasses the hard skip because the
+                        # pullback check (≥ 20% below snapshot high) proves the token
+                        # has already corrected — MIRA had h1=350% but pulled back
+                        # 30% = genuine re-entry, not a dead-cat on a pumping token.
+                        if _max_h1 >= 150.0 and not _deep_retest:
                             print(f"[monster-lifecycle] 🪦 {mint[:8]} bounce-reject "
                                   f"max_h1_seen={_max_h1:.0f}% — exhausted mover, hard skip (persisted)")
                             _lifecycle_deferred.pop(mint, None)
@@ -2510,6 +2553,8 @@ async def lifecycle_scout_loop(runtime: Any,
                         _creator_alpha_priority_mints.pop(mint, None)
                     elif viral_eligible and shape != "good":
                         sig_src = "lifecycle_viral"
+                    elif _deep_retest:
+                        sig_src = "lifecycle_bounce_deep_retest"
                     else:
                         sig_src = "lifecycle_bounce" if on_watch else "lifecycle"
                     print(f"[monster-lifecycle] 🎯 {mint[:8]} {sig_src} match "
