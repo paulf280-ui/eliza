@@ -647,14 +647,30 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
     floor_pct = get_floor_for_source(src)
 
     # ── Volume-based distribution exit (primary TP mechanism) ───────────
-    # When sellers overwhelm buyers AND the token makes 3 consecutive lower lows,
-    # a distribution/peak event is confirmed. Exit immediately.
-    # This is what the circled areas on LADA/USP/Diamond charts represented.
-    # Normal consolidations (LADA's white-line pullbacks) recover quickly and
-    # don't trigger 3 consecutive lower lows — so we hold through those.
+    # Three trigger paths — any one fires an immediate exit when in profit.
+    # Discomorphism lesson: token peaked +25% then dumped to -52%. Holder
+    # count was visibly dropping and sell ratio was failing BEFORE the price
+    # made 3 consecutive lower lows. Need faster triggers.
     peak_pnl = float(pos.get("peak_pnl_pct") or 0.0)
     _sell_ratio = pos.get("_current_sell_ratio_m5")
     _lower_lows = int(pos.get("_consecutive_lower_lows") or 0)
+    _holder_delta = pos.get("_holder_delta_5min")  # negative = holders leaving
+
+    # Path 1: Strong dump — heavy sell volume, no lower lows needed
+    if (_sell_ratio is not None and _sell_ratio > 0.72 and pnl_pct > 10.0):
+        tag = f"strong_sell_exit_sr{int(_sell_ratio*100)}pct_pnl{int(pnl_pct)}pct"
+        print(f"[monster] 🚨 STRONG SELL SIGNAL — sell_ratio={_sell_ratio:.0%}, pnl={pnl_pct:+.1f}%")
+        return tag, 1.0
+
+    # Path 2: Holders leaving + sell pressure together (Discomorphism pattern)
+    if (_holder_delta is not None and _holder_delta < -25
+            and _sell_ratio is not None and _sell_ratio > 0.58
+            and pnl_pct > 5.0):
+        tag = f"holder_exit_delta{int(_holder_delta)}_sr{int(_sell_ratio*100)}pct_pnl{int(pnl_pct)}pct"
+        print(f"[monster] 👥 HOLDER DECLINE EXIT — holders_5min={_holder_delta}, sell_ratio={_sell_ratio:.0%}")
+        return tag, 1.0
+
+    # Path 3: Original confirmed distribution (sell ratio + 3 lower lows)
     if (_sell_ratio is not None and _sell_ratio > 0.65
             and _lower_lows >= 3 and pnl_pct > 5.0):
         tag = f"distribution_exit_br{int(_sell_ratio*100)}pct_{_lower_lows}lows_pnl{int(pnl_pct)}pct"

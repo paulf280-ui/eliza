@@ -60,9 +60,29 @@ HELIUS_RPC = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_KEY}"
 PUMP_FUN_PROGRAM = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
 SYSTEM_PROGRAM   = "11111111111111111111111111111111"
 
-# Mints we must never attempt to buy as a monster position — stablecoins / WSOL / wrapped.
-# DexScreener and on-chain scans will occasionally return pairs where the stable is
-# tagged as "baseToken"; we filter here before any open_monster_position call.
+# Mints we must never attempt to buy as a monster position — stablecoins / WSOL / wrapped,
+# PLUS tokens that were hard-skipped due to max_h1_seen > 150% (these persist across restarts).
+# Critical: previously this was in-memory only — a restart cleared it, letting the bot enter
+# tokens that had already peaked massively (Discomorphism: peaked $130K, entered at $63K after
+# restart wiped the skip list). Now persisted to disk.
+_SKIP_MINTS_FILE = Path(__file__).parent / "monster_skip_mints_persistent.json"
+
+def _load_persistent_skip_mints() -> set:
+    try:
+        import json as _j
+        if _SKIP_MINTS_FILE.exists():
+            return set(_j.loads(_SKIP_MINTS_FILE.read_text()))
+    except Exception:
+        pass
+    return set()
+
+def _save_persistent_skip_mints(mints: set) -> None:
+    try:
+        import json as _j
+        _SKIP_MINTS_FILE.write_text(_j.dumps(list(mints)))
+    except Exception:
+        pass
+
 _MONSTER_SKIP_MINTS: set[str] = {
     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",  # USDC
     "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",  # USDT
@@ -71,6 +91,8 @@ _MONSTER_SKIP_MINTS: set[str] = {
     "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",   # mSOL
     "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj",  # stSOL
 }
+# Load persisted skip mints from previous sessions
+_MONSTER_SKIP_MINTS.update(_load_persistent_skip_mints())
 
 # ─── Feature flags ──────────────────────────────────────────────────────
 def _env_on(key: str, default: str = "false") -> bool:
@@ -2409,9 +2431,10 @@ async def lifecycle_scout_loop(runtime: Any,
                         #          >150%  = hard skip (Bee had 200%, entered late, -23%)
                         if _max_h1 >= 150.0:
                             print(f"[monster-lifecycle] 🪦 {mint[:8]} bounce-reject "
-                                  f"max_h1_seen={_max_h1:.0f}% — exhausted mover, hard skip")
+                                  f"max_h1_seen={_max_h1:.0f}% — exhausted mover, hard skip (persisted)")
                             _lifecycle_deferred.pop(mint, None)
                             _MONSTER_SKIP_MINTS.add(mint)
+                            _save_persistent_skip_mints(_MONSTER_SKIP_MINTS)  # survive restarts
                             cycle_rejects["late_to_party"] = cycle_rejects.get("late_to_party", 0) + 1
                             continue
                         if _max_h1 >= 50.0:
