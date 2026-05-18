@@ -2374,6 +2374,27 @@ async def lifecycle_scout_loop(runtime: Any,
                             _lifecycle_deferred.pop(mint, None)
                             continue
 
+                        # h1 decay guard — PUPE/OPOSSUM lesson.
+                        # If h1 > 80% and hasn't cooled ≥ 30% from the watchlist
+                        # max, the token is still in its initial pump phase. The
+                        # "bounce" is a brief dip mid-pump — there's no real support
+                        # level yet. PUPE: h1=102% at 43min, max_h1=80%, decay=0%
+                        # → entered mid-pump, token rugged at -50%.
+                        # MIRA: h1=21% at 82min → rule doesn't apply → good entry.
+                        # Deep-retest path bypasses this (price pullback already verified).
+                        if not _deep_retest and h1_change > 80.0:
+                            _h1_max_ws = (_lifecycle_deferred.get(mint) or {}).get("max_h1_seen", 0.0)
+                            if _h1_max_ws > 0:
+                                _h1_decay = (_h1_max_ws - h1_change) / _h1_max_ws
+                                if _h1_decay < 0.30:
+                                    _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
+                                    cycle_added_to_watchlist += 1
+                                    print(f"[monster-lifecycle] ⏳ {mint[:8]} h1={h1_change:.0f}% "
+                                          f"still hot (max={_h1_max_ws:.0f}% decay={_h1_decay:.0%} < 30%) "
+                                          f"— mid-pump, waiting for h1 to cool (watchlist)")
+                                    cycle_rejects["h1_still_hot"] = cycle_rejects.get("h1_still_hot", 0) + 1
+                                    continue
+
                         # Gate 2 — m5 buyer count must show real participation.
                         # Winners had 28-66 unique m5 buyers; CCP had 11.
                         # Gate 3 — m5 buy/sell ratio ≥ 1.5x. CCP had 11 buys vs 13
