@@ -2,7 +2,98 @@ import { useDashboardStore } from '../../store/dashboard'
 import { GlassCard } from '../common/GlassCard'
 import { Badge } from '../common/Badge'
 import { closePosition } from '../../api/client'
+import { useLivePrice } from '../../hooks/useLivePrice'
 import type { PositionData } from '../../types'
+
+// Row with live price fetched directly from DexScreener every 3s
+function LivePositionRow({
+  pos,
+  isSelected,
+  onRowClick,
+  onClose,
+  connected,
+}: {
+  pos: PositionData
+  isSelected: boolean
+  onRowClick: () => void
+  onClose: (e: React.MouseEvent) => void
+  connected: boolean
+}) {
+  const live = useLivePrice(pos.mint, pos.entry_price_sol, pos.entry_sol_spent, 3000)
+
+  const pnlPct  = live.pnlPct  ?? pos.pnl_pct
+  const pnlSol  = live.pnlSol  ?? pos.unrealized_pnl_sol
+  const curPrice = live.price  ?? pos.current_price_sol
+  const isStale = live.ageSecs > 8
+
+  const isBigWin  = pnlPct >= 100
+  const isGoodWin = pnlPct >= 50 && pnlPct < 100
+  const rowClass  = isSelected
+    ? 'border-b border-zinc-800/50 bg-cyan-500/10 cursor-pointer'
+    : isBigWin
+    ? 'moonshot-row border-b border-zinc-800/50 cursor-pointer'
+    : isGoodWin
+    ? 'big-win-row border-b border-zinc-800/50 cursor-pointer'
+    : 'border-b border-zinc-800/50 hover:bg-zinc-800/20 transition-colors cursor-pointer'
+
+  const dexLabel   = pos.dex === 'pump_fun' ? 'pump' : pos.dex === 'pumpswap' ? 'pumpswap' : pos.dex === 'social_momentum' ? 'social' : pos.dex
+  const dexVariant = pos.dex === 'pump_fun' ? 'blue' : 'amber'
+
+  return (
+    <tr className={rowClass} onClick={onRowClick}>
+      <td className="py-2 font-mono text-zinc-200">
+        <div className="flex items-center gap-1.5">
+          <a
+            href={`https://dexscreener.com/solana/${pos.mint}`}
+            target="_blank" rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            className={`transition-colors underline-offset-2 hover:underline ${isSelected ? 'text-cyan-400' : 'text-zinc-200 hover:text-cyan-400'}`}
+          >{pos.mint.slice(0, 6)}…{pos.mint.slice(-4)}</a>
+          <a href={`https://solscan.io/token/${pos.mint}`} target="_blank" rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            className="text-zinc-600 hover:text-zinc-400 transition-colors text-[10px]">[sc]</a>
+          {/* Live indicator */}
+          <div
+            className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isStale ? 'bg-amber-500' : 'bg-emerald-500'}`}
+            style={isStale ? {} : { animation: 'pulse 1.5s ease-in-out infinite' }}
+            title={isStale ? `Stale ${live.ageSecs}s ago` : 'Live (DexScreener)'}
+          />
+        </div>
+        {isSelected && <span className="text-cyan-500 text-[10px]">▶</span>}
+        {isBigWin && <span className="text-amber-400">🚀</span>}
+        {isGoodWin && <span className="text-amber-400">🔥</span>}
+      </td>
+      <td className="py-2"><Badge variant={dexVariant}>{dexLabel}</Badge></td>
+      <td className="py-2 text-right font-mono text-zinc-300">{pos.entry_price_sol.toExponential(3)}</td>
+      <td className={`py-2 text-right font-mono ${pnlPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+        {curPrice.toExponential(3)}
+      </td>
+      <td className={`py-2 text-right font-semibold tabular-nums ${pnlPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+        {pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%
+      </td>
+      <td className={`py-2 text-right font-mono tabular-nums ${pnlSol >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+        {pnlSol >= 0 ? '+' : ''}{pnlSol.toFixed(4)}
+      </td>
+      <td className="py-2 text-right font-mono text-zinc-400">{pos.entry_sol_spent.toFixed(3)}</td>
+      <td className="py-2 w-24"><PnlBar pos={{ ...pos, pnl_pct: pnlPct, current_price_sol: curPrice }} /></td>
+      <td className="py-2 text-center">
+        <div className="flex justify-center gap-0.5">
+          {[pos.tp1_hit, pos.tp2_hit, pos.tp3_hit].map((hit, i) => (
+            <div key={i} className={`w-1.5 h-1.5 rounded-full ${hit ? 'bg-emerald-400' : 'bg-zinc-700'}`} />
+          ))}
+        </div>
+      </td>
+      <td className="py-2 text-right font-mono text-zinc-500">{formatAge(pos.age_seconds)}</td>
+      <td className="py-2 text-right">
+        <button
+          onClick={onClose}
+          disabled={!connected}
+          className="px-2 py-0.5 text-xs rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        >Close</button>
+      </td>
+    </tr>
+  )
+}
 
 function formatAge(seconds: number): string {
   if (seconds < 60) return `${Math.floor(seconds)}s`
@@ -97,96 +188,16 @@ export default function PositionsTable() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((pos) => {
-                const isBigWin = pos.pnl_pct >= 100
-                const isGoodWin = pos.pnl_pct >= 50 && pos.pnl_pct < 100
-                const isSelected = selectedMint === pos.mint
-                const rowClass = isSelected
-                  ? 'border-b border-zinc-800/50 bg-cyan-500/10 cursor-pointer'
-                  : isBigWin
-                  ? 'moonshot-row border-b border-zinc-800/50 cursor-pointer'
-                  : isGoodWin
-                  ? 'big-win-row border-b border-zinc-800/50 cursor-pointer'
-                  : 'border-b border-zinc-800/50 hover:bg-zinc-800/20 transition-colors cursor-pointer'
-                const dexLabel = pos.dex === 'pump_fun' ? 'pump' : pos.dex === 'pumpswap' ? 'pumpswap' : pos.dex === 'social_momentum' ? 'social' : pos.dex
-                const dexVariant = pos.dex === 'pump_fun' ? 'blue' : pos.dex === 'pumpswap' ? 'amber' : pos.dex === 'meteora' ? 'amber' : 'amber'
-                return (
-                <tr key={pos.mint} className={rowClass} onClick={() => handleRowClick(pos.mint)}>
-                  <td className="py-2 font-mono text-zinc-200">
-                    <div className="flex items-center gap-1.5">
-                      <a
-                        href={`https://dexscreener.com/solana/${pos.mint}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={e => e.stopPropagation()}
-                        className={`transition-colors underline-offset-2 hover:underline ${isSelected ? 'text-cyan-400' : 'text-zinc-200 hover:text-cyan-400'}`}
-                        title={`DexScreener: ${pos.mint}`}
-                      >
-                        {pos.mint.slice(0, 6)}…{pos.mint.slice(-4)}
-                      </a>
-                      <a
-                        href={`https://solscan.io/token/${pos.mint}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={e => e.stopPropagation()}
-                        className="text-zinc-600 hover:text-zinc-400 transition-colors text-[10px]"
-                        title="Solscan"
-                      >
-                        [sc]
-                      </a>
-                    </div>
-                    {isSelected && <span className="text-cyan-500 text-[10px]">▶</span>}
-                    {isBigWin && <span className="text-amber-400" title="Moonshot!">🚀</span>}
-                    {isGoodWin && <span className="text-amber-400" title="Big win">🔥</span>}
-                  </td>
-                  <td className="py-2">
-                    <Badge variant={dexVariant}>
-                      {dexLabel}
-                    </Badge>
-                  </td>
-                  <td className="py-2 text-right font-mono text-zinc-300">
-                    {pos.entry_price_sol.toExponential(3)}
-                  </td>
-                  <td className={`py-2 text-right font-mono ${pos.pnl_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {pos.current_price_sol.toExponential(3)}
-                  </td>
-                  <td className={`py-2 text-right font-semibold ${pos.pnl_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {pos.pnl_pct >= 0 ? '+' : ''}{pos.pnl_pct.toFixed(1)}%
-                  </td>
-                  <td className={`py-2 text-right font-mono ${pos.unrealized_pnl_sol >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {pos.unrealized_pnl_sol >= 0 ? '+' : ''}{pos.unrealized_pnl_sol.toFixed(4)}
-                  </td>
-                  <td className="py-2 text-right font-mono text-zinc-400">
-                    {pos.entry_sol_spent.toFixed(3)}
-                  </td>
-                  <td className="py-2 w-24">
-                    <PnlBar pos={pos} />
-                  </td>
-                  <td className="py-2 text-center">
-                    <div className="flex justify-center gap-0.5">
-                      {[pos.tp1_hit, pos.tp2_hit, pos.tp3_hit].map((hit, i) => (
-                        <div
-                          key={i}
-                          className={`w-1.5 h-1.5 rounded-full ${hit ? 'bg-emerald-400' : 'bg-zinc-700'}`}
-                        />
-                      ))}
-                    </div>
-                  </td>
-                  <td className="py-2 text-right font-mono text-zinc-500">
-                    {formatAge(pos.age_seconds)}
-                  </td>
-                  <td className="py-2 text-right">
-                    <button
-                      onClick={(e) => handleClose(pos.mint, e)}
-                      disabled={!connected}
-                      className="px-2 py-0.5 text-xs rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      Close
-                    </button>
-                  </td>
-                </tr>
-                )
-              })}
+              {rows.map((pos) => (
+                <LivePositionRow
+                  key={pos.mint}
+                  pos={pos}
+                  isSelected={selectedMint === pos.mint}
+                  onRowClick={() => handleRowClick(pos.mint)}
+                  onClose={(e) => handleClose(pos.mint, e)}
+                  connected={connected}
+                />
+              ))}
             </tbody>
           </table>
         </div>
