@@ -173,39 +173,24 @@ def get_size_for_source(source: str | None) -> float:
 
 
 def get_floor_for_source(source: str | None) -> float:
-    """Catastrophic floor (negative %).
-
-    lifecycle_bounce entries get -45% SL — these are confirmed bounce setups
-    that need room to develop. LADA hit -22% then ran +11,446%. USP hit -20%
-    then ran +68%. The -25% SL was killing valid trades before the move.
-
-    Standard lifecycle entries keep -25% SL — these can die fast (Bee proved it).
-    """
+    """SL floor: -45% for all lifecycle, -25% for creator_alpha."""
     if _is_creator_alpha_source(source):
         try:
             from elizaos.plugins.solana import live_config as _lc
             return float(_lc.get("creator_alpha_floor_pct", -25.0))
         except Exception:
             return -25.0
-    if source and "bounce" in source:
-        # Bounce entries confirmed by real buying pressure — give them room
+    if _is_lifecycle_source(source):
         try:
             from elizaos.plugins.solana import live_config as _lc
-            return float(_lc.get("lifecycle_bounce_floor_pct", -45.0))
+            return float(_lc.get("lifecycle_floor_pct", -45.0))
         except Exception:
             return -45.0
-    if _is_lifecycle_source(source):
-        # Standard lifecycle — can die fast, keep tight floor
-        try:
-            from elizaos.plugins.solana import live_config as _lc
-            return float(_lc.get("lifecycle_floor_pct", -25.0))
-        except Exception:
-            return -25.0
     return MONSTER_PRE_TP1_FLOOR_PCT
 
 
 def get_tp1_mult_for_source(source: str | None) -> float:
-    """TP1 trigger multiple."""
+    """TP1 trigger multiple. Hard +40% for all lifecycle."""
     if _is_creator_alpha_source(source):
         try:
             from elizaos.plugins.solana import live_config as _lc
@@ -213,13 +198,11 @@ def get_tp1_mult_for_source(source: str | None) -> float:
         except Exception:
             return 2.0
     if _is_lifecycle_source(source):
-        # Data: 21 winning PumpSwap grad-snipes averaged +69% at TP.
-        # +60% TP is consistent and achievable. NOT +100% (AMM != BC).
         try:
             from elizaos.plugins.solana import live_config as _lc
-            return float(_lc.get("lifecycle_tp1_mult", 1.60))
+            return float(_lc.get("lifecycle_tp1_mult", 1.40))
         except Exception:
-            return 1.60
+            return 1.40
     return 1.0 + (MONSTER_TP1_GAIN_PCT / 100.0)
 
 
@@ -646,11 +629,26 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
     tp1_sell_frac = get_tp1_sell_frac_for_source(src)
     floor_pct = get_floor_for_source(src)
 
-    # ── Volume-based distribution exit (primary TP mechanism) ───────────
-    # Three trigger paths — any one fires an immediate exit when in profit.
-    # Discomorphism lesson: token peaked +25% then dumped to -52%. Holder
-    # count was visibly dropping and sell ratio was failing BEFORE the price
-    # made 3 consecutive lower lows. Need faster triggers.
+    # ── Hard TP — non-negotiable +40% exit ───────────────────────────────
+    # Bank the profit. Every last 5 trades had +40% available.
+    # Distribution exits below can still fire earlier if selling confirms.
+    if not tp1_fired and pnl_pct >= tp1_gain_pct:
+        return f"tp_hard_{pnl_pct:.0f}pct", tp1_sell_frac
+
+    # ── SL-zone signal log — bounce watch ─────────────────────────────────
+    # When within 15pp of the SL floor, log all key signals so we can see
+    # if a bounce is forming before the stop fires.
+    if not tp1_fired and floor_pct < pnl_pct < (floor_pct + 15.0):
+        _br_log = current_buy_ratio or 0
+        _sr_log = int((_sell_ratio or 0) * 100)
+        _hd_log = _holder_delta or 0
+        _liq_log = int(current_liq) if current_liq else 0
+        print(f"[monster] ⚠️  SL ZONE {pnl_pct:+.1f}% "
+              f"(SL={floor_pct:.0f}%) | "
+              f"buy={_br_log:.0f}% sell={_sr_log}% "
+              f"holders_5m={_hd_log:+d} liq=${_liq_log:,}")
+
+    # ── Volume-based distribution exit ───────────────────────────────────
     peak_pnl = float(pos.get("peak_pnl_pct") or 0.0)
     _sell_ratio = pos.get("_current_sell_ratio_m5")
     _lower_lows = int(pos.get("_consecutive_lower_lows") or 0)
