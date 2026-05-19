@@ -705,6 +705,15 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
                   f"≤ floor={_tgf_floor:.1f}% (50% of peak +{peak_pnl:.0f}%)")
             return tag, 1.0
 
+    # ── Low-liq emergency — token market has collapsed ────────────────────
+    # Below $1.5K liquidity you cannot exit at a reasonable price.
+    # Bullseye: rugged to $3.25K liq while DexScreener returned 0 price
+    # for 30min; by the time price was readable it was -97%.
+    # Gate on age > 5min to avoid false fire on fresh grads (slow liq build).
+    _pos_age_liq = time.time() - float(pos.get("entry_ts") or time.time())
+    if (current_liq is not None and 0 < current_liq < 1500 and _pos_age_liq > 300):
+        return f"liq_emergency_${int(current_liq)}", 1.0
+
     # ── Catastrophic floor → full exit ────────────────────────────────────
     # -45% for lifecycle_bounce (bounce entries need room to develop)
     # -25% for standard lifecycle (can die fast — Bee proved this)
@@ -1386,6 +1395,34 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                     if _h_price > 0:
                         current_price = _h_price
                         _used_helius_price = True
+
+                # ── No-price emergency exit ──────────────────────────────
+                # Bullseye 2026-05-19: token rugged in minutes. DexScreener
+                # and Helius both returned price=0 for ~30 minutes during
+                # the collapse. evaluate_exit guards on price=0 → returns
+                # None → SL never evaluated → eventual exit at -97%.
+                #
+                # Fix: after 3 consecutive ticks (18s) with no price AND
+                # position is > 90s old (not a fresh grad DexScreener gap),
+                # force exit at the last known price. A legitimate live
+                # token should NEVER be invisible to both APIs for 18s.
+                _pos_age_secs = time.time() - float(pos.get("entry_ts") or time.time())
+                if current_price == 0 and _pos_age_secs > 90:
+                    pos["_no_price_ticks"] = int(pos.get("_no_price_ticks", 0)) + 1
+                    if pos["_no_price_ticks"] >= 3:
+                        _last_px = float(pos.get("current_price") or pos.get("entry_price") or 0)
+                        _nm = pos.get("token_name", mint[:8])
+                        print(f"[monster] 🚨 NO-PRICE EMERGENCY {_nm} ({mint[:8]}) — "
+                              f"{pos['_no_price_ticks']} ticks no price data — force exit at last known")
+                        await _apply_exit(
+                            mint,
+                            f"no_price_rug_{pos['_no_price_ticks']}ticks",
+                            1.0, runtime, _last_px,
+                        )
+                        continue
+                else:
+                    if current_price > 0:
+                        pos["_no_price_ticks"] = 0  # reset on good data
 
                 if current_price > 0:
                     pos["current_price"] = current_price

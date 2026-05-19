@@ -2278,44 +2278,37 @@ async def lifecycle_scout_loop(runtime: Any,
                               f"vol/liq={vol_m5_lc/liq_usd:.1f}x but m5_buys={lc_m5_buys} "
                               f"≥ {BREAKOUT_WASH_OVERRIDE_BUYERS} — viral momentum, allow")
 
-                    # ── Young token guard ────────────────────────────────
-                    # Tokens under 30min are still in early volatility. Even
-                    # when m5 looks "good" (calm), DexScreener lag can mask
-                    # an active dump. Under-30min tokens MUST prove a bounce
-                    # from a watchlisted pullback — never enter via direct
-                    # standard path. Kabina (21min, -23% in 2min) & UFO
-                    # (6min, -23% in 1min) post-mortem 2026-05-09.
-                    if age_secs < 30 * 60 and not on_watch and not priority_rec:
+                    # ── Bounce-first gate (universal) ────────────────────
+                    # ALL lifecycle entries must prove a pullback + bounce
+                    # from the watchlist. NO direct entries allowed.
+                    #
+                    # Bullseye post-mortem 2026-05-19:
+                    #   - 35 min old (just past old 30-min guard)
+                    #   - h1=0% (DexScreener returns null h1 for <60min tokens)
+                    #   - Null h1 bypassed both young-token guard AND watchlist
+                    #     gate (which only fired on h1 > 30%)
+                    #   - Entered at $67K MC, token had already peaked $170K
+                    #   - No bounce evidence, no pullback confirmation
+                    #   - Rugged: -97% loss
+                    #
+                    # A token that looks clean on metrics alone (age, liq, MC,
+                    # buy-ratio) is NOT confirmed safe. The bounce path is the
+                    # only reliable entry signal — it proves support exists.
+                    # Exceptions: creator_alpha (wallet signal), viral override
+                    # (buyer flow signal), deep_retest (price pullback verified).
+                    if not on_watch and not priority_rec and not viral_eligible and not _deep_retest:
                         _lifecycle_record_snapshot(mint, float(p.get("priceNative") or 0), m5_change, h1_change, liq_usd)
                         cycle_added_to_watchlist += 1
-                        print(f"[monster-lifecycle] 👶 {mint[:8]} young ({age_secs/60:.0f}min) — watchlist only, need bounce confirmation")
+                        print(f"[monster-lifecycle] 📋 {mint[:8]} age={age_secs/60:.0f}min h1={h1_change:.0f}% "
+                              f"— watchlist (all lifecycle entries require bounce confirmation)")
                         continue
 
                     # ── Entry-shape gate (with bounce-watchlist) ─────────
-                    # Instead of rejecting bad-shape tokens outright, defer
-                    # them to a per-mint watchlist. On future scan cycles we
-                    # re-evaluate; once shape turns "good" AND we see a
-                    # confirmed bounce off the local low, we enter.
                     cycle_passed_baseline += 1
                     price_native = float(p.get("priceNative") or p.get("priceUsd") or 0)
                     _first_seen = (_lifecycle_deferred.get(mint) or {}).get("first_seen", 0.0)
                     shape, shape_reason = _lifecycle_classify_entry_shape(
                         m5_change, h1_change, first_seen=_first_seen)
-
-                    # ── Watchlist-first gate ─────────────────────────────────
-                    # If h1 > 30% and the token has never been on our watchlist,
-                    # force it through the watchlist path. We need to see a
-                    # confirmed pullback + bounce before entry — not just a calm
-                    # m5 mid-upswing. DISCLOSURE: h1=+617%, m5 calm, entered on
-                    # the way UP not at support. The white-line support zones only
-                    # appear AFTER a pullback; the bounce path enforces that.
-                    if (not on_watch and not priority_rec and not viral_eligible
-                            and h1_change > 30.0 and shape == "good"):
-                        _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
-                        cycle_added_to_watchlist += 1
-                        print(f"[monster-lifecycle] 📋 {mint[:8]} h1=+{h1_change:.0f}% "
-                              f"never watchlisted — require pullback+bounce before entry")
-                        continue
 
                     if shape != "good" and not viral_eligible and not priority_rec:
                         # Viral override fast-paths through the shape gate — at the
