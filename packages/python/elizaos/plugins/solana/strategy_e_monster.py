@@ -629,11 +629,20 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
     tp1_sell_frac = get_tp1_sell_frac_for_source(src)
     floor_pct = get_floor_for_source(src)
 
-    # ── Hard TP — non-negotiable +40% exit ───────────────────────────────
-    # Bank the profit. Every last 5 trades had +40% available.
-    # Distribution exits below can still fire earlier if selling confirms.
-    if not tp1_fired and pnl_pct >= tp1_gain_pct:
-        return f"tp_hard_{pnl_pct:.0f}pct", tp1_sell_frac
+    # ── Trailing stop — replaces fixed TP to capture monster runs ─────────
+    # Monster data: ZEN 143x, BURNIE 22x, milkers 14x. A fixed +40% TP
+    # exits at +40% and misses the entire run. 12% trail from peak price.
+    # Only activates once peak gain >= 15% (below that, hard SL is the floor).
+    # Peak 15% → trail floor ≈ +1% (near breakeven protection).
+    # Peak 100% → trail floor ≈ +76% (lock in most of the move).
+    # Peak 1000% → trail floor ≈ +868% (captures monster run).
+    peak_price = float(pos.get("peak_price") or entry)
+    peak_gain_pct = (peak_price / entry - 1.0) * 100.0 if entry > 0 else 0.0
+    _TRAIL_PCT = 0.12
+    if not tp1_fired and peak_gain_pct >= 15.0:
+        trail_floor = peak_price * (1.0 - _TRAIL_PCT)
+        if current_price <= trail_floor:
+            return f"trailing_stop_peak{peak_gain_pct:.0f}pct_exit{pnl_pct:.0f}pct", 1.0
 
     # ── SL-zone signal log — bounce watch ─────────────────────────────────
     # When within 15pp of the SL floor, log all key signals so we can see
@@ -737,7 +746,7 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
     if not tp1_fired:
         age_secs = now - float(pos.get("entry_ts") or now)
         peak_pnl = float(pos.get("peak_pnl_pct") or 0.0)
-        if age_secs > 900 and peak_pnl < 20.0:
+        if age_secs > 3600 and peak_pnl < 10.0:  # 60 min — monsters need time to develop
             if current_buy_ratio is not None and current_buy_ratio > 45.0:
                 pass  # buyers still active — skip stagnation, give it more time
             else:

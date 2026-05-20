@@ -901,8 +901,8 @@ def _persist_reject_snapshot(snapshot: dict) -> None:
     except Exception:
         pass
 
-LIFECYCLE_WATCHLIST_TTL_SECS    = 180 * 60   # drop deferred mints after 3h
-LIFECYCLE_WATCHLIST_MAX_AGE_SECS = 180 * 60  # extend age cap for deferred mints (vs 90min normal)
+LIFECYCLE_WATCHLIST_TTL_SECS    = 10 * 60 * 60   # drop deferred mints after 10h — monsters take time
+LIFECYCLE_WATCHLIST_MAX_AGE_SECS = 10 * 60 * 60  # watchlisted tokens get 10h age cap (vs 12h for direct)
 LIFECYCLE_SNAPSHOT_WINDOW_SECS   = 30 * 60   # keep last 30min of price snapshots per mint
 # Tiered bounce minimums — higher liquidity = more committed capital = less bounce proof needed.
 # Validated against trade history:
@@ -915,7 +915,7 @@ LIFECYCLE_BOUNCE_MIN_PCT_MID     = 6.0       # liq $25K-35K — moderate commitm
 LIFECYCLE_BOUNCE_MIN_PCT_HIGH    = 4.0       # liq > $35K  — high commitment, less proof needed
 LIFECYCLE_BOUNCE_MIN_PCT         = 8.0       # default (used as fallback in old code paths)
 LIFECYCLE_M5_GOOD_LOW            = -5.0      # m5 in [-5%, +12%] = clean entry shape
-LIFECYCLE_M5_GOOD_HIGH           = 12.0      # raised from 8 — +8% was too tight; +10-12% is healthy momentum not top-chasing
+LIFECYCLE_M5_GOOD_HIGH           = 10.0      # monster DNA: quiet entry ≤ +10%, NOT already pumping when we buy
 LIFECYCLE_POSTPEAK_H1_THRESHOLD  = 55.0      # raised from 30 — h1=30-55% with flat m5 is consolidation after moderate move,
                                               # not necessarily rolling over. MEMEART h1=43% was still heading higher.
 LIFECYCLE_MAX_M5_VOL_LIQ         = 3.0       # vol_m5/liq cap — same gate breakout scout uses (CCP 2026-04-30: vol/liq=4x flagged WASH on raydium-scout but bypassed on lifecycle_bounce → bought a wash-driven dead-cat bounce, -10%)
@@ -1860,19 +1860,18 @@ async def _serial_after_graduation(runtime: Any, session: aiohttp.ClientSession,
 # Previous MIN_MC_USD=250K was 5-10x past the optimal entry — that's why the
 # lifecycle scout kept missing opportunities. Correct entry is POST-graduation
 # cool-off: $25K-$300K MC, real liquidity, buyers still present.
-LIFECYCLE_MIN_LIQ_USD       = 18_000   # $18K — Aura (+39%) entered at $17K, RICH (+22%) at $23K.
-                                        # 3h watchdog confirmed 0/8 blocked tokens hit TP; liq is the
-                                        # dominant daily rejection. $18K still blocks true rugs (<$10K).
+LIFECYCLE_MIN_LIQ_USD       = 30_000   # $30K floor — all 17 confirmed monsters had ≥$29K at entry.
+                                        # <$30K = micro-cap rug territory. Real committed capital required.
 LIFECYCLE_MAX_LIQ_USD       = 300_000
 LIFECYCLE_MIN_MC_USD        = 55_000   # raised from 25K — 10-winner/10-loser cross-reference:
                                         # 7/10 losers entered below $55K MC. $45K change was made
                                         # while key was corrupted (no trades) — restored to $55K.
-LIFECYCLE_MAX_MC_USD        = 300_000  # was 3M — focus early-stage $25K-$300K
+LIFECYCLE_MAX_MC_USD        = 1_000_000 # extended to $1M — PAIN ($632K), PAC ($850K) still running at entry
 LIFECYCLE_MIN_LIQ_MC_RATIO  = 0.04
 LIFECYCLE_MAX_LIQ_MC_RATIO  = 0.60    # was 0.30 — 0.30 contradicted min_liq for MC < $50K (impossible zone)
-LIFECYCLE_MIN_AGE_SECS         = 30 * 60  # 30min floor — Kabina at 21min proved 20min still too volatile
-LIFECYCLE_WEBHOOK_MIN_AGE_SECS = 15 * 60  # 15min for Helius webhook grads — UFO at 6min proved 5min too hot
-LIFECYCLE_MAX_AGE_SECS         = 90 * 60  # 90min ceiling — tokens >90min already had their move
+LIFECYCLE_MIN_AGE_SECS         = 60 * 60  # 1h floor — monsters are 1-4h old at entry (BURNIE 14h, milkers 20h)
+LIFECYCLE_WEBHOOK_MIN_AGE_SECS = 30 * 60  # 30min for Helius webhook grads — still need time to settle
+LIFECYCLE_MAX_AGE_SECS         = 12 * 60 * 60  # 12h ceiling — BURNIE 14h missed; captures most monster window
 LIFECYCLE_TOP1_MAX_PCT      = 10.0
 LIFECYCLE_TOP10_MAX_PCT     = 21.0    # 10-winner/10-loser analysis: 7/10 losers had top10>20%;
                                         # winners averaged 17.6%. Uses lifecycle-specific cap separate
@@ -2186,29 +2185,12 @@ async def lifecycle_scout_loop(runtime: Any,
                     m5_change = float(pc.get("m5") or 0)
                     price_native = float(p.get("priceNative") or p.get("priceUsd") or 0)
                     h1_max = _CREATOR_ALPHA_PRIORITY_H1_MAX if priority_rec else LIFECYCLE_H1_CHANGE_MAX_PCT
-                    # Deep retest: watchlisted token whose h1 is still elevated from
-                    # an initial pump but has since pulled back ≥ 20% from its snapshot
-                    # high. MIRA pattern: pumped to h1=350% at 12:00, pulled back 30%
-                    # to $86K MC at 12:30 → standard path misses by ~1h waiting for
-                    # h1 to normalize below 120%. Deep retest enters at the bounce.
+                    # Deep retest path removed — all deep_retest trades were losses:
+                    # 404kitty -97.7%, WOMBLE -47.3%. The path selected for
+                    # tokens that already spiked-and-dumped, not quiet grinders.
                     _deep_retest = False
-                    _deep_retest_pullback = 0.0
-                    if (on_watch and not priority_rec and not viral_eligible
-                            and h1_change > h1_max and h1_change <= 300.0
-                            and price_native > 0):
-                        _dr_snaps = (_lifecycle_deferred.get(mint) or {}).get("snapshots", [])
-                        _dr_prices = [s["price"] for s in _dr_snaps if s.get("price", 0) > 0]
-                        _dr_max = max(_dr_prices) if _dr_prices else 0.0
-                        if _dr_max > 0:
-                            _dr_pb = (_dr_max - price_native) / _dr_max * 100
-                            if _dr_pb >= 20.0:
-                                _deep_retest = True
-                                _deep_retest_pullback = _dr_pb
-                                print(f"[monster-lifecycle] 🔄 {mint[:8]} DEEP RETEST: "
-                                      f"h1={h1_change:.0f}% but {_dr_pb:.0f}% below "
-                                      f"snapshot high — proceeding to bounce eval")
                     if h1_change > h1_max:
-                        if not viral_eligible and not _deep_retest:
+                        if not viral_eligible:
                             # Track fresh tokens with elevated h1 so we catch the
                             # normalization/pullback. MIRA pumped to h1=350% at 12:00,
                             # was never watchlisted → missed the 12:30 entry at $86K MC.
@@ -2296,11 +2278,11 @@ async def lifecycle_scout_loop(runtime: Any,
                     # only reliable entry signal — it proves support exists.
                     # Exceptions: creator_alpha (wallet signal), viral override
                     # (buyer flow signal), deep_retest (price pullback verified).
-                    if not on_watch and not priority_rec and not viral_eligible and not _deep_retest:
+                    if not on_watch and not priority_rec and not viral_eligible:
                         _lifecycle_record_snapshot(mint, float(p.get("priceNative") or 0), m5_change, h1_change, liq_usd)
                         cycle_added_to_watchlist += 1
                         print(f"[monster-lifecycle] 📋 {mint[:8]} age={age_secs/60:.0f}min h1={h1_change:.0f}% "
-                              f"— watchlist (all lifecycle entries require bounce confirmation)")
+                              f"— watchlist (quiet accumulation confirmation required)")
                         continue
 
                     # ── Entry-shape gate (with bounce-watchlist) ─────────
@@ -2352,76 +2334,50 @@ async def lifecycle_scout_loop(runtime: Any,
                               f"shape={shape} — bypassing soft gates")
                         cycle_viral_fires += 1
                     if on_watch:
-                        # ── Empirical bounce-entry gates (data-validated 2026-05-01) ─
-                        # CCP failed on FOUR of these; both lifecycle_bounce winners
-                        # (TRUTH +21%, FOFAR +21%) pass all. See on-chain validation
-                        # in commit message.
+                        # ── Monster DNA: quiet accumulation gates ─────────────────────
+                        # Confirmed from 17 monster tokens: buy_ratio 45-57%, quiet m5
+                        # (±10%), balanced buying over multiple hours. These tokens do
+                        # NOT spike at entry — they silently grind up over 6-20 hours.
 
-                        # Gate 1 — h1 must be net positive at bounce-confirm.
-                        # Winners had h1 ∈ [+4.9%, +80.8%]; CCP h1=-2.64% means the
-                        # bounce is a recovery off rollover, not a structural reentry.
+                        # Gate 1 — h1 must be net positive (trending up, not rolling over)
                         if h1_change < LIFECYCLE_BOUNCE_H1_MIN_PCT:
-                            print(f"[monster-lifecycle] 🪦 {mint[:8]} bounce-reject "
-                                  f"h1={h1_change:.1f}% < {LIFECYCLE_BOUNCE_H1_MIN_PCT}% "
-                                  f"(rollover from peak — drop watch)")
+                            print(f"[monster-lifecycle] 🪦 {mint[:8]} h1={h1_change:.1f}% negative "
+                                  f"— rolling over, drop from watchlist")
                             _lifecycle_deferred.pop(mint, None)
                             continue
 
-                        # h1 decay guard — PUPE/OPOSSUM lesson.
-                        # If h1 > 80% and hasn't cooled ≥ 30% from the watchlist
-                        # max, the token is still in its initial pump phase. The
-                        # "bounce" is a brief dip mid-pump — there's no real support
-                        # level yet. PUPE: h1=102% at 43min, max_h1=80%, decay=0%
-                        # → entered mid-pump, token rugged at -50%.
-                        # MIRA: h1=21% at 82min → rule doesn't apply → good entry.
-                        # Deep-retest path bypasses this (price pullback already verified).
-                        if not _deep_retest and h1_change > 80.0:
-                            _h1_max_ws = (_lifecycle_deferred.get(mint) or {}).get("max_h1_seen", 0.0)
-                            if _h1_max_ws > 0:
-                                _h1_decay = (_h1_max_ws - h1_change) / _h1_max_ws
-                                if _h1_decay < 0.30:
-                                    _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
-                                    cycle_added_to_watchlist += 1
-                                    print(f"[monster-lifecycle] ⏳ {mint[:8]} h1={h1_change:.0f}% "
-                                          f"still hot (max={_h1_max_ws:.0f}% decay={_h1_decay:.0%} < 30%) "
-                                          f"— mid-pump, waiting for h1 to cool (watchlist)")
-                                    cycle_rejects["h1_still_hot"] = cycle_rejects.get("h1_still_hot", 0) + 1
-                                    continue
-
-                        # Gate 2 — m5 buyer count must show real participation.
-                        # Winners had 28-66 unique m5 buyers; CCP had 11.
-                        # Gate 3 — m5 buy/sell ratio ≥ 1.5x. CCP had 11 buys vs 13
-                        # sells (0.85x = distribution wearing a buy mask). Winners:
-                        # TRUTH 9.3x, FOFAR 1.66x, EVA 3.5x.
-                        txns_m5 = (p.get("txns") or {}).get("m5") or {}
-                        m5_buys_n = int(txns_m5.get("buys") or 0)
-                        m5_sells_n = int(txns_m5.get("sells") or 0)
-                        if m5_buys_n < LIFECYCLE_BOUNCE_M5_BUYS_MIN:
+                        # Gate 2 — m5 must be quiet: not spiking (already pumping) or
+                        # dumping (actively falling). Monster DNA: ±10% at entry.
+                        if m5_change > LIFECYCLE_M5_GOOD_HIGH:
                             _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
                             cycle_added_to_watchlist += 1
-                            print(f"[monster-lifecycle] 👁 {mint[:8]} weak bounce — "
-                                  f"m5_buys={m5_buys_n} < {LIFECYCLE_BOUNCE_M5_BUYS_MIN} (watchlist)")
+                            print(f"[monster-lifecycle] ⏳ {mint[:8]} m5=+{m5_change:.1f}% > +{LIFECYCLE_M5_GOOD_HIGH:.0f}% "
+                                  f"— mid-spike, wait for quiet")
+                            cycle_rejects["m5_hot"] = cycle_rejects.get("m5_hot", 0) + 1
                             continue
-                        bs_ratio = (m5_buys_n / m5_sells_n) if m5_sells_n > 0 else float("inf")
-                        if bs_ratio < LIFECYCLE_BOUNCE_M5_BUY_SELL_RATIO:
+                        if m5_change < LIFECYCLE_M5_GOOD_LOW:
                             _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
                             cycle_added_to_watchlist += 1
-                            print(f"[monster-lifecycle] 👁 {mint[:8]} distribution-shaped — "
-                                  f"m5 buys/sells={bs_ratio:.2f}x < {LIFECYCLE_BOUNCE_M5_BUY_SELL_RATIO}x "
-                                  f"({m5_buys_n}B/{m5_sells_n}S) (watchlist)")
+                            print(f"[monster-lifecycle] ⏳ {mint[:8]} m5={m5_change:.1f}% < {LIFECYCLE_M5_GOOD_LOW:.0f}% "
+                                  f"— actively falling, wait for stability")
+                            cycle_rejects["m5_falling"] = cycle_rejects.get("m5_falling", 0) + 1
                             continue
 
-                        bounced, bounce_pct = _lifecycle_bounce_confirmed(
-                            mint, price_native, m5_change, liq_usd
-                        )
-                        if not bounced:
+                        # Gate 3 — minimum 10 min on watchlist for accumulation confirmation.
+                        # One cycle of quiet data isn't enough; need multiple checks showing
+                        # sustained balanced buying.
+                        _first_seen_ts = (_lifecycle_deferred.get(mint) or {}).get("first_seen", 0.0)
+                        _watched_mins = (time.time() - _first_seen_ts) / 60.0 if _first_seen_ts > 0 else 0.0
+                        if _watched_mins < 10.0:
                             _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
                             cycle_added_to_watchlist += 1
-                            print(f"[monster-lifecycle] 👁 {mint[:8]} shape good but no bounce yet — "
-                                  f"bounce={bounce_pct:.1f}% < {LIFECYCLE_BOUNCE_MIN_PCT:.0f}% (watchlist)")
+                            print(f"[monster-lifecycle] ⏳ {mint[:8]} only {_watched_mins:.0f}min watched "
+                                  f"— need 10min of consistent quiet data")
+                            cycle_rejects["watch_time"] = cycle_rejects.get("watch_time", 0) + 1
                             continue
-                        print(f"[monster-lifecycle] 🔄 {mint[:8]} bounce confirmed — "
-                              f"+{bounce_pct:.1f}% off local low, m5=+{m5_change:.1f}%, liq=${liq_usd:,.0f}")
+
+                        print(f"[monster-lifecycle] 🔄 {mint[:8]} quiet accumulation confirmed — "
+                              f"m5={m5_change:+.1f}% h1={h1_change:+.1f}% watched={_watched_mins:.0f}min liq=${liq_usd:,.0f}")
                     txns_h1 = (p.get("txns") or {}).get("h1") or {}
                     buys = txns_h1.get("buys") or 0
                     sells = txns_h1.get("sells") or 0
@@ -2447,7 +2403,7 @@ async def lifecycle_scout_loop(runtime: Any,
                         _lc_holders = int(base_info.get("holders")) if base_info.get("holders") is not None else None
                     except (ValueError, TypeError):
                         _lc_holders = None
-                    if _lc_holders is not None and _lc_holders < MONSTER_MIN_UNIQUE_HOLDERS:
+                    if _lc_holders is None or _lc_holders < MONSTER_MIN_UNIQUE_HOLDERS:
                         cycle_rejects["holders"] += 1
                         continue
 
@@ -2475,30 +2431,20 @@ async def lifecycle_scout_loop(runtime: Any,
                     # threat — one wallet that can move the market alone.
                     # alein post-mortem 2026-05-08.
                     if on_watch:
-                        # If this token ever showed h1 ≥ 50% while in our watchlist,
-                        # the big move already happened. A bounce here is a dead-cat
-                        # on an already-pumped token — we'd be late to the party.
-                        # "If we're late, stay late. Don't enter." — AREA51/alein lesson.
+                        # Exhausted mover: if h1 ever exceeded 150% while in our watchlist,
+                        # the token already had its big spike. A quiet period now is a
+                        # dead-cat consolidation after a blown-out move — not an accumulation.
                         _max_h1 = (_lifecycle_deferred.get(mint) or {}).get("max_h1_seen", 0.0)
-                        # Tiered: 50-150% = bounce allowed (6veQU7HD had 129%, was genuine)
-                        #          >150%  = hard skip (Bee had 200%, entered late, -23%)
-                        # Exception: deep_retest bypasses the hard skip because the
-                        # pullback check (≥ 20% below snapshot high) proves the token
-                        # has already corrected — MIRA had h1=350% but pulled back
-                        # 30% = genuine re-entry, not a dead-cat on a pumping token.
-                        if _max_h1 >= 150.0 and not _deep_retest:
-                            print(f"[monster-lifecycle] 🪦 {mint[:8]} bounce-reject "
-                                  f"max_h1_seen={_max_h1:.0f}% — exhausted mover, hard skip (persisted)")
+                        if _max_h1 >= 150.0:
+                            print(f"[monster-lifecycle] 🪦 {mint[:8]} max_h1={_max_h1:.0f}% — "
+                                  f"exhausted mover, hard skip")
                             _lifecycle_deferred.pop(mint, None)
                             _MONSTER_SKIP_MINTS.add(mint)
-                            _save_persistent_skip_mints(_MONSTER_SKIP_MINTS)  # survive restarts
+                            _save_persistent_skip_mints(_MONSTER_SKIP_MINTS)
                             cycle_rejects["late_to_party"] = cycle_rejects.get("late_to_party", 0) + 1
                             continue
-                        if _max_h1 >= 50.0:
-                            print(f"[monster-lifecycle] 🪦 {mint[:8]} bounce-reject "
-                                  f"max_h1_seen={_max_h1:.0f}% — big move but bounce still allowed")
                         if t1 is not None and t1 >= LIFECYCLE_BOUNCE_TOP1_MAX_PCT:
-                            print(f"[monster-lifecycle] 🪦 {mint[:8]} bounce-reject "
+                            print(f"[monster-lifecycle] 🪦 {mint[:8]} "
                                   f"top1={t1}% > {LIFECYCLE_BOUNCE_TOP1_MAX_PCT}% (single wallet dump risk)")
                             _lifecycle_deferred.pop(mint, None)
                             continue
@@ -2567,10 +2513,8 @@ async def lifecycle_scout_loop(runtime: Any,
                         _creator_alpha_priority_mints.pop(mint, None)
                     elif viral_eligible and shape != "good":
                         sig_src = "lifecycle_viral"
-                    elif _deep_retest:
-                        sig_src = "lifecycle_bounce_deep_retest"
                     else:
-                        sig_src = "lifecycle_bounce" if on_watch else "lifecycle"
+                        sig_src = "lifecycle_quiet" if on_watch else "lifecycle"
                     print(f"[monster-lifecycle] 🎯 {mint[:8]} {sig_src} match "
                           f"age={age_secs/60:.0f}min liq=${liq_usd:,.0f} br={br:.0f}% top1={t1}%")
                     _log_signal({
