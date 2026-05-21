@@ -69,6 +69,7 @@ interface CopyTradeStats {
   watched_wallets: string[]
   signals_today: number
   copy_trade_enabled?: boolean
+  monster_paper_only?: boolean
 }
 
 function ZoneHeader({ label, hint }: { label: string; hint?: string }) {
@@ -221,6 +222,7 @@ export default function App() {
           watchedWallets={ctStats.watched_wallets}
           tradeSize={Number(config?.monster_default_size_sol ?? 0.45)}
           liveMode={ctStats.live_mode}
+          paperMode={ctStats.monster_paper_only}
           paused={ctStats.paused}
           pauseLoading={pauseLoading}
           onTogglePause={togglePause}

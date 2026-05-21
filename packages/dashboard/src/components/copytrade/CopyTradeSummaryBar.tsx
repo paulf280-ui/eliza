@@ -9,6 +9,7 @@ interface Props {
   watchedWallets: string[]
   tradeSize?: number
   liveMode?: boolean
+  paperMode?: boolean
   paused?: boolean
   pauseLoading?: boolean
   onTogglePause?: () => void
@@ -16,7 +17,7 @@ interface Props {
 
 export default function CopyTradeSummaryBar({
   balance, netPnl, trades, wins, openCount, maxSlots, signalsToday, watchedWallets, tradeSize, liveMode,
-  paused, pauseLoading, onTogglePause,
+  paperMode, paused, pauseLoading, onTogglePause,
 }: Props) {
   const wr = trades > 0 ? Math.round((wins / trades) * 100) : 0
   const pnlPos = netPnl >= 0
@@ -37,6 +38,12 @@ export default function CopyTradeSummaryBar({
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
             style={{ background: 'rgba(239,68,68,0.2)', color: '#f87171' }}>
             LIVE
+          </span>
+        )}
+        {paperMode && !liveMode && (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse"
+            style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)', color: '#fbbf24' }}>
+            PAPER
           </span>
         )}
         {paused && (
@@ -66,7 +73,7 @@ export default function CopyTradeSummaryBar({
 
       {/* Stats */}
       <div className="flex flex-wrap items-center gap-6">
-        <Stat label="Balance" value={`${balance.toFixed(3)} SOL`} valueClass="text-amber-400" />
+        <Stat label={paperMode && !liveMode ? 'Paper Balance' : 'Balance'} value={`${balance.toFixed(3)} SOL`} valueClass="text-amber-400" />
         <Stat
           label="Net P&L"
           value={`${pnlPos ? '+' : ''}${netPnl.toFixed(4)} SOL`}

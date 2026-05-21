@@ -629,20 +629,11 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
     tp1_sell_frac = get_tp1_sell_frac_for_source(src)
     floor_pct = get_floor_for_source(src)
 
-    # ── Trailing stop — replaces fixed TP to capture monster runs ─────────
-    # Monster data: ZEN 143x, BURNIE 22x, milkers 14x. A fixed +40% TP
-    # exits at +40% and misses the entire run. 12% trail from peak price.
-    # Only activates once peak gain >= 15% (below that, hard SL is the floor).
-    # Peak 15% → trail floor ≈ +1% (near breakeven protection).
-    # Peak 100% → trail floor ≈ +76% (lock in most of the move).
-    # Peak 1000% → trail floor ≈ +868% (captures monster run).
-    peak_price = float(pos.get("peak_price") or entry)
-    peak_gain_pct = (peak_price / entry - 1.0) * 100.0 if entry > 0 else 0.0
-    _TRAIL_PCT = 0.12
-    if not tp1_fired and peak_gain_pct >= 15.0:
-        trail_floor = peak_price * (1.0 - _TRAIL_PCT)
-        if current_price <= trail_floor:
-            return f"trailing_stop_peak{peak_gain_pct:.0f}pct_exit{pnl_pct:.0f}pct", 1.0
+    # ── Hard TP at +40% — paper test configuration ────────────────────────
+    # Exit 100% of position when P&L reaches +40%. SL is lifecycle_floor_pct
+    # (-45%). Paper testing with hard TP to validate entry quality first.
+    if not tp1_fired and pnl_pct >= tp1_gain_pct:
+        return f"tp_hard_{pnl_pct:.0f}pct", tp1_sell_frac
 
     # ── SL-zone signal log — bounce watch ─────────────────────────────────
     # When within 15pp of the SL floor, log all key signals so we can see

@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from elizaos.runtime import AgentRuntime
 
 PAPER_TRADING: bool = os.getenv("PAPER_TRADING", "false").lower() in ("true", "1", "yes")
+MONSTER_PAPER_ONLY: bool = os.getenv("MONSTER_PAPER_ONLY", "true").lower() in ("true", "1", "yes")
 
 # ── Helius DAS real-time price cache ──────────────────────────────────────────
 # Prices fetched via Helius DAS (Jupiter-sourced, ~5s freshness, ~60ms latency)
@@ -1978,13 +1979,21 @@ When adjusting a filter, always explain your reasoning based on the data above."
             # Last 50 signals for the live feed (most recent first)
             stats["recent_signals"] = list(reversed(_signal_log[-50:]))
 
-            # Always replace balance with real on-chain SOL balance via RPC
-            # (wallet service returns 0 in read-only mode — bypass it entirely)
+            # Expose monster paper mode so the dashboard can show PAPER badge
+            stats["monster_paper_only"] = MONSTER_PAPER_ONLY
+
+            # Balance: show paper wallet balance when monster is in paper mode,
+            # otherwise always show the real on-chain balance via RPC.
             _env_addr = os.getenv("SOLANA_PUBLIC_KEY", "") or os.getenv("WALLET_PUBLIC_KEY", "")
-            _real_bal = await _rpc_get_sol_balance(_env_addr)
-            if _real_bal > 0:
-                stats["balance"] = round(_real_bal, 4)
-            elif stats.get("live_mode"):
+            if MONSTER_PAPER_ONLY:
+                _paper_bal = float(os.getenv("PAPER_WALLET_SOL", "5.0"))
+                stats["balance"] = round(_paper_bal, 4)
+                stats["live_mode"] = False
+            else:
+                _real_bal = await _rpc_get_sol_balance(_env_addr)
+                if _real_bal > 0:
+                    stats["balance"] = round(_real_bal, 4)
+            if not MONSTER_PAPER_ONLY and stats.get("live_mode"):
                 # secondary fallback: try wallet service
                 try:
                     wallet_svc = runtime.get_service("wallet") if runtime else None

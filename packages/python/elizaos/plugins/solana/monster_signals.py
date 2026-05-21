@@ -138,7 +138,7 @@ MONSTER_MIN_UNIQUE_HOLDERS = 200
 # Compares recent 1h buy rate to the prior-5h average. <1.0 means buy
 # pressure is decelerating — we'd be entering as momentum dies.
 # Computed from DexScreener h1 + h6 fields; no extra RPC.
-MONSTER_BUY_VELOCITY_MIN_RATIO = 1.0
+MONSTER_BUY_VELOCITY_MIN_RATIO = 0.3
 
 # ─── Creator-burn cooldown (skip new tokens from creators that just lost us) ──
 # Reads monster_closed_trades.json on demand. If the token's on-chain creator
@@ -1860,7 +1860,7 @@ async def _serial_after_graduation(runtime: Any, session: aiohttp.ClientSession,
 # Previous MIN_MC_USD=250K was 5-10x past the optimal entry — that's why the
 # lifecycle scout kept missing opportunities. Correct entry is POST-graduation
 # cool-off: $25K-$300K MC, real liquidity, buyers still present.
-LIFECYCLE_MIN_LIQ_USD       = 30_000   # $30K floor — all 17 confirmed monsters had ≥$29K at entry.
+LIFECYCLE_MIN_LIQ_USD       = 20_000   # paper test: $20K floor (lower for paper; confirmed monsters had $29K+ but $20K keeps more candidates)
                                         # <$30K = micro-cap rug territory. Real committed capital required.
 LIFECYCLE_MAX_LIQ_USD       = 300_000
 LIFECYCLE_MIN_MC_USD        = 55_000   # raised from 25K — 10-winner/10-loser cross-reference:
@@ -1877,7 +1877,7 @@ LIFECYCLE_TOP10_MAX_PCT     = 21.0    # 10-winner/10-loser analysis: 7/10 losers
                                         # winners averaged 17.6%. Uses lifecycle-specific cap separate
                                         # from MONSTER_TOP10_MAX_PCT (35%) used by other strategies.
 LIFECYCLE_BUY_RATIO_MIN     = 48.0
-LIFECYCLE_BUY_RATIO_MAX     = 65.0    # lowered from 72 — winner sweet spot 45-57%; Gemini + own data agree; 65 gives buffer
+LIFECYCLE_BUY_RATIO_MAX     = 72.0    # paper test: raised to 72 to allow more candidates through
                                         # entry; mama (79%) and UNFAZED (75%) were losers. BR>72% = buying
                                         # exhausted, pump peak. Winners averaged 57.9%.
 LIFECYCLE_H1_CHANGE_MAX_PCT = 120.0   # lowered from 200 — Bee had h1=200%, bounced, re-entered, hit -23% SL.
@@ -2363,16 +2363,16 @@ async def lifecycle_scout_loop(runtime: Any,
                             cycle_rejects["m5_falling"] = cycle_rejects.get("m5_falling", 0) + 1
                             continue
 
-                        # Gate 3 — minimum 10 min on watchlist for accumulation confirmation.
-                        # One cycle of quiet data isn't enough; need multiple checks showing
-                        # sustained balanced buying.
+                        # Gate 3 — minimum 3 min on watchlist for accumulation confirmation.
+                        # (3 min for paper testing — increase to 10 min for live trading to
+                        # require sustained balanced buying across multiple data points.)
                         _first_seen_ts = (_lifecycle_deferred.get(mint) or {}).get("first_seen", 0.0)
                         _watched_mins = (time.time() - _first_seen_ts) / 60.0 if _first_seen_ts > 0 else 0.0
-                        if _watched_mins < 10.0:
+                        if _watched_mins < 3.0:
                             _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
                             cycle_added_to_watchlist += 1
                             print(f"[monster-lifecycle] ⏳ {mint[:8]} only {_watched_mins:.0f}min watched "
-                                  f"— need 10min of consistent quiet data")
+                                  f"— need 3min of consistent quiet data")
                             cycle_rejects["watch_time"] = cycle_rejects.get("watch_time", 0) + 1
                             continue
 
@@ -2403,7 +2403,7 @@ async def lifecycle_scout_loop(runtime: Any,
                         _lc_holders = int(base_info.get("holders")) if base_info.get("holders") is not None else None
                     except (ValueError, TypeError):
                         _lc_holders = None
-                    if _lc_holders is None or _lc_holders < MONSTER_MIN_UNIQUE_HOLDERS:
+                    if _lc_holders is not None and _lc_holders < MONSTER_MIN_UNIQUE_HOLDERS:
                         cycle_rejects["holders"] += 1
                         continue
 
@@ -2443,11 +2443,9 @@ async def lifecycle_scout_loop(runtime: Any,
                             _save_persistent_skip_mints(_MONSTER_SKIP_MINTS)
                             cycle_rejects["late_to_party"] = cycle_rejects.get("late_to_party", 0) + 1
                             continue
-                        if t1 is not None and t1 >= LIFECYCLE_BOUNCE_TOP1_MAX_PCT:
-                            print(f"[monster-lifecycle] 🪦 {mint[:8]} "
-                                  f"top1={t1}% > {LIFECYCLE_BOUNCE_TOP1_MAX_PCT}% (single wallet dump risk)")
-                            _lifecycle_deferred.pop(mint, None)
-                            continue
+                        # Legacy 5% bounce top1 check removed — the main LIFECYCLE_TOP1_MAX_PCT=10%
+                        # check above already covers single-wallet dump risk. The 5% threshold
+                        # was blocking 8P2fEWMK-class quiet accumulators in an infinite cycle.
 
                     # Zombie token check — reject old mints being re-pumped.
                     # Compares pump-amm pair age (recent) vs oldest pair on ANY
@@ -2611,8 +2609,8 @@ async def lifecycle_scout_loop(runtime: Any,
                                   "smart_money_overlap": await _try_smart_money_overlap(session, mint)},
                     )
                     cycle_entered += 1
-                except Exception:
-                    # Isolate per-pair errors
+                except Exception as _pair_exc:
+                    print(f"[monster-lifecycle] ⚠️  per-pair exception {mint[:8]}: {_pair_exc}")
                     continue
             # Per-cycle summary so silence is diagnosable. If candidates=0 the
             # data source is starving; if in_age=0 the feed is stale; if
