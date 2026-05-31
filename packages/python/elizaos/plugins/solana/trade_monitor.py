@@ -54,6 +54,88 @@ def is_monitored(mint: str) -> bool:
     return mint in _active_monitors
 
 
+# ── 1m candle helpers (Jarvis signs) ─────────────────────────────────────────
+# Kept local — importing from monster_signals would create a circular import.
+
+async def _fetch_monitor_candles(session: aiohttp.ClientSession, mint: str) -> list:
+    """Fetch last 15 BirdEye 1m candles for an active position.
+    Returns [[ts, o, h, l, c, vol], ...] oldest-first, or [] on failure.
+    """
+    api_key = os.getenv("BIRDEYE_API_KEY", "")
+    if not api_key:
+        return []
+    try:
+        now = int(time.time())
+        async with session.get(
+            "https://public-api.birdeye.so/defi/ohlcv",
+            headers={"X-API-KEY": api_key, "x-chain": "solana"},
+            params={"address": mint, "type": "1m",
+                    "time_from": now - 15 * 60, "time_to": now},
+            timeout=aiohttp.ClientTimeout(total=4),
+        ) as r:
+            if r.status != 200:
+                return []
+            data = await r.json()
+            items = (data.get("data") or {}).get("items") or []
+            candles = [
+                [int(c["unixTime"]), float(c.get("open") or 0),
+                 float(c.get("high") or 0), float(c.get("low") or 0),
+                 float(c.get("close") or 0), float(c.get("volume") or 0)]
+                for c in items if c.get("unixTime")
+            ]
+            return sorted(candles, key=lambda x: x[0])
+    except Exception:
+        return []
+
+
+def _compute_monitor_signs(candles: list) -> dict:
+    """Compute the three Jarvis entry signs from 1m candles.
+
+    Sign 1: current volume ≥ 3× MA(10 prior candles)
+    Sign 2: close > max_high(last 3 candles) AND body ≥ 1.5× avg_body(10)
+    Sign 3: not computable here (needs wallet-level GMGN data) — omitted
+    Returns compact string for memory + verbose summary for Groq prompt.
+    """
+    if len(candles) < 12:
+        return {}
+    cur = candles[-1]
+    cur_vol, cur_close, cur_open = cur[5], cur[4], cur[1]
+    cur_body = abs(cur_close - cur_open)
+
+    vol_ma10   = sum(c[5] for c in candles[-11:-1]) / 10.0
+    vol_ratio  = (cur_vol / vol_ma10) if vol_ma10 > 0 else 0.0
+    s1         = vol_ratio >= 3.0
+
+    max_high_3  = max(c[2] for c in candles[-4:-1])
+    avg_body_10 = sum(abs(c[4] - c[1]) for c in candles[-11:-1]) / 10.0
+    range_break = cur_close > max_high_3
+    body_ok     = cur_body >= 1.5 * avg_body_10 if avg_body_10 > 0 else False
+    s2          = range_break and body_ok
+
+    shape = "".join(
+        "🟢" if c[4] > c[1] else ("🔴" if c[4] < c[1] else "➖")
+        for c in candles[-5:]
+    )
+    compact = (
+        f"S1={'✅' if s1 else '❌'}({vol_ratio:.1f}x) "
+        f"S2={'✅' if s2 else '❌'}(brk={range_break} body={body_ok}) "
+        f"shape={shape}"
+    )
+    summary = (
+        f"=== 1M CANDLE SIGNALS (Jarvis) ===\n"
+        f"Sign 1 Volume Spike: {vol_ratio:.1f}x MA10  {'✅ SPIKE' if s1 else '❌ flat'}\n"
+        f"Sign 2 Breakout:     close {'ABOVE' if range_break else 'below'} 3c-high, "
+        f"body {'sig' if body_ok else 'weak'}  {'✅ BREAKOUT' if s2 else '❌'}\n"
+        f"Last 5 candles: {shape}  |  "
+        f"{'🚀 BOTH GREEN' if (s1 and s2) else '⚠️ partial' if (s1 or s2) else '❌ no signal'}"
+    )
+    return {
+        "s1": s1, "s2": s2, "vol_ratio": round(vol_ratio, 2),
+        "range_break": range_break, "body_ok": body_ok,
+        "compact": compact, "summary": summary,
+    }
+
+
 def get_decision_log(mint: str) -> dict | None:
     """Return the decision log for a position (active or recently closed).
 
@@ -764,6 +846,21 @@ class AICascade:
         prompt_tmpl = _METEORA_HOLD_SELL_PROMPT if is_meteora else _HOLD_SELL_PROMPT
         prompt = prompt_tmpl.format(context=ctx)
         full_prompt = f"{system_note}\n\n{prompt}"
+
+        # Fetch 1m candles + compute Jarvis signs for this position.
+        # Appended to the prompt so Groq sees the live chart structure.
+        # The compact descriptor is stored in memory for pattern learning.
+        candle_shape: str | None = None
+        try:
+            candles = await _fetch_monitor_candles(session, self._mint)
+            if len(candles) >= 12:
+                signs = _compute_monitor_signs(candles)
+                if signs:
+                    full_prompt = full_prompt + "\n\n" + signs["summary"]
+                    candle_shape = signs["compact"]
+        except Exception:
+            pass
+
         try:
             async with session.post(
                 "https://api.groq.com/openai/v1/chat/completions",
@@ -793,7 +890,8 @@ class AICascade:
                 if dec:
                     _mark_tier_ok("groq")
                     _bm.record_decision("groq", self._mint, self._token_name,
-                                        dec.action, dec.reason, self._last_pnl_pct, dec.confidence)
+                                        dec.action, dec.reason, self._last_pnl_pct, dec.confidence,
+                                        candle_shape=candle_shape)
                 return dec
         except Exception as exc:
             print(f"[monitor/groq] {exc}")

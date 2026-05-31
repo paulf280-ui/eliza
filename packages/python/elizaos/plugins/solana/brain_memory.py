@@ -137,10 +137,12 @@ def record_decision(
     reason: str,
     pnl_pct: float | None,
     confidence: float | None = None,
+    candle_shape: str | None = None,
 ) -> None:
     """Record a brain decision to its memory file.
 
     action: HOLD | SELL | WATCH | RUNNER | RUG_RISK | ENTRY_OK | ENTRY_WARN
+    candle_shape: compact Jarvis sign descriptor, e.g. "S1=✅(4.2x) S2=✅ shape=🟢🟢🔴🟢🟢"
     Called immediately after each AI decision is parsed.
     """
     mem = load_brain_memory(brain)
@@ -154,10 +156,29 @@ def record_decision(
         "confidence": round(confidence, 2) if confidence is not None else None,
         "outcome": "PENDING",
         "final_pnl_pct": None,
+        "candle_shape": candle_shape,
     }
     decisions: list = mem.get("recent_decisions", [])
     decisions.append(entry)
     mem["recent_decisions"] = decisions[-60:]  # keep last 60
+
+    # Candle observation log — builds the pattern library over time.
+    # Each entry records what the 1m chart looked like when Groq made this
+    # call + the outcome once the trade closes. The pattern derivation step
+    # reads these to compute win/loss rates per signal combination.
+    if candle_shape:
+        obs: list = mem.setdefault("candle_observations", [])
+        obs.append({
+            "ts":            entry["ts"],
+            "mint":          mint[:12],
+            "token":         entry["token"],
+            "candle_shape":  candle_shape,
+            "action":        action,
+            "pnl_at_obs":    entry["pnl_pct_at_decision"],
+            "outcome":       "PENDING",
+            "final_pnl_pct": None,
+        })
+        mem["candle_observations"] = obs[-50:]  # keep last 50 observations
 
     stats: dict = mem.setdefault("session_stats", {})
     stats["total_calls"] = stats.get("total_calls", 0) + 1
@@ -238,6 +259,16 @@ def resolve_outcome(brain: str, mint: str, outcome: str, final_pnl: float) -> No
                 stats["correct_exit_before_sl"] = stats.get("correct_exit_before_sl", 0) + 1
             break
     mem["recent_decisions"] = decisions
+
+    # Resolve candle observations for this mint too
+    outcome_tag = "WIN" if final_pnl > 0 else "LOSS"
+    obs_list: list = mem.get("candle_observations", [])
+    for o in obs_list:
+        if o.get("mint") == mint[:12] and o.get("outcome") == "PENDING":
+            o["outcome"]       = outcome_tag
+            o["final_pnl_pct"] = round(final_pnl, 1)
+    mem["candle_observations"] = obs_list
+
     _cache.pop(brain, None)
     save_brain_memory(brain, mem)
 
@@ -397,6 +428,26 @@ def brain_memory_as_prompt(brain: str) -> str:
         lines.append("Shared historical baseline (across all brains):")
         for s in shared[:3]:
             lines.append(f"  - {s}")
+
+    # Candle pattern memory — what you've learned from 1m candle signals
+    candle_obs = [o for o in (mem.get("candle_observations") or [])
+                  if o.get("outcome") in ("WIN", "LOSS")]
+    if len(candle_obs) >= 3:
+        combo_wins:   dict[str, int] = {}
+        combo_totals: dict[str, int] = {}
+        for o in candle_obs:
+            shape = o.get("candle_shape", "")
+            s1 = "S1=✅" in shape
+            s2 = "S2=✅" in shape
+            key = f"S1={'✅' if s1 else '❌'}+S2={'✅' if s2 else '❌'}"
+            combo_totals[key] = combo_totals.get(key, 0) + 1
+            if o.get("outcome") == "WIN":
+                combo_wins[key] = combo_wins.get(key, 0) + 1
+        parts = []
+        for k, total in sorted(combo_totals.items(), key=lambda kv: -kv[1]):
+            wins = combo_wins.get(k, 0)
+            parts.append(f"{k}→{wins}/{total}W")
+        lines.append(f"1m candle pattern memory ({len(candle_obs)} obs): {' | '.join(parts)}")
 
     # Historical summary (from backfill — 119 closed trades as of 2026-04-18)
     hist = mem.get("historical_summary") or {}
@@ -718,7 +769,33 @@ def _derive_brain_specific_patterns(brain: str, mem: dict) -> list[str]:
             "Consider what signal you overweighted."
         )
 
-    return patterns[:6]
+    # ── Candle pattern stats from resolved candle_observations ───────────────
+    # Groups by S1/S2 combo and reports win rate per combo so Groq builds
+    # a quantitative understanding of which candle signals matter most.
+    obs_resolved = [
+        o for o in (mem.get("candle_observations") or [])
+        if o.get("outcome") in ("WIN", "LOSS")
+    ]
+    if len(obs_resolved) >= 5:
+        from collections import Counter as _Counter
+        combo_wins:   dict[str, int] = {}
+        combo_totals: dict[str, int] = {}
+        for o in obs_resolved:
+            shape = o.get("candle_shape", "")
+            s1 = "S1=✅" in shape
+            s2 = "S2=✅" in shape
+            key = f"S1={'✅' if s1 else '❌'} S2={'✅' if s2 else '❌'}"
+            combo_totals[key] = combo_totals.get(key, 0) + 1
+            if o.get("outcome") == "WIN":
+                combo_wins[key] = combo_wins.get(key, 0) + 1
+        candle_lines = [f"Candle signal stats ({len(obs_resolved)} resolved observations):"]
+        for combo, total in sorted(combo_totals.items(), key=lambda kv: -kv[1]):
+            wins = combo_wins.get(combo, 0)
+            wr   = round(wins / total * 100)
+            candle_lines.append(f"  {combo} → {wins}/{total} wins ({wr}%)")
+        patterns.append(" | ".join(candle_lines))
+
+    return patterns[:8]
 
 
 def _load_winning_patterns() -> list[str]:
