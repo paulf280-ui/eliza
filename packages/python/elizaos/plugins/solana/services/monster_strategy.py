@@ -72,10 +72,11 @@ class MonsterStrategyService(Service):
         from elizaos.plugins.solana import strategy_e_monster as monster
 
         import os as _os_ms
-        _ca_enabled     = _os_ms.getenv("CREATOR_ALPHA_ENABLED",     "true").lower()  not in ("false","0","no")
-        _serial_enabled = _os_ms.getenv("SERIAL_DEPLOYER_ENABLED",   "true").lower()  not in ("false","0","no")
-        _cluster_enabled= _os_ms.getenv("MONSTER_CLUSTER_CONFIRM_ENABLED","false").lower() not in ("false","0","no")
-        _breakout_enabled=_os_ms.getenv("MONSTER_BREAKOUT_ENABLED",  "false").lower() not in ("false","0","no")
+        _ca_enabled      = _os_ms.getenv("CREATOR_ALPHA_ENABLED",          "true").lower()  not in ("false","0","no")
+        _serial_enabled  = _os_ms.getenv("SERIAL_DEPLOYER_ENABLED",        "true").lower()  not in ("false","0","no")
+        _cluster_enabled = _os_ms.getenv("MONSTER_CLUSTER_CONFIRM_ENABLED","false").lower() not in ("false","0","no")
+        _breakout_enabled= _os_ms.getenv("MONSTER_BREAKOUT_ENABLED",       "false").lower() not in ("false","0","no")
+        _jarvis_enabled  = _os_ms.getenv("MONSTER_JARVIS_ENABLED",         "false").lower() not in ("false","0","no")
 
         svc._tasks = [
             asyncio.create_task(
@@ -107,6 +108,11 @@ class MonsterStrategyService(Service):
                 monster_signals.breakout_candle_scout_loop(runtime, svc._session),
                 name="monster_breakout",
             ))
+        if _jarvis_enabled:
+            svc._tasks.append(asyncio.create_task(
+                monster_signals.jarvis_scout_loop(runtime, svc._session),
+                name="monster_jarvis",
+            ))
         if _ca_enabled:
             svc._tasks.append(asyncio.create_task(
                 monster_signals.creator_alpha_scout_loop(runtime, svc._session),
@@ -123,6 +129,7 @@ class MonsterStrategyService(Service):
             f"serial={monster_signals.SERIAL_DEPLOYER_ENABLED}, "
             f"lifecycle={monster_signals.LIFECYCLE_SCOUT_ENABLED}, "
             f"breakout={monster_signals.BREAKOUT_SCOUT_ENABLED}, "
+            f"jarvis={monster_signals.JARVIS_SCOUT_ENABLED}, "
             f"social={monster_social_monitor.SOCIAL_ENABLED}",
             src="service:monster_strategy",
         )
