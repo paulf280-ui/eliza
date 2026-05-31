@@ -173,7 +173,7 @@ def get_size_for_source(source: str | None) -> float:
 
 
 def get_floor_for_source(source: str | None) -> float:
-    """SL floor: -45% for all lifecycle, -25% for creator_alpha."""
+    """SL floor: -25% for all sources. Configurable via bot_config.json."""
     if _is_creator_alpha_source(source):
         try:
             from elizaos.plugins.solana import live_config as _lc
@@ -183,9 +183,9 @@ def get_floor_for_source(source: str | None) -> float:
     if _is_lifecycle_source(source):
         try:
             from elizaos.plugins.solana import live_config as _lc
-            return float(_lc.get("lifecycle_floor_pct", -45.0))
+            return float(_lc.get("lifecycle_floor_pct", -25.0))
         except Exception:
-            return -45.0
+            return -25.0
     return MONSTER_PRE_TP1_FLOOR_PCT
 
 
@@ -713,8 +713,8 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
         return f"liq_emergency_${int(current_liq)}", 1.0
 
     # ── Catastrophic floor → full exit ────────────────────────────────────
-    # -45% for lifecycle_bounce (bounce entries need room to develop)
-    # -25% for standard lifecycle (can die fast — Bee proved this)
+    # -25% for all lifecycle sources (tightened from -45% — TREAL/WOJCUP proved
+    # that allowing -45% drawdowns destroys more than the brain recovers)
     if not tp1_fired and pnl_pct <= floor_pct:
         return f"pre_tp1_floor_{pnl_pct:.0f}pct", 1.0
 

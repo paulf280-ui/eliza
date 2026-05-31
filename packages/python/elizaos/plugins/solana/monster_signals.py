@@ -105,6 +105,7 @@ CLUSTER_CONFIRM_ENABLED  = _env_on("MONSTER_CLUSTER_CONFIRM_ENABLED", "false")
 SERIAL_DEPLOYER_ENABLED  = _env_on("MONSTER_SERIAL_DEPLOYER_ENABLED", "false")
 LIFECYCLE_SCOUT_ENABLED  = _env_on("MONSTER_LIFECYCLE_ENABLED", "false")
 BREAKOUT_SCOUT_ENABLED   = _env_on("MONSTER_BREAKOUT_ENABLED", "false")
+JARVIS_SCOUT_ENABLED     = _env_on("MONSTER_JARVIS_ENABLED", "false")
 
 # ─── Cadences ───────────────────────────────────────────────────────────
 CLUSTER_POLL_SECS         = 45     # poll cluster wallets every 45s
@@ -1867,7 +1868,7 @@ LIFECYCLE_MIN_MC_USD        = 55_000   # raised from 25K — 10-winner/10-loser 
                                         # 7/10 losers entered below $55K MC. $45K change was made
                                         # while key was corrupted (no trades) — restored to $55K.
 LIFECYCLE_MAX_MC_USD        = 1_000_000 # extended to $1M — PAIN ($632K), PAC ($850K) still running at entry
-LIFECYCLE_MIN_LIQ_MC_RATIO  = 0.04
+LIFECYCLE_MIN_LIQ_MC_RATIO  = 0.12   # raised from 0.04 — TREAL (10.1%) and WOJCUP (8.9%) rugged; 12% blocks structural thin-book tokens
 LIFECYCLE_MAX_LIQ_MC_RATIO  = 0.60    # was 0.30 — 0.30 contradicted min_liq for MC < $50K (impossible zone)
 LIFECYCLE_MIN_AGE_SECS         = 60 * 60  # 1h floor — monsters are 1-4h old at entry (BURNIE 14h, milkers 20h)
 LIFECYCLE_WEBHOOK_MIN_AGE_SECS = 30 * 60  # 30min for Helius webhook grads — still need time to settle
@@ -1883,7 +1884,7 @@ LIFECYCLE_BUY_RATIO_MAX     = 72.0    # paper test: raised to 72 to allow more c
 LIFECYCLE_H1_CHANGE_MAX_PCT = 120.0   # lowered from 200 — Bee had h1=200%, bounced, re-entered, hit -23% SL.
                                         # Winners (RICH, Aura) had h1 ~30-80% at entry. 120% still allows
                                         # genuine momentum entries without chasing exhausted movers.
-LIFECYCLE_H1_CHANGE_MIN_PCT = 0.0     # raised from -30 — all winners had positive h1 at entry; negative h1 = dying token
+LIFECYCLE_H1_CHANGE_MIN_PCT = 12.0    # raised from 0 — paper test data: all 4 TP winners had h1>=14%; all 7 losses had h1<12%
 LIFECYCLE_M5_CHANGE_MAX_PCT = 20.0    # was 15 — slightly looser
 
 
@@ -2363,21 +2364,52 @@ async def lifecycle_scout_loop(runtime: Any,
                             cycle_rejects["m5_falling"] = cycle_rejects.get("m5_falling", 0) + 1
                             continue
 
-                        # Gate 3 — minimum 3 min on watchlist for accumulation confirmation.
-                        # (3 min for paper testing — increase to 10 min for live trading to
-                        # require sustained balanced buying across multiple data points.)
+                        # Gate 3 — Multi-candle 5m buy-pressure confirmation.
+                        # Read 2 distinct 5m windows (≥5 min apart) where buyers are ≥57%
+                        # of transactions. Post-peak tokens look "quiet" on m5 price but
+                        # their 5m txn mix stays seller-dominant (40-50% buys) while genuine
+                        # accumulators show sustained ≥57% buyers across consecutive candles.
+                        # Wayne post-mortem: h1=120%, m5=0.03% → passed old 3-min gate → -52%.
+                        # MEME (same age/h1 profile, genuine momentum) would still pass here.
                         _first_seen_ts = (_lifecycle_deferred.get(mint) or {}).get("first_seen", 0.0)
                         _watched_mins = (time.time() - _first_seen_ts) / 60.0 if _first_seen_ts > 0 else 0.0
-                        if _watched_mins < 3.0:
+                        _lc_entry = _lifecycle_deferred.setdefault(mint, {"first_seen": time.time(), "snapshots": []})
+                        _lc_entry.setdefault("sym", (p.get("baseToken") or {}).get("symbol") or mint[:8])
+                        _cur_m5_txns = (p.get("txns") or {}).get("m5") or {}
+                        _cur_m5_buys = int(_cur_m5_txns.get("buys") or 0)
+                        _cur_m5_sells = int(_cur_m5_txns.get("sells") or 0)
+                        _cur_m5_total = _cur_m5_buys + _cur_m5_sells
+                        _cur_bp = (_cur_m5_buys / _cur_m5_total) if _cur_m5_total >= 5 else 0.0
+                        _lc_entry.setdefault("buy_pressure_readings", []).append(
+                            {"ts": time.time(), "buy_ratio": _cur_bp, "total": _cur_m5_total}
+                        )
+                        _lc_entry["buy_pressure_readings"] = _lc_entry["buy_pressure_readings"][-20:]
+                        _bp_now = time.time()
+                        _distinct_good = []
+                        _last_good_ts = 0.0
+                        for _r in sorted(_lc_entry["buy_pressure_readings"], key=lambda x: x["ts"]):
+                            if _bp_now - _r["ts"] > 900:
+                                continue
+                            if _r["ts"] - _last_good_ts < 300:
+                                continue
+                            if _r["buy_ratio"] >= 0.57 and _r["total"] >= 5:
+                                _distinct_good.append(_r)
+                                _last_good_ts = _r["ts"]
+                        if len(_distinct_good) < 2:
                             _lifecycle_record_snapshot(mint, price_native, m5_change, h1_change, liq_usd)
                             cycle_added_to_watchlist += 1
-                            print(f"[monster-lifecycle] ⏳ {mint[:8]} only {_watched_mins:.0f}min watched "
-                                  f"— need 3min of consistent quiet data")
-                            cycle_rejects["watch_time"] = cycle_rejects.get("watch_time", 0) + 1
+                            _best_bp = max((r["buy_ratio"] for r in _lc_entry["buy_pressure_readings"][-5:]), default=0.0)
+                            print(f"[monster-lifecycle] 📊 {mint[:8]} buy-pressure: "
+                                  f"{len(_distinct_good)}/2 windows ≥57% "
+                                  f"(cur={_cur_bp:.0%} {_cur_m5_buys}b/{_cur_m5_sells}s, "
+                                  f"best5={_best_bp:.0%}) watched={_watched_mins:.0f}min")
+                            cycle_rejects["buy_pressure"] = cycle_rejects.get("buy_pressure", 0) + 1
                             continue
 
                         print(f"[monster-lifecycle] 🔄 {mint[:8]} quiet accumulation confirmed — "
-                              f"m5={m5_change:+.1f}% h1={h1_change:+.1f}% watched={_watched_mins:.0f}min liq=${liq_usd:,.0f}")
+                              f"m5={m5_change:+.1f}% h1={h1_change:+.1f}% "
+                              f"buy_pressure={len(_distinct_good)} windows ≥57% "
+                              f"watched={_watched_mins:.0f}min liq=${liq_usd:,.0f}")
                     txns_h1 = (p.get("txns") or {}).get("h1") or {}
                     buys = txns_h1.get("buys") or 0
                     sells = txns_h1.get("sells") or 0
@@ -2587,6 +2619,7 @@ async def lifecycle_scout_loop(runtime: Any,
                     # _monster_positions and the deferred snapshot history is no
                     # longer needed.
                     _lifecycle_deferred.pop(mint, None)
+                    _jarvis_watchlist.pop(mint, None)  # prevent Jarvis double-entry
                     if not monster.can_open_new_position():
                         continue
                     sym = (p.get("baseToken") or {}).get("symbol") or mint[:8]
@@ -2882,3 +2915,520 @@ async def breakout_candle_scout_loop(runtime: Any,
         except Exception as e:
             print(f"[monster-breakout] loop error: {e}")
         await asyncio.sleep(BREAKOUT_POLL_SECS)
+
+
+# ─── 5) Jarvis scout — 1-minute candle breakout detection ───────────────────
+# Fires when ALL THREE conditions align on a single closed 1-minute candle:
+#
+#   Sign 1 — VOLUME EXPLOSION:  current 1m candle volume ≥ 3× MA(last 10 candles)
+#   Sign 2 — RANGE BREAKOUT:    close > max_high(last 3 candles)
+#                               AND body ≥ 1.5× avg body(last 10 candles)
+#   Sign 3 — BUYER SURGE:       unique buying wallets this minute ≥ 1.4× prev minute
+#             Fallback:         DexScreener m5 buy count ≥ 1.4× stored prior value
+#
+# Uses GMGN (gmgn.ai) for real-time 1m OHLCV + per-wallet trade data.
+# DexScreener does not expose 1m candles on its free tier.
+
+JARVIS_POLL_SECS             = 30
+JARVIS_MIN_AGE_SECS          = 5 * 60
+JARVIS_MAX_AGE_SECS          = 6 * 60 * 60
+JARVIS_MIN_LIQ_USD           = 15_000
+JARVIS_MAX_LIQ_USD           = 500_000
+JARVIS_MIN_MC_USD            = 30_000
+JARVIS_MAX_MC_USD            = 2_000_000
+JARVIS_MAX_WATCHLIST_SIZE    = 15          # 15 × 1 candle call/30s = 30 rpm (BirdEye free limit = 60 rpm)
+JARVIS_CANDLE_LOOKBACK_SECS  = 25 * 60    # 25 min of 1m history
+JARVIS_VOL_SPIKE_MULT        = 3.0        # Sign 1: vol ≥ 3× MA10
+JARVIS_BODY_MULT             = 1.5        # Sign 2: body ≥ 1.5× avg
+JARVIS_BUYER_SURGE_MIN       = 1.4        # Sign 3: unique buyers ≥ 1.4× prev minute
+JARVIS_MIN_UNIQUE_BUYERS_CUR = 5          # Sign 3: floor — at least 5 buyers this minute
+JARVIS_TOP1_MAX_PCT          = 12.0
+JARVIS_LIQ_MC_FLOOR          = 0.10       # <10% liq/MC = thin book, rug risk
+
+_GMGN_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+    ),
+    "Referer": "https://gmgn.ai/",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+# mint → {first_seen, last_fired_candle_ts, ds_m5_buys_prev, ds_m5_buys_cur, sym}
+_jarvis_watchlist: dict[str, dict] = {}
+
+
+async def _fetch_gmgn_candles(
+    session: aiohttp.ClientSession,
+    mint: str,
+    lookback_secs: int = JARVIS_CANDLE_LOOKBACK_SECS,
+) -> list:
+    """Fetch 1m OHLCV from GMGN. Returns [[ts, o, h, l, c, vol], ...] sorted oldest-first."""
+    now = int(time.time())
+    url = f"https://gmgn.ai/defi/quotation/v1/tokens/kline/sol/{mint}"
+    params = {"resolution": "1", "from": str(now - lookback_secs), "to": str(now)}
+    try:
+        async with session.get(
+            url, params=params, headers=_GMGN_HEADERS,
+            timeout=aiohttp.ClientTimeout(total=6),
+        ) as r:
+            if r.status != 200:
+                return []
+            d = await r.json(content_type=None)
+            raw = (d.get("data") or {}).get("list") or []
+            if not raw:
+                return []
+            candles = []
+            for item in raw:
+                if isinstance(item, (list, tuple)) and len(item) >= 6:
+                    candles.append([float(x) for x in item[:6]])
+                elif isinstance(item, dict):
+                    ts  = float(item.get("timestamp") or item.get("time") or 0)
+                    o   = float(item.get("open")   or 0)
+                    h   = float(item.get("high")   or 0)
+                    lo  = float(item.get("low")    or 0)
+                    c   = float(item.get("close")  or 0)
+                    vol = float(item.get("volume") or item.get("vol") or 0)
+                    if ts > 0:
+                        candles.append([ts, o, h, lo, c, vol])
+            candles.sort(key=lambda x: x[0])
+            return candles
+    except Exception:
+        return []
+
+
+async def _fetch_gmgn_trades(
+    session: aiohttp.ClientSession,
+    mint: str,
+    limit: int = 200,
+) -> list[dict]:
+    """Fetch recent trades from GMGN. Each dict has 'maker', 'side', 'timestamp'."""
+    url = f"https://gmgn.ai/defi/quotation/v1/trades/sol/{mint}"
+    params = {"limit": str(limit)}
+    try:
+        async with session.get(
+            url, params=params, headers=_GMGN_HEADERS,
+            timeout=aiohttp.ClientTimeout(total=6),
+        ) as r:
+            if r.status != 200:
+                return []
+            d = await r.json(content_type=None)
+            raw = (d.get("data") or {}).get("list") or []
+            return raw if isinstance(raw, list) else []
+    except Exception:
+        return []
+
+
+async def _fetch_birdeye_candles(
+    session: aiohttp.ClientSession,
+    mint: str,
+    lookback_secs: int = JARVIS_CANDLE_LOOKBACK_SECS,
+) -> list:
+    """Fetch 1m OHLCV from BirdEye (works from AWS IPs; requires BIRDEYE_API_KEY env var).
+    Returns [[ts, o, h, l, c, vol], ...] sorted oldest-first, or [] if no key set.
+    """
+    api_key = os.getenv("BIRDEYE_API_KEY", "")
+    if not api_key:
+        return []
+    now = int(time.time())
+    url = "https://public-api.birdeye.so/defi/ohlcv"
+    params = {"address": mint, "type": "1m",
+              "time_from": str(now - lookback_secs), "time_to": str(now)}
+    headers = {"X-API-KEY": api_key, "x-chain": "solana", "Accept": "application/json"}
+    try:
+        async with session.get(
+            url, params=params, headers=headers,
+            timeout=aiohttp.ClientTimeout(total=8),
+        ) as r:
+            if r.status != 200:
+                return []
+            d = await r.json(content_type=None)
+            items = (d.get("data") or {}).get("items") or []
+            candles = []
+            for item in items:
+                ts  = float(item.get("unixTime") or item.get("timestamp") or 0)
+                o   = float(item.get("open")   or 0)
+                h   = float(item.get("high")   or 0)
+                lo  = float(item.get("low")    or 0)
+                c   = float(item.get("close")  or 0)
+                vol = float(item.get("volume") or 0)
+                if ts > 0:
+                    candles.append([ts, o, h, lo, c, vol])
+            candles.sort(key=lambda x: x[0])
+            return candles
+    except Exception:
+        return []
+
+
+def _build_pseudo_candles(snapshots: list) -> list:
+    """Build 60-second pseudo-candles from DexScreener 30s poll snapshots.
+
+    Each snapshot: {ts, price, volume_m5, m5_buys}
+    Groups consecutive snapshots into 60s windows. Volume approximated as the
+    delta of volume_m5 between window start and end (rolling 5m window delta ≈
+    the last minute's traded volume). Needs ≥12 complete candles to be useful.
+    """
+    if len(snapshots) < 4:
+        return []
+    snaps = sorted(snapshots, key=lambda x: x["ts"])
+    candles: list = []
+    bucket_start = snaps[0]["ts"]
+    bucket: list = [snaps[0]]
+    for s in snaps[1:]:
+        if s["ts"] - bucket_start < 60:
+            bucket.append(s)
+        else:
+            # Close the bucket as a candle
+            prices = [b["price"] for b in bucket if b["price"] > 0]
+            if prices:
+                vol_delta = max(0.0, bucket[-1]["volume_m5"] - bucket[0]["volume_m5"])
+                candles.append([
+                    bucket_start,          # ts
+                    prices[0],             # open
+                    max(prices),           # high
+                    min(prices),           # low
+                    prices[-1],            # close
+                    vol_delta,             # volume (approximated)
+                ])
+            bucket_start = s["ts"]
+            bucket = [s]
+    # Keep the partial current bucket as the latest candle
+    if bucket:
+        prices = [b["price"] for b in bucket if b["price"] > 0]
+        if prices:
+            vol_delta = max(0.0, bucket[-1]["volume_m5"] - bucket[0]["volume_m5"])
+            candles.append([
+                bucket_start, prices[0], max(prices), min(prices), prices[-1], vol_delta,
+            ])
+    return candles
+
+
+def _compute_jarvis_signals(
+    candles: list,
+    trades: list,
+    prev_m5_buys: int = 0,
+    cur_m5_buys: int = 0,
+) -> dict:
+    """
+    Evaluate the three Jarvis entry conditions against a 1m candle set.
+    Returns dict with 'all_green' and per-sign detail fields.
+    """
+    result: dict = {
+        "all_green": False,
+        "sign1_pass": False, "sign1_vol_ratio": 0.0,
+        "sign2_pass": False, "sign2_range_break": False, "sign2_body_ok": False,
+        "sign3_pass": False, "sign3_method": "none",
+        "sign3_cur_buyers": 0, "sign3_prev_buyers": 0, "sign3_growth": 0.0,
+    }
+    if len(candles) < 12:
+        result["reason"] = f"only {len(candles)} candles (need ≥12)"
+        return result
+
+    cur_ts, cur_open, cur_high, cur_low, cur_close, cur_vol = candles[-1]
+
+    # ── Sign 1: volume ≥ 3× MA10 ──────────────────────────────────────────
+    prev10_vols = [c[5] for c in candles[-11:-1]]
+    ma10_vol    = sum(prev10_vols) / len(prev10_vols) if prev10_vols else 0.0
+    vol_ratio   = (cur_vol / ma10_vol) if ma10_vol > 0 else 0.0
+    sign1       = vol_ratio >= JARVIS_VOL_SPIKE_MULT
+    result.update(sign1_pass=sign1, sign1_vol_ratio=round(vol_ratio, 2))
+
+    # ── Sign 2: close > max-high(last 3) AND body ≥ 1.5× avg ─────────────
+    last3       = candles[-4:-1]
+    max_high_3  = max(c[2] for c in last3) if last3 else 0.0
+    range_break = cur_close > max_high_3
+
+    cur_body    = abs(cur_close - cur_open)
+    prev_bodies = [abs(c[4] - c[1]) for c in candles[-11:-1]]
+    avg_body    = sum(prev_bodies) / len(prev_bodies) if prev_bodies else 0.0
+    body_ok     = (cur_body >= JARVIS_BODY_MULT * avg_body) if avg_body > 0 else False
+
+    sign2 = range_break and body_ok
+    result.update(sign2_pass=sign2, sign2_range_break=range_break, sign2_body_ok=body_ok)
+
+    # ── Sign 3: unique buying wallets this minute ≥ 1.4× previous minute ─
+    now_ts = time.time()
+    cur_min_buyers:  set[str] = set()
+    prev_min_buyers: set[str] = set()
+
+    for trade in trades:
+        t_ts    = float(trade.get("timestamp") or trade.get("block_time") or trade.get("time") or 0)
+        t_side  = str(trade.get("side") or trade.get("type") or "").lower()
+        t_maker = str(trade.get("maker") or trade.get("wallet") or trade.get("from") or "")
+        is_buy  = t_side in ("buy", "b")
+        if not is_buy or not t_maker or t_maker == "None":
+            continue
+        if t_ts >= now_ts - 60:
+            cur_min_buyers.add(t_maker)
+        elif t_ts >= now_ts - 120:
+            prev_min_buyers.add(t_maker)
+
+    n_cur  = len(cur_min_buyers)
+    n_prev = len(prev_min_buyers)
+
+    if n_cur >= JARVIS_MIN_UNIQUE_BUYERS_CUR and n_prev > 0:
+        buyer_growth = n_cur / n_prev
+        sign3        = buyer_growth >= JARVIS_BUYER_SURGE_MIN
+        method       = "gmgn_wallets"
+    elif n_cur >= JARVIS_MIN_UNIQUE_BUYERS_CUR and n_prev == 0:
+        # Fresh token: no prior-minute data → any burst of ≥5 unique buyers passes
+        buyer_growth = 99.0
+        sign3        = True
+        method       = "gmgn_wallets_fresh"
+    elif prev_m5_buys > 0 and cur_m5_buys >= JARVIS_MIN_UNIQUE_BUYERS_CUR:
+        # Fallback: DexScreener m5 buy count as proxy for unique buyer surge
+        buyer_growth = cur_m5_buys / prev_m5_buys
+        n_cur        = cur_m5_buys
+        n_prev       = prev_m5_buys
+        sign3        = buyer_growth >= JARVIS_BUYER_SURGE_MIN
+        method       = "ds_m5_fallback"
+    else:
+        buyer_growth = 0.0
+        sign3        = False
+        method       = "no_data"
+
+    result.update(
+        sign3_pass=sign3, sign3_method=method,
+        sign3_cur_buyers=n_cur, sign3_prev_buyers=n_prev,
+        sign3_growth=round(buyer_growth, 2),
+    )
+    result["all_green"] = sign1 and sign2 and sign3
+    return result
+
+
+async def jarvis_scout_loop(runtime: Any, session: aiohttp.ClientSession) -> None:
+    """Jarvis 1m candle breakout scout.
+
+    Syncs candidates from lifecycle_deferred (tokens that have already passed
+    lifecycle basic gates: age, liq, mc, liq/mc, h1, m5-shape). Validates each
+    using GMGN/BirdEye 1m candles + trade data. Enters when Signs 1+2+3 all
+    fire on the same closed candle. Evicts tokens when lifecycle removes them.
+    """
+    if not JARVIS_SCOUT_ENABLED:
+        print("[jarvis] disabled (MONSTER_JARVIS_ENABLED=false)")
+        return
+    print("[jarvis] loop started — GMGN 1m candle breakout detection active")
+
+    while True:
+        try:
+            # ── Step 1: Sync watchlist from lifecycle-deferred pool ───────
+            # Only tokens that have already passed lifecycle basic gates
+            # (age, liq, mc, liq/mc, h1, m5-shape) are eligible for Jarvis.
+            # This prevents Jarvis from entering tokens that would fail the
+            # lifecycle pre-flight checks.
+            _now = time.time()
+            for mint in list(_lifecycle_deferred.keys()):
+                if mint in _MONSTER_SKIP_MINTS or _recently_signalled(mint):
+                    continue
+                lc_entry = _lifecycle_deferred.get(mint)
+                if not lc_entry:
+                    continue
+                if mint not in _jarvis_watchlist:
+                    if len(_jarvis_watchlist) >= JARVIS_MAX_WATCHLIST_SIZE:
+                        oldest = min(_jarvis_watchlist,
+                                     key=lambda k: _jarvis_watchlist[k]["first_seen"])
+                        _jarvis_watchlist.pop(oldest, None)
+                    sym = lc_entry.get("sym") or mint[:8]
+                    _jarvis_watchlist[mint] = {
+                        "first_seen":           _now,
+                        "last_fired_candle_ts": 0.0,
+                        "ds_m5_buys_prev":      0,
+                        "ds_m5_buys_cur":       0,
+                        "sym":                  sym,
+                        "snapshots":            [],
+                    }
+                    print(f"[jarvis] 👀 {sym} admitted from lifecycle pool")
+
+            # ── Step 2: Evict tokens no longer in lifecycle-deferred pool ─
+            for m in [k for k in list(_jarvis_watchlist.keys())
+                      if k not in _lifecycle_deferred]:
+                _jarvis_watchlist.pop(m, None)
+
+            # ── Step 3: Evaluate GMGN candles for each watchlisted token ─
+            checked = 0
+            fired   = 0
+            for mint, rec in list(_jarvis_watchlist.items()):
+                try:
+                    if _recently_signalled(mint):
+                        _jarvis_watchlist.pop(mint, None)
+                        continue
+
+                    # Candle source priority: GMGN → BirdEye → DexScreener snapshots
+                    candles = await _fetch_gmgn_candles(session, mint)
+                    candle_src = "gmgn"
+                    if len(candles) < 12:
+                        candles = await _fetch_birdeye_candles(session, mint)
+                        candle_src = "birdeye"
+                    if len(candles) < 12:
+                        candles = _build_pseudo_candles(rec.get("snapshots") or [])
+                        candle_src = "ds_snapshots"
+                    if len(candles) < 12:
+                        continue
+                    checked += 1
+
+                    cur_candle_ts = candles[-1][0]
+                    if cur_candle_ts <= rec["last_fired_candle_ts"]:
+                        continue  # same candle already evaluated
+
+                    sym = rec.get("sym") or mint[:8]
+
+                    # Two-stage evaluation — saves API calls.
+                    # Stage 1: Signs 1+2 from candles only (no trade fetch yet).
+                    # Stage 2: fetch trades for Sign 3 only if Signs 1+2 pass.
+                    sig_s1s2 = _compute_jarvis_signals(
+                        candles=candles, trades=[],
+                        prev_m5_buys=rec.get("ds_m5_buys_prev", 0),
+                        cur_m5_buys=rec.get("ds_m5_buys_cur", 0),
+                    )
+                    print(
+                        f"[jarvis] 📊 {sym[:10]} [{candle_src}] "
+                        f"S1={'✅' if sig_s1s2['sign1_pass'] else '❌'}"
+                        f"({sig_s1s2['sign1_vol_ratio']:.1f}x) "
+                        f"S2={'✅' if sig_s1s2['sign2_pass'] else '❌'}"
+                        f"(brk={sig_s1s2['sign2_range_break']} body={sig_s1s2['sign2_body_ok']})"
+                    )
+                    rec["last_fired_candle_ts"] = cur_candle_ts
+
+                    if not (sig_s1s2["sign1_pass"] and sig_s1s2["sign2_pass"]):
+                        continue
+
+                    # Signs 1+2 green — now fetch trades for Sign 3
+                    trades  = await _fetch_gmgn_trades(session, mint)
+                    signals = _compute_jarvis_signals(
+                        candles=candles,
+                        trades=trades,
+                        prev_m5_buys=rec.get("ds_m5_buys_prev", 0),
+                        cur_m5_buys=rec.get("ds_m5_buys_cur", 0),
+                    )
+                    print(
+                        f"[jarvis] 🔔 {sym[:10]} S1+S2 GREEN — checking S3: "
+                        f"{'✅' if signals['sign3_pass'] else '❌'} "
+                        f"({signals['sign3_cur_buyers']}b/{signals['sign3_prev_buyers']}b "
+                        f"{signals.get('sign3_method','?')} ×{signals['sign3_growth']:.1f})"
+                    )
+
+                    if not signals["all_green"]:
+                        continue
+
+                    # ── All three signs green ─────────────────────────────
+                    if not monster.can_open_new_position():
+                        print(f"[jarvis] 🎯 {sym} ALL GREEN — no slot available")
+                        continue
+
+                    _j_dist = await top_wallet_distribution(session, mint)
+                    t1 = (_j_dist or {}).get("top1_pct")
+                    if t1 is not None and t1 >= JARVIS_TOP1_MAX_PCT:
+                        print(f"[jarvis] 🚫 {sym} all-green but top1={t1}% ≥ {JARVIS_TOP1_MAX_PCT}%")
+                        continue
+
+                    # Groq confirmation — passes the last 5 candles + signal summary
+                    _groq_ok = True
+                    _groq_key_j = os.getenv("GROQ_API_KEY", "")
+                    if _groq_key_j:
+                        _j_last5 = candles[-5:]
+                        _j_candle_str = " | ".join(
+                            f"[{i+1}] o={c[1]:.8f} h={c[2]:.8f} l={c[3]:.8f} "
+                            f"c={c[4]:.8f} vol={c[5]:.0f}"
+                            for i, c in enumerate(_j_last5)
+                        )
+                        _j_prompt = (
+                            f"Jarvis 1m candle breakout check on Solana token {sym}.\n"
+                            f"Last 5 candles (1m OHLCV oldest→newest):\n{_j_candle_str}\n"
+                            f"Signals: vol={signals['sign1_vol_ratio']:.1f}x MA10 | "
+                            f"close above 3-candle high={signals['sign2_range_break']} "
+                            f"body_size={signals['sign2_body_ok']} | "
+                            f"buyer_surge={signals['sign3_growth']:.1f}x "
+                            f"({signals['sign3_cur_buyers']} unique buyers)\n"
+                            f"All three Jarvis conditions met. Does the candle structure confirm "
+                            f"a genuine breakout, or does it look like wash-trading or "
+                            f"manipulation (thin volume, single wallet, immediate reversal risk)? "
+                            f'Reply JSON only: {{"enter": true/false, "reason": "one sentence"}}'
+                        )
+                        try:
+                            async with session.post(
+                                "https://api.groq.com/openai/v1/chat/completions",
+                                headers={"Authorization": f"Bearer {_groq_key_j}",
+                                         "Content-Type": "application/json"},
+                                json={"model": "llama-3.3-70b-versatile",
+                                      "messages": [{"role": "user", "content": _j_prompt}],
+                                      "temperature": 0.1, "max_tokens": 80},
+                                timeout=aiohttp.ClientTimeout(total=4),
+                            ) as _gr_j:
+                                if _gr_j.status == 200:
+                                    _grd_j = await _gr_j.json()
+                                    _raw_j = (
+                                        (_grd_j.get("choices") or [{}])[0]
+                                        .get("message", {}).get("content", "") or ""
+                                    )
+                                    try:
+                                        import json as _jj
+                                        _clean_j = _raw_j.strip().strip("```json").strip("```").strip()
+                                        _parsed_j = _jj.loads(_clean_j)
+                                        _groq_ok = bool(_parsed_j.get("enter", True))
+                                        _groq_reason_j = _parsed_j.get("reason", "")
+                                        if not _groq_ok:
+                                            print(f"[jarvis] 🤖 Groq skip {sym}: {_groq_reason_j}")
+                                    except Exception:
+                                        pass
+                        except Exception:
+                            pass  # Groq unreachable → allow entry
+
+                    if not _groq_ok:
+                        continue
+
+                    _mark_signalled(mint)
+                    _jarvis_watchlist.pop(mint, None)
+                    _lifecycle_deferred.pop(mint, None)  # prevent lifecycle double-entry
+                    _log_signal({
+                        "source": "jarvis",
+                        "mint": mint,
+                        "sign1_vol_ratio": signals["sign1_vol_ratio"],
+                        "sign2_range_break": signals["sign2_range_break"],
+                        "sign2_body_ok": signals["sign2_body_ok"],
+                        "sign3_buyers": signals["sign3_cur_buyers"],
+                        "sign3_growth": signals["sign3_growth"],
+                        "sign3_method": signals["sign3_method"],
+                        "candle_ts": cur_candle_ts,
+                        "top1_pct": t1,
+                    })
+                    print(
+                        f"[jarvis] 🚀 {sym} ALL THREE GREEN — "
+                        f"vol={signals['sign1_vol_ratio']:.1f}x MA10 | "
+                        f"range_break | "
+                        f"buyers={signals['sign3_cur_buyers']} "
+                        f"(+{(signals['sign3_growth']-1)*100:.0f}%) | "
+                        f"top1={t1}%"
+                    )
+                    await monster.open_monster_position(
+                        mint=mint,
+                        token_name=sym,
+                        signal_source="jarvis",
+                        sol_size=monster.get_default_size_sol(),
+                        session=session,
+                        runtime=runtime,
+                        metadata={
+                            "sign1_vol_ratio":   signals["sign1_vol_ratio"],
+                            "sign2_range_break": signals["sign2_range_break"],
+                            "sign2_body_ok":     signals["sign2_body_ok"],
+                            "sign3_cur_buyers":  signals["sign3_cur_buyers"],
+                            "sign3_prev_buyers": signals["sign3_prev_buyers"],
+                            "sign3_growth":      signals["sign3_growth"],
+                            "sign3_method":      signals["sign3_method"],
+                            "candle_ts":         cur_candle_ts,
+                            "top1_pct":          t1,
+                        },
+                    )
+                    fired += 1
+
+                except Exception as _je:
+                    print(f"[jarvis] ⚠️  {mint[:8]} error: {_je}")
+                    continue
+
+            print(
+                f"[jarvis] cycle: watchlisted={len(_jarvis_watchlist)} "
+                f"checked={checked} fired={fired}"
+            )
+        except Exception as e:
+            print(f"[jarvis] loop error: {e}")
+        await asyncio.sleep(JARVIS_POLL_SECS)
