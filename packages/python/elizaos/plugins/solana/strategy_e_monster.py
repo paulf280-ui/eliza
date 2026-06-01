@@ -1338,6 +1338,18 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                             del _monster_positions[mint]
                             _monster_cascades.pop(mint, None)
                             _monster_feeds.pop(mint, None)
+                            # Golden rule: manual/external closes must also block re-entry.
+                            try:
+                                import json as _json_mc
+                                _tp = _BASE / "traded_mints.json"
+                                _ex: list = json.load(open(_tp)) if _tp.exists() else []
+                                if mint not in _ex:
+                                    _ex.append(mint)
+                                    with open(_tp, "w") as _f:
+                                        _json_mc.dump(_ex, _f)
+                                    print(f"[monster] 🔒 golden rule: {mint[:20]} added (manual/external close)")
+                            except Exception as _gr2:
+                                print(f"[monster] traded_mints write failed (manual): {_gr2}")
                             _save_state()
                             continue
                     else:
