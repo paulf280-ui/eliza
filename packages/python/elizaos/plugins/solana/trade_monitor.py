@@ -58,8 +58,10 @@ def is_monitored(mint: str) -> bool:
 # Kept local — importing from monster_signals would create a circular import.
 
 async def _fetch_monitor_candles(session: aiohttp.ClientSession, mint: str) -> list:
-    """Fetch last 15 BirdEye 1m candles for an active position.
+    """Fetch last 45 minutes of BirdEye 1m candles for an active position.
     Returns [[ts, o, h, l, c, vol], ...] oldest-first, or [] on failure.
+    45-minute window (vs 15) ensures ≥12 candles even when BirdEye has gaps
+    on newly-indexed pump-amm tokens.
     """
     api_key = os.getenv("BIRDEYE_API_KEY", "")
     if not api_key:
@@ -70,10 +72,11 @@ async def _fetch_monitor_candles(session: aiohttp.ClientSession, mint: str) -> l
             "https://public-api.birdeye.so/defi/ohlcv",
             headers={"X-API-KEY": api_key, "x-chain": "solana"},
             params={"address": mint, "type": "1m",
-                    "time_from": now - 15 * 60, "time_to": now},
+                    "time_from": now - 45 * 60, "time_to": now},
             timeout=aiohttp.ClientTimeout(total=4),
         ) as r:
             if r.status != 200:
+                print(f"[monitor/candles] BirdEye HTTP {r.status} for {mint[:8]}")
                 return []
             data = await r.json()
             items = (data.get("data") or {}).get("items") or []
@@ -83,8 +86,12 @@ async def _fetch_monitor_candles(session: aiohttp.ClientSession, mint: str) -> l
                  float(c.get("close") or 0), float(c.get("volume") or 0)]
                 for c in items if c.get("unixTime")
             ]
-            return sorted(candles, key=lambda x: x[0])
-    except Exception:
+            result = sorted(candles, key=lambda x: x[0])
+            if not result:
+                print(f"[monitor/candles] BirdEye returned 0 candles for {mint[:8]}")
+            return result
+    except Exception as exc:
+        print(f"[monitor/candles] fetch error {mint[:8]}: {exc}")
         return []
 
 
