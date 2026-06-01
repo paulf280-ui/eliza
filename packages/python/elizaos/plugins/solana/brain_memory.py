@@ -703,6 +703,29 @@ def _derive_brain_specific_patterns(brain: str, mem: dict) -> list[str]:
                       "only HOLD when accumulation (buys>sells, holders growing, liq growing) is clear.",
         }
         patterns.append(seed.get(brain, "Cold start — build your track record."))
+        # Still inject candle stats even in cold start — they're independent of
+        # HOLD/SELL decision history and should inform Groq from the first trade.
+        _cold_obs = [
+            o for o in (mem.get("candle_observations") or [])
+            if o.get("outcome") in ("WIN", "LOSS")
+        ]
+        if len(_cold_obs) >= 5:
+            from collections import Counter as _C
+            _ct: dict[str, int] = {}
+            _cw: dict[str, int] = {}
+            for _o in _cold_obs:
+                _sh = _o.get("candle_shape", "")
+                _s1 = "S1=✅" in _sh
+                _s2 = "S2=✅" in _sh
+                _k = f"S1={'✅' if _s1 else '❌'} S2={'✅' if _s2 else '❌'}"
+                _ct[_k] = _ct.get(_k, 0) + 1
+                if _o.get("outcome") == "WIN":
+                    _cw[_k] = _cw.get(_k, 0) + 1
+            _lines = [f"1m candle pattern memory ({len(_cold_obs)} obs):"]
+            for _k, _tot in sorted(_ct.items(), key=lambda kv: -kv[1]):
+                _wr = round(_cw.get(_k, 0) / _tot * 100)
+                _lines.append(f"  {_k} → {_cw.get(_k,0)}/{_tot} wins ({_wr}%)")
+            patterns.append(" | ".join(_lines))
         return patterns
 
     # Accuracy by action
