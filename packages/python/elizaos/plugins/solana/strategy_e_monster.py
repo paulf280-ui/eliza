@@ -1325,8 +1325,29 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
     # Lazy import to avoid circular refs (trade_monitor imports things that may
     # import us back through the strategy registry).
     from elizaos.plugins.solana import trade_monitor as _tm
+    from elizaos.plugins.solana import live_config as _lc_audit
 
     GHOST_PURGE_TICKS = 3  # 3 ticks × 15s = 45s of zero on-chain balance → purge
+
+    # ── Startup golden-rules audit ─────────────────────────────────────────
+    # Printed once at startup so every restart is self-documenting.
+    # Any drift in critical settings is immediately visible in the logs.
+    _tm_count = len(json.load(open(_BASE / "traded_mints.json"))) if (_BASE / "traded_mints.json").exists() else 0
+    print(
+        f"\n[golden-rules] ══ STARTUP AUDIT ══\n"
+        f"  mode            : {'PAPER' if MONSTER_PAPER_ONLY else 'LIVE ✅'}\n"
+        f"  trading_paused  : {_lc_audit.get('trading_paused', '?')}  (must be False)\n"
+        f"  copy_trade      : {_lc_audit.get('copy_trade_enabled', '?')}  (must be False)\n"
+        f"  max_concurrent  : {_lc_audit.get('monster_max_concurrent', '?')}  (must be 1)\n"
+        f"  lifecycle_size  : {_lc_audit.get('lifecycle_size_sol', '?')} SOL  (compound-managed)\n"
+        f"  lifecycle_floor : {_lc_audit.get('lifecycle_floor_pct', '?')}%  (must be -25.0)\n"
+        f"  lifecycle_tp    : ×{_lc_audit.get('lifecycle_tp1_mult', '?')}  (must be 1.2 = +20% TP)\n"
+        f"  liq/mc gate     : 12%  (hardcoded, blocks structural rugs)\n"
+        f"  traded_mints    : {_tm_count} blacklisted  (NEVER wipe)\n"
+        f"  compound tiers  : <1.5→0.5 | 1.5-2.5→0.75 | ≥2.5→1.0 SOL/trade\n"
+        f"  bank target     : 5.0 SOL → keep 1.5 | bank 2.5 private | 1.0 new strategy\n"
+        f"[golden-rules] ══════════════════\n"
+    )
 
     while True:
         try:
