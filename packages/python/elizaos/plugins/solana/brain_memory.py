@@ -449,6 +449,32 @@ def brain_memory_as_prompt(brain: str) -> str:
             parts.append(f"{k}→{wins}/{total}W")
         lines.append(f"1m candle pattern memory ({len(candle_obs)} obs): {' | '.join(parts)}")
 
+    # Static 1m candle playbook — always injected for Groq only.
+    # This is foundational knowledge, not learned from data.
+    if brain == "groq":
+        lines.append(
+            "=== 1M MEME TOKEN CANDLE PLAYBOOK (always apply) ===\n"
+            "BULLISH — lean HOLD:\n"
+            "  S1✅ (vol≥3×MA10): crowd flooding in, not a bot — real demand.\n"
+            "  S2✅ (close above 3c-high, big body): structural breakout, buyers holding the line.\n"
+            "  🟢🟢🟢🟢🟢 staircase with higher lows: healthy accumulation — hold.\n"
+            "  ➖ doji after 🔴🔴: buyers stepping in at support — potential reversal.\n"
+            "BEARISH — lean SELL:\n"
+            "  ➖➖➖➖➖ + vol=0.0x: DEAD TOKEN. Zero buyers. Exit immediately — no exceptions.\n"
+            "  🔴🔴🔴🔴🔴 five reds: distribution phase, someone is dumping — sell into any bounce.\n"
+            "  S1✅ on a RED candle: volume spike INTO a falling price = smart money exiting fast.\n"
+            "  Big green candle then upper wick rejected: price pumped then sellers overwhelmed — top signal.\n"
+            "  Big green spike → 2 red candles with decreasing volume: rug pull developing — exit now.\n"
+            "PUMP-AND-DUMP (most common meme pattern — recognise and exit):\n"
+            "  Step 1: Massive green candle (S1+S2 both fire).\n"
+            "  Step 2: 2-3 smaller greens (momentum riders).\n"
+            "  Step 3: Red candle with high volume — the dump starts HERE. SELL at step 3.\n"
+            "  Step 4: Cascading reds — too late, you're holding a bag.\n"
+            "HEALTHY RUN (what we want to hold through):\n"
+            "  Moderate green → small ➖ consolidation → another green. Staircase repeats. HOLD.\n"
+            "GOLDEN RULE: flat candles + zero volume = dead money. Never hold through this."
+        )
+
     # Historical summary (from backfill — 119 closed trades as of 2026-04-18)
     hist = mem.get("historical_summary") or {}
     if hist.get("total_trades"):

@@ -129,6 +129,91 @@ def open_positions() -> dict[str, dict]:
     return dict(_monster_positions)
 
 
+# ─── Compound tier auto-scaler ───────────────────────────────────────────────
+# Tiers (wallet balance → trade size):
+#   < 1.5 SOL  → 0.50 SOL/trade   (build to trigger)
+#   1.5–2.5    → 0.75 SOL/trade   (compounding phase 1)
+#   ≥ 2.5      → 1.00 SOL/trade   (compounding phase 2)
+#   ≥ 5.0      → BANK ALERT       (bank 3.5, reset to 1.5)
+_COMPOUND_TIERS: list[tuple[float, float]] = [
+    (2.5, 1.00),
+    (1.5, 0.75),
+    (0.0, 0.50),
+]
+_COMPOUND_BANK_SOL  = 5.0   # trigger bank alert
+_COMPOUND_RESET_SOL = 1.5   # keep this after banking
+_compound_last_check: float = 0.0
+_compound_current_size: float = 0.0   # 0 = unknown, forces first-run update
+
+
+async def _check_compound_tier(session: aiohttp.ClientSession) -> None:
+    """Read wallet SOL balance and auto-scale trade size if tier changed.
+    Runs at most once every 5 minutes to avoid excess RPC calls.
+    """
+    global _compound_last_check, _compound_current_size
+    import time as _t, os as _os
+    now = _t.time()
+    if now - _compound_last_check < 300:
+        return
+    _compound_last_check = now
+
+    # Fetch SOL balance via RPC
+    wallet_sol = 0.0
+    try:
+        rpc = _os.getenv("SOLANA_RPC_URL", "")
+        pk  = _os.getenv("WALLET_PUBLIC_KEY") or _os.getenv("SOLANA_PUBLIC_KEY", "")
+        if rpc and pk:
+            async with session.post(
+                rpc,
+                json={"jsonrpc": "2.0", "id": 1, "method": "getBalance",
+                      "params": [pk, {"commitment": "confirmed"}]},
+                timeout=aiohttp.ClientTimeout(total=5),
+            ) as r:
+                if r.status == 200:
+                    d = await r.json()
+                    wallet_sol = ((d.get("result") or {}).get("value", 0)) / 1e9
+    except Exception:
+        return
+
+    if wallet_sol <= 0:
+        return
+
+    # Bank alert
+    if wallet_sol >= _COMPOUND_BANK_SOL:
+        bank_amount = round(wallet_sol - _COMPOUND_RESET_SOL, 3)
+        print(
+            f"\n[compound] 🏦🏦🏦 BANK NOW — wallet={wallet_sol:.3f} SOL reached "
+            f"{_COMPOUND_BANK_SOL} SOL target!\n"
+            f"[compound] 👉 WITHDRAW {bank_amount} SOL to cold wallet, keep {_COMPOUND_RESET_SOL} SOL here.\n"
+        )
+
+    # Determine target tier
+    target_size = 0.50
+    for threshold, size in _COMPOUND_TIERS:
+        if wallet_sol >= threshold:
+            target_size = size
+            break
+
+    if target_size == _compound_current_size:
+        return  # no change
+
+    # Apply tier update to all three trade size keys
+    prev = _compound_current_size
+    _compound_current_size = target_size
+    try:
+        from elizaos.plugins.solana import live_config as _lc
+        for key in ("lifecycle_size_sol", "monster_default_size_sol", "creator_alpha_size_sol"):
+            _lc.set_value(key, target_size, changed_by="compound_tier",
+                          reason=f"wallet={wallet_sol:.3f}SOL")
+        arrow = "⬆️ UP" if target_size > prev else "⬇️ DOWN"
+        print(
+            f"[compound] {arrow} TIER CHANGE: wallet={wallet_sol:.3f} SOL  "
+            f"{prev:.2f}→{target_size:.2f} SOL/trade"
+        )
+    except Exception as _ce:
+        print(f"[compound] tier update failed: {_ce}")
+
+
 def get_max_concurrent() -> int:
     """Live max concurrent positions — reads live_config first, falls back to module constant."""
     try:
@@ -1245,6 +1330,9 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
 
     while True:
         try:
+            # Auto-scale trade size based on wallet balance (runs every 5 min).
+            await _check_compound_tier(session)
+
             # One wallet balance snapshot per tick, reused across all positions.
             wallet_balances_by_mint: dict[str, int] = {}
             if not MONSTER_PAPER_ONLY and runtime is not None:
