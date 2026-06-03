@@ -915,7 +915,10 @@ LIFECYCLE_BOUNCE_MIN_PCT_LOW     = 8.0       # liq < $25K  — thin pool, need s
 LIFECYCLE_BOUNCE_MIN_PCT_MID     = 6.0       # liq $25K-35K — moderate commitment
 LIFECYCLE_BOUNCE_MIN_PCT_HIGH    = 4.0       # liq > $35K  — high commitment, less proof needed
 LIFECYCLE_BOUNCE_MIN_PCT         = 8.0       # default (used as fallback in old code paths)
-LIFECYCLE_M5_GOOD_LOW            = -5.0      # m5 in [-5%, +12%] = clean entry shape
+LIFECYCLE_M5_GOOD_LOW            = -1.0      # m5 must be ≥-1% at entry — SHIBEUS post-mortem 2026-06-03:
+                                             # entered at m5=-2.67% (momentum already reversing), bought the
+                                             # local top, hit -30% floor. Token was fundamentally good and
+                                             # recovered to 160K MC — just bad timing. Defer until m5 stabilises.
 LIFECYCLE_M5_GOOD_HIGH           = 10.0      # monster DNA: quiet entry ≤ +10%, NOT already pumping when we buy
 LIFECYCLE_POSTPEAK_H1_THRESHOLD  = 55.0      # raised from 30 — h1=30-55% with flat m5 is consolidation after moderate move,
                                               # not necessarily rolling over. MEMEART h1=43% was still heading higher.

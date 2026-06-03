@@ -43,12 +43,23 @@ function LivePositionRow({
     <tr className={rowClass} onClick={onRowClick}>
       <td className="py-2 font-mono text-zinc-200">
         <div className="flex items-center gap-1.5">
+          {/* Primary: GMGN — fastest chart + live trading */}
           <a
-            href={`https://dexscreener.com/solana/${pos.mint}`}
+            href={`https://gmgn.ai/sol/token/${pos.mint}`}
             target="_blank" rel="noopener noreferrer"
             onClick={e => e.stopPropagation()}
             className={`transition-colors underline-offset-2 hover:underline ${isSelected ? 'text-cyan-400' : 'text-zinc-200 hover:text-cyan-400'}`}
+            title="Open in GMGN (fastest — use for manual closes)"
           >{pos.mint.slice(0, 6)}…{pos.mint.slice(-4)}</a>
+          {/* Quick-close terminals */}
+          <a href={`https://axiom.trade/t/${pos.mint}`} target="_blank" rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            className="text-orange-500 hover:text-orange-300 transition-colors text-[10px] font-bold"
+            title="Open in Axiom">[ax]</a>
+          <a href={`https://dexscreener.com/solana/${pos.mint}`} target="_blank" rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            className="text-zinc-600 hover:text-zinc-400 transition-colors text-[10px]"
+            title="DexScreener (may lag)">[ds]</a>
           <a href={`https://solscan.io/token/${pos.mint}`} target="_blank" rel="noopener noreferrer"
             onClick={e => e.stopPropagation()}
             className="text-zinc-600 hover:text-zinc-400 transition-colors text-[10px]">[sc]</a>
@@ -56,7 +67,7 @@ function LivePositionRow({
           <div
             className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isStale ? 'bg-amber-500' : 'bg-emerald-500'}`}
             style={isStale ? {} : { animation: 'pulse 1.5s ease-in-out infinite' }}
-            title={isStale ? `Stale ${live.ageSecs}s ago` : 'Live (DexScreener)'}
+            title={isStale ? `Stale ${live.ageSecs}s ago` : 'Live price'}
           />
         </div>
         {isSelected && <span className="text-cyan-500 text-[10px]">▶</span>}

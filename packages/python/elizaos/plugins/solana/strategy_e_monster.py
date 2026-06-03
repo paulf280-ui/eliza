@@ -803,6 +803,21 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
     if not tp1_fired and pnl_pct <= floor_pct:
         return f"pre_tp1_floor_{pnl_pct:.0f}pct", 1.0
 
+    # ── Slow bleed detector ──────────────────────────────────────────────
+    # Catches coordinated slow-drain rugs that the -25% floor misses until
+    # the final flush. Painmaxxin 2026-06-03: sat -8% to -10% for 70 min
+    # while top-10 holders quietly drained, then gapped to -30% in one tick.
+    # Rule: if below -8% for 20 consecutive minutes without recovering to
+    # -2%, exit. Recovery above -2% resets the clock.
+    if not tp1_fired and pnl_pct <= -8.0:
+        if pos.get("_slow_bleed_since") is None:
+            pos["_slow_bleed_since"] = now
+        elif now - pos["_slow_bleed_since"] >= 20 * 60:
+            mins = round((now - pos["_slow_bleed_since"]) / 60)
+            return f"slow_bleed_{mins}min_at_{pnl_pct:.0f}pct", 1.0
+    elif pnl_pct >= -2.0 and pos.get("_slow_bleed_since") is not None:
+        pos["_slow_bleed_since"] = None  # recovered meaningfully — reset
+
     # ── Time-based stagnation exit ───────────────────────────────────────
     # If a position has been open >15 minutes and peak PnL never exceeded 20%,
     # the token never had real momentum — bank whatever small profit/loss exists
