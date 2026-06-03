@@ -954,6 +954,38 @@ LIFECYCLE_VIRAL_H1_MAX_PCT      = 600.0   # cap relaxation when override fires (
 LIFECYCLE_VIRAL_AGE_MIN_SECS    = 10 * 60 # drop the 20-min age floor to 10 when viral
 
 
+async def _run_cluster_check_bg(
+    session: "aiohttp.ClientSession",
+    mint: str,
+    pair_created_ts: float,
+    lc_entry: dict,
+) -> None:
+    """Background task: run cluster check and store result in lc_entry["cluster"]."""
+    try:
+        from elizaos.plugins.solana.cluster_check import check_holder_clusters
+        result = await check_holder_clusters(session, mint, pair_created_ts)
+        lc_entry["cluster"] = result
+        risk    = result.get("risk", "CLEAN")
+        checked = result.get("wallets_checked", 0)
+        reason  = result.get("skip_reason")
+        if risk == "HIGH":
+            cc = (result.get("clusters") or [{}])[0]
+            print(f"[cluster] 🔴 {mint[:8]} HIGH — "
+                  f"{cc.get('wallets')}w/{cc.get('combined_pct')}% from {cc.get('master')} "
+                  f"checked={checked}w")
+        elif risk == "MEDIUM":
+            cc = (result.get("clusters") or [{}])[0]
+            print(f"[cluster] ⚠️  {mint[:8]} MEDIUM — "
+                  f"{cc.get('wallets')}w/{cc.get('combined_pct')}% from {cc.get('master')} "
+                  f"checked={checked}w")
+        elif reason:
+            print(f"[cluster] ⬜ {mint[:8]} skipped ({reason})")
+        else:
+            print(f"[cluster] ✅ {mint[:8]} CLEAN checked={checked}w")
+    except Exception as _ce:
+        lc_entry["cluster"] = {"risk": "CLEAN", "skip_reason": f"error:{_ce}"}
+
+
 def _lifecycle_record_snapshot(mint: str, price: float, m5: float, h1: float, liq: float) -> None:
     now = time.time()
     entry = _lifecycle_deferred.setdefault(mint, {"first_seen": now, "snapshots": []})
@@ -2374,10 +2406,45 @@ async def lifecycle_scout_loop(runtime: Any,
                         # accumulators show sustained ≥57% buyers across consecutive candles.
                         # Wayne post-mortem: h1=120%, m5=0.03% → passed old 3-min gate → -52%.
                         # MEME (same age/h1 profile, genuine momentum) would still pass here.
-                        _first_seen_ts = (_lifecycle_deferred.get(mint) or {}).get("first_seen", 0.0)
-                        _watched_mins = (time.time() - _first_seen_ts) / 60.0 if _first_seen_ts > 0 else 0.0
                         _lc_entry = _lifecycle_deferred.setdefault(mint, {"first_seen": time.time(), "snapshots": []})
                         _lc_entry.setdefault("sym", (p.get("baseToken") or {}).get("symbol") or mint[:8])
+                        _first_seen_ts = _lc_entry.get("first_seen", time.time())
+                        _watched_mins  = (time.time() - _first_seen_ts) / 60.0
+
+                        # ── Cluster check: fire once (guard via cluster_queued flag)
+                        # _lifecycle_record_snapshot() can populate _lifecycle_deferred
+                        # before we reach Gate 3, so we cannot rely on "mint not in dict".
+                        if not _lc_entry.get("cluster_queued"):
+                            _lc_entry["cluster_queued"] = True
+                            _pair_ts = float(pca) / 1000
+                            asyncio.create_task(
+                                _run_cluster_check_bg(session, mint, _pair_ts, _lc_entry),
+                                name=f"cluster_{mint[:8]}",
+                            )
+                            print(f"[cluster] 🔍 {mint[:8]} cluster check queued "
+                                  f"(age={age_secs/60:.0f}min)")
+
+                        # ── Cluster gate: block HIGH-risk before buy pressure ─────
+                        _cluster = _lc_entry.get("cluster")
+                        if _cluster and _cluster.get("risk") == "HIGH":
+                            _cc = (_cluster.get("clusters") or [{}])[0]
+                            print(
+                                f"[monster-lifecycle] 🔴 {mint[:8]} CLUSTER HIGH — "
+                                f"{_cc.get('wallets','?')}w from same funder "
+                                f"({_cc.get('combined_pct','?')}% supply) — permanent skip"
+                            )
+                            _MONSTER_SKIP_MINTS.add(mint)
+                            _save_persistent_skip_mints(_MONSTER_SKIP_MINTS)
+                            _lifecycle_deferred.pop(mint, None)
+                            cycle_rejects["cluster_high"] = cycle_rejects.get("cluster_high", 0) + 1
+                            continue
+                        elif _cluster and _cluster.get("risk") == "MEDIUM":
+                            _cc = (_cluster.get("clusters") or [{}])[0]
+                            print(
+                                f"[monster-lifecycle] ⚠️  {mint[:8]} CLUSTER MEDIUM — "
+                                f"{_cc.get('wallets','?')}w from same funder "
+                                f"({_cc.get('combined_pct','?')}% supply) — proceeding"
+                            )
                         _cur_m5_txns = (p.get("txns") or {}).get("m5") or {}
                         _cur_m5_buys = int(_cur_m5_txns.get("buys") or 0)
                         _cur_m5_sells = int(_cur_m5_txns.get("sells") or 0)
