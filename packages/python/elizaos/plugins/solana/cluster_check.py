@@ -329,3 +329,153 @@ async def check_holder_clusters(
         "wallets_checked": len(funder_map),
         "skip_reason":     None,
     }
+
+
+# ── Visual map entry point ────────────────────────────────────────────────────
+
+# Known CEX / infrastructure addresses to label specially
+_KNOWN_LABELS: dict[str, str] = {
+    "5Q4aF1UefAcZMkKRnrYiLZhFrR7dZ3bsYvBKsUMGFVN": "Binance",
+    "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM": "Coinbase",
+    "AC5RDfQFmDS1deWZos921JfqscXdByf8BKHs5ACWjtW2": "Kraken",
+    "H8sMJSCQxfKiFTCfDR3DUMLPwcRbM61LGFJ8N4dK3WjS": "OKX",
+    "GugU1tP7doLeTw9hQP51xmJyg5uYTBign4K4BbsBug6K": "Bybit",
+}
+
+
+async def get_cluster_map(
+    session: aiohttp.ClientSession,
+    mint: str,
+    token_created_ts: float,
+    top_n: int = 15,
+) -> dict:
+    """
+    Full visual data for the dashboard bubble-map panel.
+    Returns per-holder data with cluster assignments, suitable for SVG rendering.
+
+    Structure:
+      risk:         "HIGH" | "MEDIUM" | "CLEAN"
+      holders:      list of {rank, address, address_short, pct, cluster_id, is_lp, label}
+      clusters:     list of {id, master_short, wallet_count, combined_pct, risk}
+      total_supply_est: float
+      wallets_checked:  int
+      skip_reason:  str | None
+      computed_at:  float (unix ts)
+    """
+    window_start = token_created_ts - _WINDOW_BEFORE_SECS
+    window_end   = token_created_ts + _WINDOW_AFTER_SECS
+
+    # ── Holders ──────────────────────────────────────────────────────────────
+    h_result = await _rpc(session, "getTokenLargestAccounts",
+                          [mint, {"commitment": "confirmed"}])
+    if not h_result:
+        return {"risk": "CLEAN", "holders": [], "clusters": [],
+                "total_supply_est": 0, "wallets_checked": 0,
+                "skip_reason": "rpc_error", "computed_at": time.time()}
+
+    accounts = (h_result.get("value") or [])[:top_n]
+    top_sum = sum(float(a.get("uiAmount") or 0) for a in accounts)
+    total_supply_est = top_sum / 0.85 if top_sum > 0 else 1.0
+
+    # Resolve owner wallets concurrently
+    owners_raw = await asyncio.gather(
+        *[_resolve_owner(session, a["address"]) for a in accounts]
+    )
+
+    # Build holder list with LP/pool detection
+    raw_holders: list[dict] = []
+    owner_wallets: list[tuple[str, float]] = []
+    for i, (acc, owner) in enumerate(zip(accounts, owners_raw)):
+        ui   = float(acc.get("uiAmount") or 0)
+        pct  = round(ui / total_supply_est * 100, 2)
+        addr = owner or acc["address"]
+        is_lp = (owner is None)  # owner == None means it's a program/pool account
+        label = _KNOWN_LABELS.get(addr) or ("LP Pool" if is_lp else None)
+        raw_holders.append({
+            "rank":          i + 1,
+            "address":       addr,
+            "address_short": addr[:6] + "…" + addr[-4:],
+            "ui_amount":     ui,
+            "pct":           pct,
+            "cluster_id":    None,
+            "is_lp":         is_lp,
+            "label":         label,
+        })
+        if not is_lp:
+            owner_wallets.append((addr, ui))
+
+    # ── Cluster detection ────────────────────────────────────────────────────
+    token_age_h = (time.time() - token_created_ts) / 3600
+    funder_map: dict[str, str] = {}
+
+    if token_age_h <= _MAX_TOKEN_AGE_HOURS:
+        wallets_to_check = [w for w, _ in owner_wallets[:12]]
+
+        async def _check_one(wallet: str) -> tuple[str, str | None]:
+            try:
+                return wallet, await _find_funder_in_window(
+                    session, wallet, window_start, window_end
+                )
+            except Exception:
+                return wallet, None
+
+        try:
+            async with asyncio.timeout(_CHECK_TIMEOUT_SECS):
+                results = await asyncio.gather(*[_check_one(w) for w in wallets_to_check])
+            for wallet, funder in results:
+                if funder:
+                    funder_map[wallet] = funder
+        except (asyncio.TimeoutError, Exception):
+            pass
+
+    # Build cluster objects
+    funder_groups: dict[str, list[str]] = {}
+    for wallet, funder in funder_map.items():
+        funder_groups.setdefault(funder, []).append(wallet)
+
+    clusters: list[dict] = []
+    cluster_id = 0
+    wallet_to_cluster: dict[str, int] = {}
+
+    for funder, cluster_wallets in sorted(
+        funder_groups.items(), key=lambda kv: -len(kv[1])
+    ):
+        n = len(cluster_wallets)
+        if n < _MEDIUM_RISK_WALLETS or n > _EXCHANGE_THRESHOLD:
+            continue
+        combined_ui  = sum(amt for w, amt in owner_wallets if w in cluster_wallets)
+        combined_pct = round(combined_ui / total_supply_est * 100, 1)
+        risk = "HIGH" if n >= _HIGH_RISK_WALLETS else "MEDIUM"
+        clusters.append({
+            "id":           cluster_id,
+            "master_short": funder[:6] + "…" + funder[-4:],
+            "master_full":  funder,
+            "wallet_count": n,
+            "combined_pct": combined_pct,
+            "risk":         risk,
+        })
+        for w in cluster_wallets:
+            wallet_to_cluster[w] = cluster_id
+        cluster_id += 1
+
+    # Annotate holders with cluster IDs
+    for h in raw_holders:
+        cid = wallet_to_cluster.get(h["address"])
+        if cid is not None:
+            h["cluster_id"] = cid
+
+    overall_risk = "CLEAN"
+    if any(c["risk"] == "HIGH" for c in clusters):
+        overall_risk = "HIGH"
+    elif clusters:
+        overall_risk = "MEDIUM"
+
+    return {
+        "risk":             overall_risk,
+        "holders":          raw_holders,
+        "clusters":         clusters,
+        "total_supply_est": round(total_supply_est),
+        "wallets_checked":  len(funder_map),
+        "skip_reason":      None if token_age_h <= _MAX_TOKEN_AGE_HOURS else "token_too_old",
+        "computed_at":      time.time(),
+    }

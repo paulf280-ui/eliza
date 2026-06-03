@@ -2850,6 +2850,73 @@ When adjusting a filter, always explain your reasoning based on the data above."
     app.router.add_post("/api/webhooks/helius/pumpfun-create", handle_helius_pumpfun_create)
     app.router.add_post("/api/webhooks/helius/pumpswap-grad", handle_helius_pumpswap_grad)
 
+    # ── Cluster / bubble-map endpoint ────────────────────────────────────────
+    async def handle_cluster_map(request: web.Request) -> web.Response:
+        """
+        GET /api/cluster-map?mint=<mint>[&created_ts=<unix_ts>]
+
+        Returns per-holder data + cluster assignments for the bubble-map panel.
+        If created_ts is omitted, fetches pairCreatedAt from DexScreener.
+        """
+        mint = request.rel_url.query.get("mint", "").strip()
+        if not mint:
+            return web.json_response({"error": "mint required"}, status=400)
+
+        # Resolve token creation timestamp
+        created_ts_str = request.rel_url.query.get("created_ts", "")
+        created_ts: float = 0.0
+
+        if created_ts_str:
+            try:
+                created_ts = float(created_ts_str)
+            except ValueError:
+                pass
+
+        # Try closed trades for creation time
+        if not created_ts:
+            try:
+                from elizaos.plugins.solana.strategy_e_monster import _monster_closed
+                for t in _monster_closed:
+                    if t.get("mint") == mint and t.get("entry_ts"):
+                        age_at_entry = (t.get("metadata") or {}).get("age_min", 0) * 60
+                        created_ts = float(t["entry_ts"]) - age_at_entry
+                        break
+            except Exception:
+                pass
+
+        # Fallback: DexScreener
+        if not created_ts:
+            try:
+                import aiohttp as _aio_ds
+                async with _aio_ds.ClientSession() as _ds:
+                    async with _ds.get(
+                        f"https://api.dexscreener.com/tokens/v1/solana/{mint}",
+                        timeout=_aio_ds.ClientTimeout(total=6),
+                    ) as r:
+                        if r.status == 200:
+                            pairs = await r.json()
+                            if isinstance(pairs, list) and pairs:
+                                pca = pairs[0].get("pairCreatedAt") or 0
+                                created_ts = float(pca) / 1000
+            except Exception:
+                pass
+
+        # Last resort: assume token is ~2 hours old
+        if not created_ts:
+            import time as _t
+            created_ts = _t.time() - 7200
+
+        try:
+            import aiohttp as _aio_cm
+            from elizaos.plugins.solana.cluster_check import get_cluster_map
+            async with _aio_cm.ClientSession() as _cm_sess:
+                result = await get_cluster_map(_cm_sess, mint, created_ts)
+            return web.json_response(result)
+        except Exception as exc:
+            return web.json_response({"error": str(exc)}, status=500)
+
+    app.router.add_get("/api/cluster-map", handle_cluster_map)
+
     app.router.add_get("/ws", handle_ws)
 
     if os.path.isdir(dashboard_dist):

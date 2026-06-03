@@ -11,6 +11,7 @@ import TradeHistoryTable from './components/copytrade/CopyTradeHistoryTable'
 import BrainPanel from './components/brains/BrainPanel'
 import PositionConfigPanel from './components/diagnostics/PositionConfigPanel'
 import CreatorAlphaPnLPanel from './components/diagnostics/CreatorAlphaPnLPanel'
+import BubbleMapPanel from './components/diagnostics/BubbleMapPanel'
 import PhantomTerminalPanel from './components/phantom/PhantomTerminalPanel'
 
 interface MonsterStats {
@@ -170,6 +171,19 @@ export default function App() {
       <div className="col-span-12">
         <PositionsTable />
       </div>
+
+      {/* ── BUBBLE MAP — shown when a position is open ───────────────── */}
+      {positions.length > 0 && (
+        <>
+          <ZoneHeader label="Holder Map" hint="top 15 holders · cluster detection · funding source trace · live via Helius RPC" />
+          <div className="col-span-12">
+            <BubbleMapPanel
+              mint={positions[0].mint}
+              tokenName={positions[0].token_name}
+            />
+          </div>
+        </>
+      )}
 
       {/* ── AI BRAIN + COMMAND ────────────────────────────────────────── */}
       <ZoneHeader label="Intelligence" hint="Groq 30s → Gemini 2m → Claude 5m · candle pattern learning · every decision logged" />
