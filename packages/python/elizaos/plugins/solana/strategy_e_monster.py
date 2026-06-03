@@ -349,6 +349,7 @@ async def open_monster_position(
     runtime: Any,
     metadata: dict | None = None,
     pool: str | None = None,  # explicit pool override; None = auto-detect via DexScreener
+    cluster_data: dict | None = None,  # result of cluster_check — injected into AI prompts
 ) -> bool:
     """Open a new monster position. Returns True on success.
 
@@ -608,6 +609,8 @@ async def open_monster_position(
         "buy_sig":          buy_sig,
         "pool":             pool,
         "tokens_received_raw": tokens_received_raw,  # 0 in paper; verified >0 in live
+        # Cluster/bubble-map data — used by AI brains (Groq/Gemini/Claude) and dashboard
+        "cluster_data":     cluster_data,
         # Lifecycle flags
         "tp1_fired":        False,
         "remaining_fraction": 1.0,
@@ -1680,9 +1683,11 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                             cascade = _tm.AICascade()
                             _monster_cascades[mint] = cascade
                         # Labels used by brain_memory.record_decision for dashboard panels.
-                        cascade._mint = mint
-                        cascade._token_name = pos.get("token_name", mint[:8])
+                        cascade._mint        = mint
+                        cascade._token_name  = pos.get("token_name", mint[:8])
                         cascade._last_pnl_pct = ((current_price / (pos["entry_price"] or 1)) - 1.0) * 100
+                        # Cluster/bubble-map data — injected into every brain prompt.
+                        cascade._cluster_data = pos.get("cluster_data")
 
                         decision = await cascade.evaluate(mint, pos, feed, session)
                         # ── Monster AI-exit gate ─────────────────────────────

@@ -143,6 +143,41 @@ def _compute_monitor_signs(candles: list) -> dict:
     }
 
 
+def _format_cluster_for_prompt(cluster_data: dict) -> str:
+    """Format cluster/bubble-map data as a concise AI-readable block.
+
+    Injected into Groq and Gemini prompts so they know holder concentration
+    and coordinated wallet risk when making HOLD/SELL decisions.
+    """
+    risk     = cluster_data.get("risk", "CLEAN")
+    clusters = cluster_data.get("clusters") or []
+    checked  = cluster_data.get("wallets_checked", 0)
+    skip     = cluster_data.get("skip_reason")
+
+    if risk == "CLEAN" and not clusters:
+        if skip == "token_too_old":
+            return "=== HOLDER CLUSTER MAP ===\nTrace unavailable (token age)."
+        return f"=== HOLDER CLUSTER MAP ===\nCLEAN — no coordinated wallets detected ({checked} wallets traced)."
+
+    lines = [f"=== HOLDER CLUSTER MAP (risk={risk}) ==="]
+    for c in clusters:
+        lines.append(
+            f"• Cluster: {c['wallet_count']} wallets funded by same source "
+            f"({c['master_short']}) hold {c['combined_pct']}% combined — {c['risk']} RISK"
+        )
+    if risk == "HIGH":
+        lines.append(
+            "⚠️  COORDINATED WALLETS: These holders can dump simultaneously. "
+            "Any price weakness = likely coordinated exit. Weight toward SELL on negative signals."
+        )
+    elif risk == "MEDIUM":
+        lines.append(
+            "⚠️  Possible coordination. Watch for multi-wallet sell pattern. "
+            "If liq or buy-ratio drops sharply, prefer SELL."
+        )
+    return "\n".join(lines)
+
+
 def get_decision_log(mint: str) -> dict | None:
     """Return the decision log for a position (active or recently closed).
 
@@ -667,9 +702,10 @@ class AICascade:
         self._gemini_skip_until = 0.0
         self._claude_skip_until = 0.0
         # Set by TradeMonitor before each evaluate() call
-        self._mint:        str   = ""
-        self._token_name:  str   = ""
+        self._mint:         str        = ""
+        self._token_name:   str        = ""
         self._last_pnl_pct: float | None = None
+        self._cluster_data: dict | None  = None  # cluster/bubble-map data for this position
         self.decisions:   list[AIDecision] = []
         self._pending_escalation = False
 
@@ -854,6 +890,10 @@ class AICascade:
         prompt = prompt_tmpl.format(context=ctx)
         full_prompt = f"{system_note}\n\n{prompt}"
 
+        # Cluster / bubble-map context — injected if available for this position.
+        if self._cluster_data:
+            full_prompt = full_prompt + "\n\n" + _format_cluster_for_prompt(self._cluster_data)
+
         # Fetch 1m candles + compute Jarvis signs for this position.
         # Appended to the prompt so Groq sees the live chart structure.
         # The compact descriptor is stored in memory for pattern learning.
@@ -916,6 +956,8 @@ class AICascade:
         prompt_tmpl = _METEORA_HOLD_SELL_PROMPT if is_meteora else _HOLD_SELL_PROMPT
         prompt = prompt_tmpl.format(context=ctx)
         full_prompt = f"{system_note}\n\n{prompt}"
+        if self._cluster_data:
+            full_prompt = full_prompt + "\n\n" + _format_cluster_for_prompt(self._cluster_data)
         body = {
             "contents": [{"parts": [{"text": full_prompt}]}],
             "generationConfig": {

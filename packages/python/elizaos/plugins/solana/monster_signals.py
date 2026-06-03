@@ -2710,6 +2710,7 @@ async def lifecycle_scout_loop(runtime: Any,
                                   "creator": _creator,
                                   "creator_tier": _creator_tier,
                                   "smart_money_overlap": await _try_smart_money_overlap(session, mint)},
+                        cluster_data=_lc_entry.get("cluster"),
                     )
                     cycle_entered += 1
                 except Exception as _pair_exc:

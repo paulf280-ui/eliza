@@ -2633,6 +2633,22 @@ When adjusting a filter, always explain your reasoning based on the data above."
             positions = _mon.open_positions()
             if positions:
                 status_lines.append(f"Open positions: {len(positions)} — {', '.join(m[:8] for m in list(positions)[:5])}")
+                # Inject cluster/bubble-map data for the first open position
+                first_mint = next(iter(positions))
+                first_pos  = positions[first_mint]
+                _cd = first_pos.get("cluster_data")
+                if _cd:
+                    _cr = _cd.get("risk", "CLEAN")
+                    _cc = _cd.get("clusters") or []
+                    if _cc:
+                        _c0 = _cc[0]
+                        status_lines.append(
+                            f"Holder cluster ({first_mint[:8]}…): risk={_cr} — "
+                            f"{_c0['wallet_count']} wallets from same funder hold "
+                            f"{_c0['combined_pct']}% supply ({_c0['risk']})"
+                        )
+                    else:
+                        status_lines.append(f"Holder cluster ({first_mint[:8]}…): CLEAN")
             else:
                 status_lines.append("Open positions: none")
         except Exception:
