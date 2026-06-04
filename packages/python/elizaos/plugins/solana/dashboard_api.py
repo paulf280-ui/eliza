@@ -2866,6 +2866,38 @@ When adjusting a filter, always explain your reasoning based on the data above."
     app.router.add_post("/api/webhooks/helius/pumpfun-create", handle_helius_pumpfun_create)
     app.router.add_post("/api/webhooks/helius/pumpswap-grad", handle_helius_pumpswap_grad)
 
+    # ── Fear & Greed endpoint — cached 12h, refreshes twice a day ───────────
+    _fng_cache: dict = {"value": None, "label": None, "fetched_ts": 0.0}
+
+    async def handle_fear_greed(request: web.Request) -> web.Response:
+        """GET /api/fear-greed — returns {value, label, fetched_ts}.
+        Fetches live from alternative.me at most once every 12 hours.
+        """
+        import time as _t
+        now = _t.time()
+        if _fng_cache["value"] is None or now - _fng_cache["fetched_ts"] > 43200:
+            try:
+                import aiohttp as _aio_fng
+                async with _aio_fng.ClientSession() as _fs:
+                    async with _fs.get(
+                        "https://api.alternative.me/fng/?limit=1",
+                        timeout=_aio_fng.ClientTimeout(total=6),
+                    ) as _r:
+                        if _r.status == 200:
+                            _d = (await _r.json()).get("data", [{}])[0]
+                            _fng_cache["value"]      = int(_d.get("value", 0))
+                            _fng_cache["label"]      = _d.get("value_classification", "Unknown")
+                            _fng_cache["fetched_ts"] = now
+            except Exception:
+                pass
+        return web.json_response({
+            "value":      _fng_cache.get("value"),
+            "label":      _fng_cache.get("label", "Unknown"),
+            "fetched_ts": _fng_cache.get("fetched_ts", 0),
+        })
+
+    app.router.add_get("/api/fear-greed", handle_fear_greed)
+
     # ── Cluster / bubble-map endpoint ────────────────────────────────────────
     async def handle_cluster_map(request: web.Request) -> web.Response:
         """

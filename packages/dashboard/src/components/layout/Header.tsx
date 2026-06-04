@@ -4,12 +4,36 @@ import { ConnectionDot } from '../common/ConnectionDot'
 import { AddressLink } from '../common/AddressLink'
 import { SolAmount } from '../common/SolAmount'
 
+interface FngData { value: number | null; label: string }
+
+function fngColour(value: number | null): string {
+  if (value === null) return '#6b7280'
+  if (value <= 25)  return '#ef4444'  // Extreme Fear — red
+  if (value <= 49)  return '#f97316'  // Fear          — orange
+  if (value <= 74)  return '#eab308'  // Neutral        — yellow
+  if (value <= 89)  return '#22c55e'  // Greed          — green
+  return '#10b981'                     // Extreme Greed  — emerald
+}
+
 export function Header() {
   const { connected, wallet } = useDashboardStore()
   const [time, setTime] = useState(new Date())
+  const [fng, setFng]   = useState<FngData>({ value: null, label: '' })
 
   useEffect(() => {
     const id = setInterval(() => setTime(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  // Fetch Fear & Greed on mount + every 12 hours
+  useEffect(() => {
+    const fetchFng = () =>
+      fetch('/api/fear-greed')
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d) setFng({ value: d.value, label: d.label }) })
+        .catch(() => {})
+    fetchFng()
+    const id = setInterval(fetchFng, 12 * 60 * 60 * 1000)
     return () => clearInterval(id)
   }, [])
 
@@ -60,10 +84,27 @@ export function Header() {
             </div>
           </div>
 
-          {/* Center — UTC clock */}
-          <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center">
+          {/* Center — UTC clock + Fear & Greed */}
+          <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5">
             <span className="font-mono text-sm text-slate-300 tabular-nums">{utc}</span>
             <span className="text-[10px] text-slate-600 tracking-widest uppercase">UTC</span>
+            {fng.value !== null && (
+              <div
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full mt-0.5"
+                style={{
+                  background: fngColour(fng.value) + '18',
+                  border: `1px solid ${fngColour(fng.value)}44`,
+                }}
+                title="Crypto Fear & Greed Index — refreshes every 12h"
+              >
+                <span className="text-[9px] font-bold tabular-nums" style={{ color: fngColour(fng.value) }}>
+                  {fng.value}/100
+                </span>
+                <span className="text-[9px] text-zinc-500 uppercase tracking-wide">
+                  {fng.label}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Right — wallet */}
