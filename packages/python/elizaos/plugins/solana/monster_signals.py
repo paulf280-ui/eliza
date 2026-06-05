@@ -3552,10 +3552,15 @@ async def velocity_scout_loop(runtime: Any, session: aiohttp.ClientSession) -> N
                 continue
 
             # ── Fetch recent pumpswap graduates ──────────────────────────────
-            pairs = await _fetch_recent_pumpswap_pairs(session)
+            pairs = await _recent_pumpswap_profiles(session)
             if not pairs:
                 await asyncio.sleep(VELOCITY_POLL_SECS)
                 continue
+
+            now_ms = time.time() * 1000
+            candidates_checked = 0
+            age_ok = h1_ok = 0
+            entered = 0
 
             now_ms = time.time() * 1000
             entered = 0
@@ -3576,9 +3581,12 @@ async def velocity_scout_loop(runtime: Any, session: aiohttp.ClientSession) -> N
                     continue
                 age_secs = (now_ms - float(pca)) / 1000
 
+                candidates_checked += 1
+
                 # ── Gate 1: Age 55-90 minutes ─────────────────────────────────
                 if not (VELOCITY_MIN_AGE_SECS <= age_secs <= VELOCITY_MAX_AGE_SECS):
                     continue
+                age_ok += 1
 
                 # ── Gate 2: h1 must show velocity (100-400%) ─────────────────
                 pc    = p.get("priceChange") or {}
@@ -3586,6 +3594,7 @@ async def velocity_scout_loop(runtime: Any, session: aiohttp.ClientSession) -> N
                 m5    = float(pc.get("m5") or 0)
                 if not (VELOCITY_MIN_H1_PCT <= h1 <= VELOCITY_MAX_H1_PCT):
                     continue
+                h1_ok += 1
 
                 # ── Gate 3: m5 — not in free-fall, not mid-spike ─────────────
                 if not (VELOCITY_MIN_M5_PCT <= m5 <= VELOCITY_MAX_M5_PCT):
@@ -3680,7 +3689,13 @@ async def velocity_scout_loop(runtime: Any, session: aiohttp.ClientSession) -> N
                     entered += 1
                     _mark_signalled(mint)
 
+            print(
+                f"[velocity] cycle: pairs={len(pairs)} "
+                f"age_ok={age_ok} h1_ok={h1_ok} entered={entered}"
+            )
+
         except Exception as e:
             print(f"[velocity] loop error: {e}")
+            import traceback; traceback.print_exc()
 
         await asyncio.sleep(VELOCITY_POLL_SECS)

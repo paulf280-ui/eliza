@@ -39,6 +39,14 @@ function LivePositionRow({
   const dexLabel   = pos.dex === 'pump_fun' ? 'pump' : pos.dex === 'pumpswap' ? 'pumpswap' : pos.dex === 'social_momentum' ? 'social' : pos.dex
   const dexVariant = pos.dex === 'pump_fun' ? 'blue' : 'amber'
 
+  const src = pos.signal_source || ''
+  const isVelocity  = src.startsWith('velocity')
+  const isLifecycle = src.startsWith('lifecycle')
+  const strategyLabel = isVelocity ? '⚡ VELOCITY' : isLifecycle ? 'LIFECYCLE' : src ? src.toUpperCase() : 'MONSTER'
+  const strategyStyle = isVelocity
+    ? { background: 'rgba(249,115,22,0.2)', color: '#fb923c', border: '1px solid rgba(249,115,22,0.5)' }
+    : { background: 'rgba(20,184,166,0.15)', color: '#2dd4bf', border: '1px solid rgba(20,184,166,0.4)' }
+
   return (
     <tr className={rowClass} onClick={onRowClick}>
       <td className="py-2 font-mono text-zinc-200">
@@ -69,6 +77,18 @@ function LivePositionRow({
             style={isStale ? {} : { animation: 'pulse 1.5s ease-in-out infinite' }}
             title={isStale ? `Stale ${live.ageSecs}s ago` : 'Live price'}
           />
+        </div>
+        {/* Strategy badge — clearly differentiates VELOCITY vs LIFECYCLE side-by-side */}
+        <div className="flex items-center gap-1 mt-0.5">
+          <span
+            className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm tracking-wide"
+            style={strategyStyle}
+          >
+            {strategyLabel}
+          </span>
+          {pos.token_name && (
+            <span className="text-[10px] text-zinc-500">{pos.token_name}</span>
+          )}
         </div>
         {isSelected && <span className="text-cyan-500 text-[10px]">▶</span>}
         {isBigWin && <span className="text-amber-400">🚀</span>}
@@ -113,10 +133,25 @@ function formatAge(seconds: number): string {
 }
 
 function PnlBar({ pos }: { pos: PositionData }) {
-  const entry = pos.entry_price_sol
+  const entry   = pos.entry_price_sol
   const current = pos.current_price_sol
-  const sl = pos.stop_loss_price
-  const tp3 = pos.tp3_price
+  const sl      = pos.stop_loss_price
+  const tp3     = pos.tp3_price
+  const isVel   = (pos.signal_source || '').startsWith('velocity')
+
+  // Velocity: show 0% → 200% progress bar (no SL zone)
+  if (isVel && entry > 0) {
+    const pnlPct    = ((current / entry) - 1) * 100
+    const clampedPct = Math.max(0, Math.min(100, pnlPct / 2))  // 200% = 100% bar
+    return (
+      <div className="relative h-1.5 bg-zinc-800 rounded-full overflow-visible my-0.5"
+           title={`Velocity TP: +200% | Current: ${pnlPct.toFixed(1)}%`}>
+        <div className="absolute top-0 h-full bg-orange-900/40 rounded-full" style={{ left: '50%', right: 0 }} />
+        <div className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full border border-zinc-900 shadow-sm z-10 transition-all"
+          style={{ left: `${clampedPct}%`, backgroundColor: pnlPct >= 0 ? '#f97316' : '#ef4444' }} />
+      </div>
+    )
+  }
 
   if (!entry || !tp3 || !sl) return null
 

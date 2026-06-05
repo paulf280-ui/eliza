@@ -261,6 +261,11 @@ def _serialize_monster_position(mint: str, mp: dict[str, Any],
     remaining = float(mp.get("remaining_fraction", 1.0))
     pnl_pct = ((cur / entry) - 1.0) * 100 if entry > 0 else 0.0
     age_secs = time.time() - float(mp.get("entry_ts") or time.time())
+    src = mp.get("signal_source", "")
+    is_velocity = src.startswith("velocity") if src else False
+    # Velocity: target is 3× (200%), no hard SL. Lifecycle: TP at 2×, SL at 0.75×.
+    tp_price    = entry * 3.0 if is_velocity else (entry * 2.0 if entry > 0 else 0)
+    sl_price    = 0 if is_velocity else (entry * 0.75 if entry > 0 else 0)
     return {
         "mint": mint,
         "dex": "pump-amm" if (mp.get("pool") or "").startswith("pump") else (mp.get("pool") or "pumpswap"),
@@ -268,10 +273,10 @@ def _serialize_monster_position(mint: str, mp: dict[str, Any],
         "entry_sol_spent": sol_spent,
         "token_amount": 0,
         "token_decimals": 6,
-        "stop_loss_price": entry * 0.6 if entry > 0 else 0,  # -40% hard floor pre-TP1
-        "tp1_price": entry * 2.0 if entry > 0 else 0,        # +100% = TP1
+        "stop_loss_price": sl_price,
+        "tp1_price": tp_price,
         "tp2_price": 0,
-        "tp3_price": 0,
+        "tp3_price": tp_price,  # used for progress bar range
         "peak_price": float(mp.get("peak_price") or entry),
         "trailing_stop_price": 0,
         "tp1_hit": bool(mp.get("tp1_fired", False)),

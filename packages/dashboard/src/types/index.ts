@@ -32,6 +32,10 @@ export interface PositionData {
   current_price_sol: number
   pnl_pct: number
   unrealized_pnl_sol: number
+  // Monster strategy extras
+  signal_source?: string
+  token_name?: string
+  peak_pnl_pct?: number
 }
 
 export interface RiskData {

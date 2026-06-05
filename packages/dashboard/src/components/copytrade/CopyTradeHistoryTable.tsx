@@ -140,10 +140,19 @@ export default function CopyTradeHistoryTable({ trades, netPnl, winRate, wins, t
                       </div>
                     </td>
                     <td className="py-1.5">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded font-medium"
-                        style={{ background: 'rgba(249,115,22,0.15)', color: '#fb923c' }}>
-                        {t.wallet}
-                      </span>
+                      {(() => {
+                        const w = t.wallet || ''
+                        const isVel = w.includes('velocity')
+                        return (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                            style={isVel
+                              ? { background: 'rgba(249,115,22,0.25)', color: '#fb923c', border: '1px solid rgba(249,115,22,0.5)' }
+                              : { background: 'rgba(20,184,166,0.12)', color: '#2dd4bf', border: '1px solid rgba(20,184,166,0.3)' }
+                            }>
+                            {isVel ? '⚡ ' : ''}{w.replace('monster/', '')}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td className="py-1.5 text-right font-mono text-zinc-500 text-[10px]">
                       {t.entry_price > 0 ? t.entry_price.toExponential(3) : '—'}
