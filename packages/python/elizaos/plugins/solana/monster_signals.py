@@ -3503,3 +3503,184 @@ async def jarvis_scout_loop(runtime: Any, session: aiohttp.ClientSession) -> Non
         except Exception as e:
             print(f"[jarvis] loop error: {e}")
         await asyncio.sleep(JARVIS_POLL_SECS)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Strategy F — Monster Velocity Scout
+#
+# Targets tokens that have already shown h1 > 100% velocity at the 1-hour mark.
+# Entry: age 55-90min, h1 +100-400%, MC $30K-$800K, top10 <15%, LP burned,
+#        cluster CLEAN, buy_ratio >55%. Position size: 0.2 SOL.
+# Exit:  +200% hard TP (3× price), no SL, emergency liq/stagnation exits only.
+# ─────────────────────────────────────────────────────────────────────────────
+
+VELOCITY_SCOUT_ENABLED = _env_on("MONSTER_VELOCITY_ENABLED", "false")
+
+VELOCITY_MIN_H1_PCT         = 100.0   # token must have proven velocity
+VELOCITY_MAX_H1_PCT         = 400.0   # cap: above here run is likely exhausted
+VELOCITY_MIN_MC_USD         = 30_000
+VELOCITY_MAX_MC_USD         = 800_000
+VELOCITY_MIN_LIQ_USD        = 20_000
+VELOCITY_MIN_AGE_SECS       = 55 * 60   # 55 minutes after graduation
+VELOCITY_MAX_AGE_SECS       = 90 * 60   # 90 minutes — still early
+VELOCITY_MIN_BUY_RATIO      = 55.0      # buyers must dominate at 1h mark
+VELOCITY_MAX_TOP10_PCT      = 15.0      # tight — broad distribution required
+VELOCITY_MAX_TOP1_PCT       = 8.0
+VELOCITY_MIN_M5_PCT         = -5.0      # allow small dips at entry
+VELOCITY_MAX_M5_PCT         = 20.0      # but not mid-spike
+VELOCITY_POLL_SECS          = 45        # faster than lifecycle (45s)
+
+
+async def velocity_scout_loop(runtime: Any, session: aiohttp.ClientSession) -> None:
+    """Scout loop for Strategy F — Monster Velocity.
+
+    Scans every 45 seconds for tokens in the 55-90 minute window after graduation
+    that have already proven h1 > 100% velocity. Applies strict fundamental
+    gates (cluster CLEAN, top10 <15%, LP burned by pump-amm) then enters with
+    0.2 SOL and a hard +200% TP, no SL.
+    """
+    import aiohttp as _aio
+
+    print("[velocity] loop started")
+
+    while True:
+        try:
+            from elizaos.plugins.solana import strategy_e_monster as monster
+            from elizaos.plugins.solana.cluster_check import check_holder_clusters
+
+            if not monster.can_open_new_position("velocity"):
+                await asyncio.sleep(VELOCITY_POLL_SECS)
+                continue
+
+            # ── Fetch recent pumpswap graduates ──────────────────────────────
+            pairs = await _fetch_recent_pumpswap_pairs(session)
+            if not pairs:
+                await asyncio.sleep(VELOCITY_POLL_SECS)
+                continue
+
+            now_ms = time.time() * 1000
+            entered = 0
+
+            for p in pairs:
+                if entered:
+                    break
+
+                mint = (p.get("baseToken") or {}).get("address", "")
+                if not mint or mint in _MONSTER_SKIP_MINTS or _recently_signalled(mint):
+                    continue
+
+                if not monster.can_open_new_position("velocity"):
+                    break
+
+                pca = p.get("pairCreatedAt")
+                if not pca:
+                    continue
+                age_secs = (now_ms - float(pca)) / 1000
+
+                # ── Gate 1: Age 55-90 minutes ─────────────────────────────────
+                if not (VELOCITY_MIN_AGE_SECS <= age_secs <= VELOCITY_MAX_AGE_SECS):
+                    continue
+
+                # ── Gate 2: h1 must show velocity (100-400%) ─────────────────
+                pc    = p.get("priceChange") or {}
+                h1    = float(pc.get("h1") or 0)
+                m5    = float(pc.get("m5") or 0)
+                if not (VELOCITY_MIN_H1_PCT <= h1 <= VELOCITY_MAX_H1_PCT):
+                    continue
+
+                # ── Gate 3: m5 — not in free-fall, not mid-spike ─────────────
+                if not (VELOCITY_MIN_M5_PCT <= m5 <= VELOCITY_MAX_M5_PCT):
+                    continue
+
+                # ── Gate 4: MC and liquidity ──────────────────────────────────
+                mc    = float(p.get("marketCap") or 0)
+                liq   = float((p.get("liquidity") or {}).get("usd") or 0)
+                if not (VELOCITY_MIN_MC_USD <= mc <= VELOCITY_MAX_MC_USD):
+                    continue
+                if liq < VELOCITY_MIN_LIQ_USD:
+                    continue
+
+                # ── Gate 5: LP burned (pump-amm = burned by design) ──────────
+                dex = (p.get("dexId") or "").lower()
+                if "pump" not in dex:
+                    continue  # require pump-amm / pumpswap
+
+                # ── Gate 6: buy_ratio ─────────────────────────────────────────
+                txns_h1 = (p.get("txns") or {}).get("h1") or {}
+                b = int(txns_h1.get("buys") or 0)
+                s = int(txns_h1.get("sells") or 0)
+                buy_ratio = (b / (b + s) * 100) if (b + s) >= 5 else 0
+                if buy_ratio < VELOCITY_MIN_BUY_RATIO:
+                    continue
+
+                # ── Gate 7: top1 / top10 distribution (RPC) ──────────────────
+                dist = await top_wallet_distribution(session, mint)
+                t1   = (dist or {}).get("top1_pct")
+                t10  = (dist or {}).get("top10_pct")
+                if t1 is None or t1 >= VELOCITY_MAX_TOP1_PCT:
+                    continue
+                if t10 is not None and t10 >= VELOCITY_MAX_TOP10_PCT:
+                    continue
+
+                # ── Gate 8: Cluster check (hard gate, awaited) ────────────────
+                pair_created_ts = float(pca) / 1000
+                try:
+                    cluster = await asyncio.wait_for(
+                        check_holder_clusters(session, mint, pair_created_ts),
+                        timeout=25.0,
+                    )
+                except asyncio.TimeoutError:
+                    cluster = {"risk": "CLEAN", "skip_reason": "timeout"}
+
+                if (cluster.get("risk") or "CLEAN") != "CLEAN":
+                    cc = (cluster.get("clusters") or [{}])[0]
+                    print(f"[velocity] 🔴 {mint[:8]} cluster {cluster['risk']} "
+                          f"({cc.get('wallets','?')}w/{cc.get('combined_pct','?')}%) — skip")
+                    _MONSTER_SKIP_MINTS.add(mint)
+                    _save_persistent_skip_mints(_MONSTER_SKIP_MINTS)
+                    continue
+
+                # ── Gate 9: zombie / creator burn ─────────────────────────────
+                if await _is_zombie_token(session, mint):
+                    continue
+                burned, creator = await is_creator_burned(session, mint)
+                if burned:
+                    continue
+
+                # ── All gates passed — ENTER ──────────────────────────────────
+                sym = (p.get("baseToken") or {}).get("symbol") or mint[:8]
+                print(
+                    f"[velocity] 🚀 ENTRY {sym} | age={age_secs/60:.0f}min "
+                    f"h1={h1:+.0f}% m5={m5:+.1f}% MC=${mc/1000:.0f}K "
+                    f"liq=${liq/1000:.0f}K top10={t10:.1f}% buy_ratio={buy_ratio:.0f}%"
+                )
+
+                ok = await monster.open_monster_position(
+                    mint=mint,
+                    token_name=sym,
+                    signal_source="velocity",
+                    sol_size=monster.get_size_for_source("velocity"),
+                    session=session,
+                    runtime=runtime,
+                    metadata={
+                        "age_min":         round(age_secs / 60, 1),
+                        "mc_usd":          mc,
+                        "liq_usd":         liq,
+                        "liq_mc_ratio":    round(liq / mc, 4) if mc else 0,
+                        "h1_change":       h1,
+                        "m5_change":       m5,
+                        "buy_ratio":       buy_ratio,
+                        "top1_pct":        t1,
+                        "top10_pct":       t10,
+                        "buy_velocity_ratio": _buy_velocity_ratio(p),
+                        "smart_money_overlap": await _try_smart_money_overlap(session, mint),
+                    },
+                    cluster_data=cluster,
+                )
+                if ok:
+                    entered += 1
+                    _mark_signalled(mint)
+
+        except Exception as e:
+            print(f"[velocity] loop error: {e}")
+
+        await asyncio.sleep(VELOCITY_POLL_SECS)

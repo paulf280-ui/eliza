@@ -304,6 +304,10 @@ def _is_lifecycle_source(source: str | None) -> bool:
     return bool(source) and source.startswith(("lifecycle", "pumpswap_grad", "graduation"))
 
 
+def _is_velocity_source(source: str | None) -> bool:
+    return bool(source) and source.startswith("velocity")
+
+
 def get_size_for_source(source: str | None) -> float:
     """Return the trade size for a given signal_source."""
     if _is_creator_alpha_source(source):
@@ -318,11 +322,19 @@ def get_size_for_source(source: str | None) -> float:
             return float(_lc.get("lifecycle_size_sol", 0.10))
         except Exception:
             return 0.10
+    if _is_velocity_source(source):
+        try:
+            from elizaos.plugins.solana import live_config as _lc
+            return float(_lc.get("velocity_size_sol", 0.20))
+        except Exception:
+            return 0.20
     return get_default_size_sol()
 
 
 def get_floor_for_source(source: str | None) -> float:
-    """SL floor: -25% for all sources. Configurable via bot_config.json."""
+    """SL floor: -25% for all sources. Velocity returns None (no hard SL)."""
+    if _is_velocity_source(source):
+        return None  # type: ignore[return-value]  — velocity has no hard SL
     if _is_creator_alpha_source(source):
         try:
             from elizaos.plugins.solana import live_config as _lc
@@ -339,7 +351,9 @@ def get_floor_for_source(source: str | None) -> float:
 
 
 def get_tp1_mult_for_source(source: str | None) -> float:
-    """TP1 trigger multiple. Hard +40% for all lifecycle."""
+    """TP1 trigger multiple. Velocity targets +200% = 3.0×."""
+    if _is_velocity_source(source):
+        return 3.0   # +200% = 3× price — full exit, no moonbag
     if _is_creator_alpha_source(source):
         try:
             from elizaos.plugins.solana import live_config as _lc
@@ -367,8 +381,18 @@ def get_tp1_sell_frac_for_source(source: str | None) -> float:
 
 
 def can_open_new_position(source: str | None = None) -> bool:
-    """Slot check — creator_alpha has its own slot pool (separate from lifecycle)
-    so the two strategies don't compete for the same slot."""
+    """Slot check — each strategy has its own slot pool so they don't compete."""
+    if _is_velocity_source(source):
+        try:
+            from elizaos.plugins.solana import live_config as _lc
+            cap = int(_lc.get("velocity_max_concurrent", 1))
+        except Exception:
+            cap = 1
+        vel_count = sum(
+            1 for pos in _monster_positions.values()
+            if _is_velocity_source(pos.get("signal_source"))
+        )
+        return vel_count < cap
     if _is_creator_alpha_source(source):
         try:
             from elizaos.plugins.solana import live_config as _lc
@@ -380,10 +404,11 @@ def can_open_new_position(source: str | None = None) -> bool:
             if _is_creator_alpha_source(pos.get("signal_source"))
         )
         return ca_count < cap
-    # Standard slot pool — count non-creator_alpha positions
+    # Standard slot pool — lifecycle_quiet and others
     other_count = sum(
         1 for pos in _monster_positions.values()
         if not _is_creator_alpha_source(pos.get("signal_source"))
+        and not _is_velocity_source(pos.get("signal_source"))
     )
     return other_count < get_max_concurrent()
 
@@ -770,9 +795,41 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
     tp1_fired = pos.get("tp1_fired", False)
     now = time.time()
 
+    # ── VELOCITY strategy: +200% TP, no SL, emergency exits only ─────────────
+    # Velocity positions target a clean 3× (200% gain) full exit.
+    # No hard SL — the token needs room to breathe and develop.
+    # Only three exits are allowed: hit +200%, liquidity collapses, or stagnation.
+    src = pos.get("signal_source")
+    if _is_velocity_source(src):
+        # TP: hit 200% (+3× entry price)
+        if pnl_pct >= 200.0:
+            return f"velocity_tp200_{pnl_pct:.0f}pct", 1.0
+
+        # Emergency: liquidity collapsed >60% from entry value
+        entry_liq = float(pos.get("liq_usd_at_entry") or 0)
+        if current_liq is not None and entry_liq > 0:
+            if current_liq < entry_liq * 0.40:
+                return f"velocity_liq_collapse_${int(current_liq)}", 1.0
+
+        # Stagnation: still open after 6h AND price below entry
+        age_h = (now - float(pos.get("entry_ts") or now)) / 3600
+        if age_h > 6.0 and pnl_pct < 0:
+            return f"velocity_stagnant_{age_h:.1f}h_pnl{pnl_pct:.0f}pct", 1.0
+
+        # Volume distribution: strong sell signal (inherited from standard logic)
+        _sell_ratio = pos.get("_current_sell_ratio_m5")
+        _holder_delta = pos.get("_holder_delta_5min")
+        if _sell_ratio is not None and _sell_ratio > 0.75 and pnl_pct > 20.0:
+            return f"velocity_distribution_sr{int(_sell_ratio*100)}pct_pnl{int(pnl_pct)}pct", 1.0
+        if (_holder_delta is not None and _holder_delta < -30
+                and _sell_ratio is not None and _sell_ratio > 0.60):
+            return f"velocity_holder_exit_delta{int(_holder_delta)}_pnl{int(pnl_pct)}pct", 1.0
+
+        # All clear — hold and let it develop
+        return None, 0.0
+
     # Source-aware TP/SL — creator_alpha gets +100% TP1 / -75% floor / 50% sell-frac
     # while everything else uses the standard +20% TP / -25% floor / 100% sell.
-    src = pos.get("signal_source")
     tp1_mult = get_tp1_mult_for_source(src)
     tp1_gain_pct = (tp1_mult - 1.0) * 100.0
     # Groq TP veto can raise the target on a single position (see monitor loop)

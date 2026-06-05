@@ -804,8 +804,10 @@ class AICascade:
         entry_price = pos.get("entry_price", 0.0)
         if entry_price > 0 and current_price > 0:
             pnl_pct = ((current_price / entry_price) - 1.0) * 100
-            if pnl_pct > 80.0:
-                # Runner — let hard TP handle it, don't interrupt
+            _is_velocity = str(pos.get("signal_source") or "").startswith("velocity")
+            if pnl_pct > 80.0 and not _is_velocity:
+                # Runner — let hard TP handle it, don't interrupt.
+                # Velocity positions target 200%+ so brains stay active the whole way.
                 return None
 
         # Probe single-whale concentration from on-chain swap history (cached
