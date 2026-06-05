@@ -75,6 +75,70 @@ MONSTER_PAPER_ONLY       = _env_on("MONSTER_PAPER_ONLY", "true")
 
 # ─── State files (own files — do NOT share with copy-trade) ─────────────
 _BASE = Path(__file__).parent
+
+
+async def _get_real_sell_pnl(
+    session: aiohttp.ClientSession,
+    mint: str,
+    sol_spent: float,
+    close_ts_approx: float,
+) -> tuple[float, float] | None:
+    """Find the actual on-chain swap transaction and return (real_pnl_pct, sol_received).
+
+    Uses Helius Enhanced Transactions API — same data source Phantom uses.
+    Returns None if the transaction cannot be found within the time window.
+
+    This replaces the stale DexScreener `current_price` used for manual closes,
+    which can be wrong by ±6% when price slips on a thin-liquidity pool.
+    """
+    helius_key = os.getenv("HELIUS_API_KEY", "")
+    wallet     = os.getenv("WALLET_PUBLIC_KEY") or os.getenv("SOLANA_PUBLIC_KEY", "")
+    if not helius_key or not wallet or sol_spent <= 0:
+        return None
+    try:
+        async with session.get(
+            f"https://api.helius.xyz/v0/addresses/{wallet}/transactions",
+            params={"api-key": helius_key, "type": "SWAP", "limit": "10"},
+            timeout=aiohttp.ClientTimeout(total=8),
+        ) as r:
+            if r.status != 200:
+                return None
+            txns = await r.json()
+
+        for t in (txns or []):
+            ts = t.get("timestamp", 0)
+            if abs(ts - close_ts_approx) > 300:   # within 5 min
+                continue
+
+            # Confirm this transaction moved our token OUT
+            token_out = any(
+                mint[:20] in (tt.get("mint") or "")
+                and (tt.get("fromUserAccount") or "")[:12] == wallet[:12]
+                for tt in (t.get("tokenTransfers") or [])
+            )
+            if not token_out:
+                continue
+
+            # Sum SOL received INTO our wallet from native transfers
+            sol_received = sum(
+                nt.get("amount", 0) / 1e9
+                for nt in (t.get("nativeTransfers") or [])
+                if (nt.get("toUserAccount") or "")[:12] == wallet[:12]
+            )
+            if sol_received <= 0:
+                continue
+
+            real_pnl_pct = (sol_received / sol_spent - 1.0) * 100.0
+            print(
+                f"[monster] 📊 on-chain P&L confirmed: received={sol_received:.4f} SOL "
+                f"spent={sol_spent:.4f} SOL  real_pnl={real_pnl_pct:+.2f}% "
+                f"(tx={t.get('signature','')[:20]}...)"
+            )
+            return real_pnl_pct, sol_received
+
+    except Exception as _e:
+        print(f"[monster] Helius P&L lookup failed: {_e}")
+    return None
 MONSTER_POSITIONS_FILE    = _BASE / "monster_positions.json"
 MONSTER_CLOSED_TRADES_FILE = _BASE / "monster_closed_trades.json"
 
@@ -1438,13 +1502,24 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                                     _close_reason = "externally_closed"
                                     _close_price = _last_known_price
                                 elif _last_known_price > 0 and entry_price > 0:
-                                    # Manual sell detected — use last known price for P&L
-                                    _final_pct = (_last_known_price / entry_price - 1.0) * 100.0
-                                    _final_sol = _spent * (_final_pct / 100.0)
+                                    # Manual sell detected — look up the real on-chain execution
+                                    # price via Helius Enhanced API (same source as Phantom).
+                                    # Falls back to stale DexScreener price if Helius unavailable.
                                     _close_reason = "manual_close"
-                                    _close_price = _last_known_price
-                                    print(f"[monster] 👤 manual close {tn}: "
-                                          f"est pnl={_final_pct:+.1f}% at price={_last_known_price:.3e}")
+                                    _real = await _get_real_sell_pnl(
+                                        session, mint, _spent, now
+                                    )
+                                    if _real is not None:
+                                        _final_pct, _final_sol_recv = _real
+                                        _final_sol  = _final_sol_recv - _spent
+                                        _close_price = entry_price * (1.0 + _final_pct / 100.0)
+                                    else:
+                                        # Helius lookup failed — fall back to DexScreener price
+                                        _final_pct = (_last_known_price / entry_price - 1.0) * 100.0
+                                        _final_sol = _spent * (_final_pct / 100.0)
+                                        _close_price = _last_known_price
+                                        print(f"[monster] 👤 manual close {tn}: "
+                                              f"est pnl={_final_pct:+.1f}% (DexScreener fallback)")
                                 else:
                                     _final_sol = -_spent
                                     _final_pct = -100.0
