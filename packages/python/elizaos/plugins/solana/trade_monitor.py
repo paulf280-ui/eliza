@@ -57,12 +57,72 @@ def is_monitored(mint: str) -> bool:
 # ── 1m candle helpers (Jarvis signs) ─────────────────────────────────────────
 # Kept local — importing from monster_signals would create a circular import.
 
+# Cache mint → DexScreener pair address to avoid repeated lookups
+_pair_addr_cache: dict[str, str] = {}
+
+
+async def _resolve_pair_address(session: aiohttp.ClientSession, mint: str) -> str:
+    """Return the DexScreener pair address for a mint (cached)."""
+    if mint in _pair_addr_cache:
+        return _pair_addr_cache[mint]
+    try:
+        async with session.get(
+            f"https://api.dexscreener.com/tokens/v1/solana/{mint}",
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=aiohttp.ClientTimeout(total=5),
+        ) as r:
+            if r.status == 200:
+                pairs = await r.json()
+                if pairs:
+                    addr = pairs[0].get("pairAddress", "")
+                    if addr:
+                        _pair_addr_cache[mint] = addr
+                        return addr
+    except Exception:
+        pass
+    return ""
+
+
 async def _fetch_monitor_candles(session: aiohttp.ClientSession, mint: str) -> list:
-    """Fetch last 45 minutes of BirdEye 1m candles for an active position.
+    """Fetch last 15 x 1m candles via GeckoTerminal (primary) or BirdEye (fallback).
+
+    GeckoTerminal is free, no API key, and is not blocked from server IPs — it
+    replaced BirdEye which returns HTTP 403 from AWS datacenter IPs.
     Returns [[ts, o, h, l, c, vol], ...] oldest-first, or [] on failure.
-    45-minute window (vs 15) ensures ≥12 candles even when BirdEye has gaps
-    on newly-indexed pump-amm tokens.
     """
+    # ── Primary: GeckoTerminal ───────────────────────────────────────────────
+    try:
+        pair_addr = await _resolve_pair_address(session, mint)
+        if pair_addr:
+            url = (
+                f"https://api.geckoterminal.com/api/v2/networks/solana"
+                f"/pools/{pair_addr}/ohlcv/minute?limit=30&aggregate=1"
+            )
+            async with session.get(
+                url,
+                headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"},
+                timeout=aiohttp.ClientTimeout(total=6),
+            ) as r:
+                if r.status == 200:
+                    data   = await r.json()
+                    raw    = (data.get("data") or {}).get("attributes", {}).get("ohlcv_list") or []
+                    # GeckoTerminal returns [ts_secs, open, high, low, close, volume_usd]
+                    # newest-first — reverse for oldest-first
+                    candles = [
+                        [int(c[0]), float(c[1]), float(c[2]),
+                         float(c[3]), float(c[4]), float(c[5])]
+                        for c in raw if c[0]
+                    ]
+                    candles.sort(key=lambda x: x[0])
+                    if candles:
+                        return candles
+                    print(f"[monitor/candles] GeckoTerminal 0 candles for {mint[:8]}")
+                else:
+                    print(f"[monitor/candles] GeckoTerminal HTTP {r.status} for {mint[:8]}")
+    except Exception as exc:
+        print(f"[monitor/candles] GeckoTerminal error {mint[:8]}: {exc}")
+
+    # ── Fallback: BirdEye (may be 403 from server IPs) ───────────────────────
     api_key = os.getenv("BIRDEYE_API_KEY", "")
     if not api_key:
         return []
@@ -76,9 +136,8 @@ async def _fetch_monitor_candles(session: aiohttp.ClientSession, mint: str) -> l
             timeout=aiohttp.ClientTimeout(total=4),
         ) as r:
             if r.status != 200:
-                print(f"[monitor/candles] BirdEye HTTP {r.status} for {mint[:8]}")
                 return []
-            data = await r.json()
+            data  = await r.json()
             items = (data.get("data") or {}).get("items") or []
             candles = [
                 [int(c["unixTime"]), float(c.get("open") or 0),
@@ -86,12 +145,8 @@ async def _fetch_monitor_candles(session: aiohttp.ClientSession, mint: str) -> l
                  float(c.get("close") or 0), float(c.get("volume") or 0)]
                 for c in items if c.get("unixTime")
             ]
-            result = sorted(candles, key=lambda x: x[0])
-            if not result:
-                print(f"[monitor/candles] BirdEye returned 0 candles for {mint[:8]}")
-            return result
-    except Exception as exc:
-        print(f"[monitor/candles] fetch error {mint[:8]}: {exc}")
+            return sorted(candles, key=lambda x: x[0])
+    except Exception:
         return []
 
 
