@@ -1917,8 +1917,13 @@ When adjusting a filter, always explain your reasoning based on the data above."
                         "partial_exits":      (mp.get("partial_exits") or [])[-5:],
                         "strategy":           "monster",
                     })
-                # Track slot count for the summary bar
-                stats["open_count"] = int(stats.get("open_count") or 0) + len(_mon.open_positions())
+                # Track slot counts separately for lifecycle and velocity
+                all_pos = _mon.open_positions()
+                vel_pos = [p for p in all_pos.values() if str(p.get("signal_source","")).startswith("velocity")]
+                lc_pos  = [p for p in all_pos.values() if not str(p.get("signal_source","")).startswith("velocity")]
+                stats["open_count"]          = int(stats.get("open_count") or 0) + len(all_pos)
+                stats["velocity_open_count"] = len(vel_pos)
+                stats["lifecycle_open_count"] = len(lc_pos)
             except Exception:
                 pass
             # Build the recent trades feed: merge copy-trade paper trades

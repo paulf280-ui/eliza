@@ -270,6 +270,10 @@ _config: dict = {
     "lifecycle_floor_pct":    -20.0,   # -20% floor (tighter than BC — AMM is orderly)
     "lifecycle_tp1_mult":      1.60,   # +60% TP — proven by 21/21 wins in data
 
+    # ── Strategy F — Monster Velocity (enter at 1h, hard +200% TP, no SL) ──────
+    "velocity_size_sol":          0.20,  # 0.2 SOL per trade
+    "velocity_max_concurrent":    1,     # 1 slot (independent from lifecycle)
+
     "creator_alpha_min_entry_mc_usd":   6_000, # MC FLOOR: skip if MC below this — only bundlers bought
                                                # All recent losses entered at $2.4-3K MC (1-8% BC progress)
                                                # UNCTON $2.4K → blocked | BOOBFACE $6.6K → allowed
@@ -460,6 +464,8 @@ def set_value(key: str, value, changed_by: str = "system", reason: str = "") -> 
         "monster_scanner_min_buy_ratio": (0.0, 95.0),
         "monster_max_concurrent":     (1, 5),       # cap 5 — wallet headroom check happens at trade time
         "monster_default_size_sol":   (0.05, 2.0),  # 0.05 SOL floor, 2 SOL ceiling
+        "velocity_size_sol":          (0.05, 2.0),
+        "velocity_max_concurrent":    (1, 3),
         "creator_alpha_size_sol":          (0.05, 2.0),
         "creator_alpha_max_concurrent":    (1, 10),
         "creator_alpha_floor_pct":         (-95.0, -10.0),
