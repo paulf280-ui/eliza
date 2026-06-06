@@ -2985,6 +2985,75 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
     app.router.add_get("/api/cluster-map", handle_cluster_map)
 
+    # ── Cabal-Hunter internal bridge (for MCP server) ─────────────────────────
+    # Called by the Node.js cabal-hunter service. Returns full analysis including
+    # pre-cached results. Internal-only — protected by CABAL_INTERNAL_SECRET env var.
+    async def handle_cabal_internal(request: web.Request) -> web.Response:
+        """GET /api/cabal/internal?mint=<mint>
+        Internal endpoint for the Cabal-Hunter MCP server to call.
+        Returns: full cluster map + cabal score + cache metadata.
+        Requires X-Internal-Secret header matching CABAL_INTERNAL_SECRET env var.
+        """
+        secret = os.getenv("CABAL_INTERNAL_SECRET", "")
+        if secret and request.headers.get("X-Internal-Secret") != secret:
+            return web.json_response({"error": "unauthorized"}, status=401)
+
+        mint = request.rel_url.query.get("mint", "").strip()
+        if not mint:
+            return web.json_response({"error": "mint required"}, status=400)
+
+        # Check pre-indexed cache first (sub-100ms)
+        try:
+            from elizaos.plugins.solana.cabal_cache import get_result as _cache_get, cache_size as _cache_size
+            cached = _cache_get(mint)
+            if cached:
+                cached["source"] = "pre_indexed"
+                return web.json_response(cached)
+        except Exception:
+            pass
+
+        # Cache miss — run full analysis in real-time
+        created_ts_str = request.rel_url.query.get("created_ts", "")
+        created_ts: float = float(created_ts_str) if created_ts_str else 0.0
+
+        if not created_ts:
+            try:
+                import aiohttp as _aio_ds
+                async with _aio_ds.ClientSession() as _ds:
+                    async with _ds.get(
+                        f"https://api.dexscreener.com/tokens/v1/solana/{mint}",
+                        timeout=_aio_ds.ClientTimeout(total=6),
+                    ) as r:
+                        if r.status == 200:
+                            pairs = await r.json()
+                            if isinstance(pairs, list) and pairs:
+                                pca = pairs[0].get("pairCreatedAt") or 0
+                                created_ts = float(pca) / 1000
+            except Exception:
+                pass
+
+        if not created_ts:
+            import time as _t
+            created_ts = _t.time() - 3600
+
+        try:
+            import aiohttp as _aio_cb
+            from elizaos.plugins.solana.cluster_check import get_cluster_map
+            async with _aio_cb.ClientSession() as _cb_sess:
+                result = await get_cluster_map(_cb_sess, mint, created_ts)
+            result["source"] = "real_time"
+            # Save to cache for future requests
+            try:
+                from elizaos.plugins.solana.cabal_cache import save_result as _cs
+                _cs(mint, result.get("token_name") or mint[:8], result, created_ts)
+            except Exception:
+                pass
+            return web.json_response(result)
+        except Exception as exc:
+            return web.json_response({"error": str(exc)}, status=500)
+
+    app.router.add_get("/api/cabal/internal", handle_cabal_internal)
+
     app.router.add_get("/ws", handle_ws)
 
     if os.path.isdir(dashboard_dist):

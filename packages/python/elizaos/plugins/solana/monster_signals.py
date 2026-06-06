@@ -960,11 +960,21 @@ async def _run_cluster_check_bg(
     pair_created_ts: float,
     lc_entry: dict,
 ) -> None:
-    """Background task: run cluster check and store result in lc_entry["cluster"]."""
+    """Background task: run cluster check and store result in lc_entry["cluster"].
+    Also persists to cabal_cache SQLite so the Cabal-Hunter MCP server can serve
+    pre-indexed results without re-running the analysis.
+    """
     try:
         from elizaos.plugins.solana.cluster_check import check_holder_clusters
         result = await check_holder_clusters(session, mint, pair_created_ts)
         lc_entry["cluster"] = result
+        # Persist to shared cache for the Cabal-Hunter SaaS
+        try:
+            from elizaos.plugins.solana.cabal_cache import save_result as _cache_save
+            sym = lc_entry.get("sym") or mint[:8]
+            _cache_save(mint, sym, result, pair_created_ts)
+        except Exception:
+            pass
         risk    = result.get("risk", "CLEAN")
         checked = result.get("wallets_checked", 0)
         reason  = result.get("skip_reason")
