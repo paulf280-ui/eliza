@@ -2643,22 +2643,32 @@ When adjusting a filter, always explain your reasoning based on the data above."
             positions = _mon.open_positions()
             if positions:
                 status_lines.append(f"Open positions: {len(positions)} — {', '.join(m[:8] for m in list(positions)[:5])}")
-                # Inject cluster/bubble-map data for the first open position
-                first_mint = next(iter(positions))
-                first_pos  = positions[first_mint]
-                _cd = first_pos.get("cluster_data")
-                if _cd:
-                    _cr = _cd.get("risk", "CLEAN")
-                    _cc = _cd.get("clusters") or []
-                    if _cc:
-                        _c0 = _cc[0]
-                        status_lines.append(
-                            f"Holder cluster ({first_mint[:8]}…): risk={_cr} — "
-                            f"{_c0['wallet_count']} wallets from same funder hold "
-                            f"{_c0['combined_pct']}% supply ({_c0['risk']})"
-                        )
-                    else:
-                        status_lines.append(f"Holder cluster ({first_mint[:8]}…): CLEAN")
+                # Inject cluster/bubble-map data for ALL open positions
+                # NOTE: cluster_data IS the bubble map analysis (holder cluster detection
+                # via Helius RPC). "bubble map" = cluster_data in the codebase.
+                # Live bubble map for any token: GET /api/cluster-map?mint=MINT_ADDRESS
+                status_lines.append(
+                    "BUBBLE MAP NOTE: In this codebase 'bubble map' = cluster_data field "
+                    "(holder cluster detection via Helius RPC). "
+                    "Live bubble map for any token: GET /api/cluster-map?mint=MINT_ADDRESS. "
+                    "In closed trades, cluster_data.risk is CLEAN/MEDIUM/HIGH. "
+                    "CLEAN = no coordinated wallets. HIGH = 3+ wallets from same funder."
+                )
+                for _mint, _pos in positions.items():
+                    _cd = _pos.get("cluster_data")
+                    if _cd:
+                        _cr = _cd.get("risk", "CLEAN")
+                        _cc = _cd.get("clusters") or []
+                        _tn = _pos.get("token_name", _mint[:8])
+                        if _cc:
+                            _c0 = _cc[0]
+                            status_lines.append(
+                                f"Bubble map {_tn} ({_mint[:8]}…): risk={_cr} — "
+                                f"{_c0.get('wallet_count','?')} wallets from same funder "
+                                f"hold {_c0.get('combined_pct','?')}% supply"
+                            )
+                        else:
+                            status_lines.append(f"Bubble map {_tn} ({_mint[:8]}…): CLEAN — no clusters")
             else:
                 status_lines.append("Open positions: none")
         except Exception:

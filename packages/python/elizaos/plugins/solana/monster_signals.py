@@ -3526,7 +3526,8 @@ VELOCITY_MIN_BUY_RATIO      = 55.0      # buyers must dominate at 1h mark
 VELOCITY_MAX_TOP10_PCT      = 15.0      # tight — broad distribution required
 VELOCITY_MAX_TOP1_PCT       = 8.0
 VELOCITY_MIN_M5_PCT         = -5.0      # allow small dips at entry
-VELOCITY_MAX_M5_PCT         = 20.0      # but not mid-spike
+VELOCITY_MAX_M5_PCT         =  8.0      # tightened from 20 — CONVAI post-mortem: m5=+16%
+                                         # was mid-spike entry that peaked immediately
 VELOCITY_POLL_SECS          = 45        # faster than lifecycle (45s)
 
 
@@ -3598,6 +3599,18 @@ async def velocity_scout_loop(runtime: Any, session: aiohttp.ClientSession) -> N
 
                 # ── Gate 3: m5 — not in free-fall, not mid-spike ─────────────
                 if not (VELOCITY_MIN_M5_PCT <= m5 <= VELOCITY_MAX_M5_PCT):
+                    continue
+
+                # ── Gate 3b: Peak-retracement check — "dead cat" filter ───────
+                # Tokens that pumped hard in the FIRST 30 MINUTES have h1 > 150%
+                # but by the 1h mark the price is already falling.
+                # Signal: h1 very high BUT m5 flat/small = the big move is done.
+                # 1 TURD post-mortem: h1=+217%, m5=+3.99% → peaked at $450K in
+                # first 25 min, we entered at $260K (-42% from peak). Dead cat.
+                # Block if: h1 > 150% AND m5 < +2% — momentum exhausted.
+                if h1 > 150.0 and m5 < 2.0:
+                    print(f"[velocity] ⏭ {mint[:8]} dead-cat filter: "
+                          f"h1={h1:+.0f}% but m5={m5:+.1f}% — peak was earlier, skip")
                     continue
 
                 # ── Gate 4: MC and liquidity ──────────────────────────────────
