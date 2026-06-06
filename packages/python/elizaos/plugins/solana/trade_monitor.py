@@ -931,21 +931,30 @@ class AICascade:
             d = json.loads(ctx)
             if d.get("dex") == "meteora":
                 return "meteora"
-            return d.get("strategy") or "copy_trade"
+            strat = d.get("strategy") or ""
+            if "velocity" in strat:
+                return "velocity"
+            return strat or "copy_trade"
         except Exception:
             return "copy_trade"
 
     async def _call_groq(self, ctx: str, session: aiohttp.ClientSession) -> AIDecision | None:
         is_meteora = self._is_meteora(ctx)
+        is_velocity = self._strategy_hint(ctx) == "velocity"
         patterns = _get_learned_patterns(self._strategy_hint(ctx))
         brain_ctx = _bm.brain_memory_as_prompt("groq")
         system_note = (
             "You are a Solana meme-coin trading exit advisor. Respond with a single JSON object only — no prose, no markdown fences. The JSON must contain action (HOLD|SELL|WATCH), confidence (0.0-1.0), reason, and urgency (low|medium|high).\n"
             + patterns + brain_ctx
         )
-        prompt_tmpl = _METEORA_HOLD_SELL_PROMPT if is_meteora else _HOLD_SELL_PROMPT
-        prompt = prompt_tmpl.format(context=ctx)
-        full_prompt = f"{system_note}\n\n{prompt}"
+        if is_velocity:
+            prompt_tmpl = _VELOCITY_HOLD_SELL_PROMPT
+            prompt = prompt_tmpl.format(context=ctx)
+            full_prompt = prompt  # velocity prompt already has system instructions baked in
+        else:
+            prompt_tmpl = _METEORA_HOLD_SELL_PROMPT if is_meteora else _HOLD_SELL_PROMPT
+            prompt = prompt_tmpl.format(context=ctx)
+            full_prompt = f"{system_note}\n\n{prompt}"
 
         # Cluster / bubble-map context — injected if available for this position.
         if self._cluster_data:
@@ -1003,16 +1012,20 @@ class AICascade:
             return None
 
     async def _call_gemini(self, ctx: str, session: aiohttp.ClientSession) -> AIDecision | None:
-        is_meteora = self._is_meteora(ctx)
+        is_meteora  = self._is_meteora(ctx)
+        is_velocity = self._strategy_hint(ctx) == "velocity"
         patterns = _get_learned_patterns(self._strategy_hint(ctx))
         brain_ctx = _bm.brain_memory_as_prompt("gemini")
         system_note = (
             "You are a Solana meme-coin trading exit advisor. Respond with JSON only.\n"
             + patterns + brain_ctx
         )
-        prompt_tmpl = _METEORA_HOLD_SELL_PROMPT if is_meteora else _HOLD_SELL_PROMPT
-        prompt = prompt_tmpl.format(context=ctx)
-        full_prompt = f"{system_note}\n\n{prompt}"
+        if is_velocity:
+            full_prompt = _VELOCITY_HOLD_SELL_PROMPT.format(context=ctx)
+        else:
+            prompt_tmpl = _METEORA_HOLD_SELL_PROMPT if is_meteora else _HOLD_SELL_PROMPT
+            prompt = prompt_tmpl.format(context=ctx)
+            full_prompt = f"{system_note}\n\n{prompt}"
         if self._cluster_data:
             full_prompt = full_prompt + "\n\n" + _format_cluster_for_prompt(self._cluster_data)
         body = {
@@ -1832,6 +1845,57 @@ POSITION DATA:
 
 Respond with JSON only — same shape as examples above. The `risk` field is the primary signal the code acts on. Be precise: only HIGH when multiple gates confirm danger simultaneously.
 {{"reasoning": {{"G1_HOLDER_FLOW":"...","G2_LIQUIDITY":"...","G3_BUY_PRESSURE":"...","G4_PRICE_ACTION":"...","G5_PHASE":"...","G6_PULLBACK_SHAPE":"...","G7_WHALE_PATTERN":"..."}}, "risk": "LOW"|"MEDIUM"|"HIGH", "action": "HOLD"|"SELL"|"WATCH", "confidence": 0.0-1.0, "reason": "one sentence", "urgency": "low"|"medium"|"high"}}"""
+
+
+_VELOCITY_HOLD_SELL_PROMPT = """You are Groq, the SPEED brain on a Solana meme-coin velocity trade.
+This is Strategy F — Monster Velocity. Read the entire briefing before deciding.
+
+=== VELOCITY STRATEGY BRIEFING ===
+
+Entry criteria already met: token was 55-90 min old, h1 > 100%, LP burned, top10 < 15%, cluster CLEAN.
+Target: +200% TP (3× entry price). This fires automatically — your job is NOT to call the TP.
+No hard SL. The position WILL have dips. That is normal. Do NOT sell on consolidation.
+
+=== YOUR SINGLE JOB ===
+
+Protect against RUIN before the +200% TP fires.
+- HOLD through normal staircase dips (🟢🔴🟢🔴🟢 = healthy, buyers re-entering)
+- SELL when the pump is OVER and the dump is starting
+
+=== 1-MINUTE CANDLE EXIT SIGNALS — KNOW THESE ===
+
+SELL immediately if ANY of these appear:
+  1. Dead candles: ➖➖➖➖➖ flat, zero volume — no buyers, token is dead
+  2. Volume exhaust: S1 fires on a RED candle (vol ≥ 3× MA10 but price FALLING = smart money exiting fast)
+  3. Distribution: 5+ consecutive red candles with declining volume — someone is slowly dumping into bids
+  4. Staircase broken: each bounce is lower than the previous (lower highs, lower lows on bounces)
+  5. Volume per candle is DECREASING over 5+ candles while price is flat — no new buyers entering
+
+HOLD through:
+  - Single red candle after green run (normal consolidation before next leg)
+  - Brief dip to -10% to -15% if volume on the red candles is LOW (weak selling)
+  - Staircase pattern with alternating candles — this is how a 200% run builds
+
+=== CONTEXT YOU ARE RECEIVING ===
+
+You get: current P&L, holder delta, buy/sell ratio, liquidity, 1m candle S1/S2 signals, bubble map data.
+The candle data (S1/S2 in the 1M CANDLE SIGNALS section) is YOUR PRIMARY SIGNAL for timing the exit.
+S1 = volume spike (≥3× MA10). S2 = range breakout (close above recent highs).
+
+If S1✅ on GREEN candle = buying surge, momentum alive → HOLD
+If S1✅ on RED candle = volume into a dump → SELL
+If S1❌ + S2❌ + flat candles = dead momentum → SELL (or WATCH if you want one more cycle)
+If S2✅ = breakout just happened → HOLD, next leg starting
+
+=== KEY RULE FOR VELOCITY ===
+You are watching for the PEAK. When volume stops growing with each leg up, the pump is exhausting.
+"Staircase with declining volume" means we're in distribution — exit before the crash.
+
+Respond with JSON only:
+{{"action": "HOLD"|"SELL"|"WATCH", "confidence": 0.0-1.0, "reason": "one sentence citing specific candle/volume signal", "urgency": "low"|"medium"|"high"}}
+
+=== POSITION DATA ===
+{context}"""
 
 
 _METEORA_HOLD_SELL_PROMPT = """You are a quant trader managing a Meteora DLMM meme-coin position. Think precisely.

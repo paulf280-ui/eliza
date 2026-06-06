@@ -1863,17 +1863,19 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                             # deeper brain's HOLD signal deserves more weight on
                             # previously-winning positions. Claude SELLs always
                             # use the base 0.70 (we trust the depth tier).
-                            min_conf = 0.70
-                            if (tier != "claude"
+                            # Velocity positions have NO hard SL — Groq is the primary
+                            # exit authority. Lower threshold so he acts decisively
+                            # on candle/volume signals without needing extreme confidence.
+                            is_vel_pos = _is_velocity_source(pos.get("signal_source"))
+                            min_conf = 0.65 if is_vel_pos else 0.70
+                            if (not is_vel_pos
+                                and tier != "claude"
                                 and peak_pnl >= 5.0
                                 and cur_pnl > -10.0
                                 and drawdown_from_peak < 10.0):
-                                # Only protect when drawdown from peak is small (<10%).
-                                # If we've given back ≥10% from peak the token is
-                                # genuinely rolling over — let the brain exit at 0.70.
-                                # HANTA 2026-05-07: peaked +30.9%, Groq correctly
-                                # read rollover at +17% (13% drawdown) but was blocked
-                                # by 0.90 threshold and we rode it down.
+                                # Only protect lifecycle positions with small drawdown.
+                                # Velocity positions don't get this — they need Groq
+                                # to be responsive when the candles turn bearish.
                                 min_conf = 0.90
 
                             # Claude-HOLD veto on lower tiers — extends below
@@ -1889,7 +1891,10 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
                             if tier != "claude":
                                 try:
                                     from elizaos.plugins.solana import brain_memory as _bm_v
-                                    claude_veto, claude_veto_conf = _bm_v.claude_recently_holding(mint, 600)
+                                    # Velocity: tighter Claude veto window (120s vs 600s) —
+                                    # Groq should be more decisive on velocity candle signals.
+                                    veto_window = 120 if is_vel_pos else 600
+                                    claude_veto, claude_veto_conf = _bm_v.claude_recently_holding(mint, veto_window)
                                 except Exception:
                                     pass
 
