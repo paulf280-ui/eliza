@@ -42,7 +42,27 @@
     position: sticky; top: 0; z-index: 100;
     backdrop-filter: blur(12px);
   }
-  .header-brand { display: flex; align-items: center; gap: 10px; }
+  .header-brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .header-center { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; }
+  .token-name { font-size: 17px; font-weight: 800; color: var(--text); letter-spacing: -0.4px; }
+  .token-mint-row { display: flex; align-items: center; gap: 6px; }
+  .copy-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px;
+    padding: 2px 4px; border-radius: 4px; transition: color 0.15s;
+  }
+  .copy-btn:hover { color: var(--text); }
+  .header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .chart-links { display: flex; gap: 6px; }
+  .chart-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 700;
+    text-decoration: none; letter-spacing: 0.3px; transition: opacity 0.15s;
+    white-space: nowrap;
+  }
+  .chart-btn:hover { opacity: 0.8; }
+  .axiom-btn { background: rgba(249,115,22,0.15); color: #fb923c; border: 1px solid rgba(249,115,22,0.35); }
+  .gmgn-btn  { background: rgba(20,184,166,0.15); color: #2dd4bf; border: 1px solid rgba(20,184,166,0.35); }
+  .ds-btn    { background: rgba(99,102,241,0.15);  color: #818cf8; border: 1px solid rgba(99,102,241,0.35); }
   .brand-icon {
     width: 32px; height: 32px; border-radius: 8px;
     background: linear-gradient(135deg, #ff4d6d, #7c3aed);
@@ -120,8 +140,12 @@
   .holder-row:hover { background: rgba(255,255,255,0.03); }
   .holder-rank { font-size: 11px; color: var(--muted); width: 20px; text-align: right; flex-shrink: 0; }
   .holder-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .holder-addr { font-family: monospace; font-size: 11px; flex: 1; color: var(--text); }
-  .holder-pct { font-size: 12px; font-weight: 600; color: var(--text); }
+  .holder-addr {
+    font-family: monospace; font-size: 11px; flex: 1; color: var(--text);
+    text-decoration: none; transition: color 0.15s;
+  }
+  .holder-addr:hover { color: #60a5fa; text-decoration: underline; }
+  .holder-pct { font-size: 12px; font-weight: 600; }
   .lp-badge { font-size: 9px; background: rgba(255,255,255,0.08); color: var(--muted); padding: 1px 5px; border-radius: 3px; }
 
   /* ── Canvas ── */
@@ -195,8 +219,31 @@
       <div class="brand-sub">Solana Token Cluster Analysis</div>
     </div>
   </div>
-  <div class="header-token" id="mint-display">Loading…</div>
-  <div class="risk-badge" id="risk-badge" style="display:none"></div>
+
+  <!-- Token info — populated after data loads -->
+  <div class="header-center" id="header-center" style="display:none">
+    <div class="token-name" id="token-name-display"></div>
+    <div class="token-mint-row">
+      <span class="header-token" id="mint-display"></span>
+      <button class="copy-btn" id="copy-mint-btn" title="Copy mint address">⎘</button>
+    </div>
+  </div>
+
+  <div class="header-right">
+    <!-- Live chart links -->
+    <div class="chart-links" id="chart-links" style="display:none">
+      <a class="chart-btn axiom-btn" id="axiom-link" target="_blank" rel="noopener" title="Open on Axiom">
+        ⚡ Axiom
+      </a>
+      <a class="chart-btn gmgn-btn" id="gmgn-link" target="_blank" rel="noopener" title="Open on GMGN">
+        📊 GMGN
+      </a>
+      <a class="chart-btn ds-btn" id="ds-link" target="_blank" rel="noopener" title="Open on DexScreener">
+        📈 Dex
+      </a>
+    </div>
+    <div class="risk-badge" id="risk-badge" style="display:none"></div>
+  </div>
 </div>
 
 <div class="main">
@@ -279,17 +326,24 @@
   <div class="tt-row"><span>Holdings</span><span class="tt-val" id="tt-pct"></span></div>
   <div class="tt-row"><span>Rank</span><span class="tt-val" id="tt-rank"></span></div>
   <div class="tt-cluster" id="tt-cluster" style="display:none"></div>
+  <div id="tt-hint" style="margin-top:8px;font-size:10px;color:#3b82f6;"></div>
 </div>
 
 <script>
 // ── Colour palette ────────────────────────────────────────────────────────────
 const CLUSTER_COLOURS = ['#ff4d6d','#7c3aed','#0ea5e9','#f59e0b','#10b981','#ec4899','#06b6d4'];
 const LP_COLOUR   = '#1e293b';
-const SOLO_COLOUR = '#334155';
 const RISK_COLOURS = { HIGH: '#ff4d6d', MEDIUM: '#f59e0b', CLEAN: '#10b981' };
 
-function clusterColour(id) {
-  if (id === null || id === undefined) return SOLO_COLOUR;
+// Each independent (non-cluster) holder gets a unique muted colour by rank
+// so they're visually distinguishable without competing with vivid cluster colours
+function soloColour(rank) {
+  const hue = (rank * 43 + 200) % 360;
+  return `hsl(${hue},22%,38%)`;
+}
+
+function clusterColour(id, rank) {
+  if (id === null || id === undefined) return soloColour(rank || 0);
   return CLUSTER_COLOURS[id % CLUSTER_COLOURS.length];
 }
 
@@ -337,8 +391,30 @@ function render(data) {
   const timeMs    = data.analysis_time_ms;
   const tokenName = data.token_name || MINT.slice(0,8);
 
-  // Header
+  // ── Populate header ────────────────────────────────────────────────────────
   document.title = `Cabal-Hunter — ${tokenName}`;
+
+  // Token name + mint
+  const headerCenter = document.getElementById('header-center');
+  document.getElementById('token-name-display').textContent = tokenName || MINT.slice(0,8)+'…';
+  document.getElementById('mint-display').textContent = MINT.slice(0,8)+'…'+MINT.slice(-4);
+  headerCenter.style.display = '';
+
+  // Copy mint button
+  document.getElementById('copy-mint-btn').addEventListener('click', () => {
+    navigator.clipboard.writeText(MINT).then(() => {
+      const btn = document.getElementById('copy-mint-btn');
+      btn.textContent = '✓'; setTimeout(() => { btn.textContent = '⎘'; }, 1500);
+    });
+  });
+
+  // Live chart links
+  document.getElementById('axiom-link').href = `https://axiom.trade/t/${MINT}`;
+  document.getElementById('gmgn-link').href  = `https://gmgn.ai/sol/token/${MINT}`;
+  document.getElementById('ds-link').href    = `https://dexscreener.com/solana/${MINT}`;
+  document.getElementById('chart-links').style.display = '';
+
+  // Risk badge
   const badge = document.getElementById('risk-badge');
   badge.textContent = risk;
   badge.className = `risk-badge risk-${risk}`;
@@ -394,17 +470,23 @@ function render(data) {
     document.getElementById('clusters-section').innerHTML = html;
   }
 
-  // Holders section
+  // Holders section — addresses link to Solscan for copy-trading research
   if (holders.length) {
-    let html = `<div class="section-title">Top Holders (${holders.length})</div>`;
+    let html = `<div class="section-title">Top Holders — click to research on Solscan</div>`;
     holders.forEach(h => {
-      const col = h.is_lp ? LP_COLOUR : clusterColour(h.cluster_id);
+      const col   = h.is_lp ? LP_COLOUR : clusterColour(h.cluster_id, h.rank);
       const extra = h.is_lp ? '<span class="lp-badge">LP</span>' : '';
+      const addr  = h.address || h.address_short;
       html += `
         <div class="holder-row">
           <div class="holder-rank">#${h.rank}</div>
           <div class="holder-dot" style="background:${col}"></div>
-          <div class="holder-addr">${h.label || h.address_short} ${extra}</div>
+          <a class="holder-addr"
+             href="https://solscan.io/account/${addr}"
+             target="_blank" rel="noopener"
+             title="View ${h.label || h.address_short} on Solscan">
+            ${h.label || h.address_short} ${extra}
+          </a>
           <div class="holder-pct" style="color:${col}">${h.pct.toFixed(2)}%</div>
         </div>`;
     });
@@ -435,7 +517,7 @@ function drawGraph(holders, clusters, totalSupply) {
   const nodes = holders.map(h => ({
     ...h,
     r:     rScale(h.pct),
-    color: h.is_lp ? LP_COLOUR : clusterColour(h.cluster_id),
+    color: h.is_lp ? LP_COLOUR : clusterColour(h.cluster_id, h.rank),
   }));
 
   // links — connect cluster members to each other
@@ -543,10 +625,16 @@ function drawGraph(holders, clusters, totalSupply) {
     .attr('dy', '1em')
     .text(d => d.pct.toFixed(1)+'%');
 
-  // Tooltip interaction
+  // Tooltip + click interaction
   const tt = document.getElementById('tooltip');
   nodeSel
+    .on('click', (evt, d) => {
+      // Open full wallet on Solscan for copy-trading / deep-dive research
+      const addr = d.address || d.address_short;
+      window.open(`https://solscan.io/account/${addr}`, '_blank', 'noopener');
+    })
     .on('mousemove', (evt, d) => {
+      const addr = d.address || d.address_short;
       document.getElementById('tt-name').textContent = d.label || d.address_short;
       document.getElementById('tt-pct').textContent  = d.pct.toFixed(3)+'%';
       document.getElementById('tt-rank').textContent = '#'+d.rank;
@@ -554,12 +642,15 @@ function drawGraph(holders, clusters, totalSupply) {
       if (d.cluster_id !== null && d.cluster_id !== undefined) {
         const c = clusters[d.cluster_id];
         cEl.style.display = '';
-        cEl.innerHTML = `<span style="color:${clusterColour(d.cluster_id)}">●</span> Cluster ${d.cluster_id+1} — ${c?.combined_pct?.toFixed(1)}% combined — ${c?.risk}`;
+        cEl.innerHTML = `<span style="color:${clusterColour(d.cluster_id, d.rank)}">●</span> Cluster ${d.cluster_id+1} — ${c?.combined_pct?.toFixed(1)}% combined — ${c?.risk}`;
       } else {
         cEl.style.display = 'none';
       }
+      // Show "click to research" hint
+      const hintEl = document.getElementById('tt-hint');
+      if (hintEl) hintEl.textContent = `🔗 Click to view ${(addr).slice(0,8)}… on Solscan`;
       const x = Math.min(evt.clientX + 16, window.innerWidth  - 230);
-      const y = Math.min(evt.clientY + 16, window.innerHeight - 120);
+      const y = Math.min(evt.clientY + 16, window.innerHeight - 130);
       tt.style.left = x+'px'; tt.style.top = y+'px'; tt.style.display = '';
     })
     .on('mouseleave', () => { tt.style.display = 'none'; });
