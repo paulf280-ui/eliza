@@ -308,17 +308,18 @@ async function fetchData() {
   if (!MINT) return;
   document.getElementById('mint-display').textContent = MINT.slice(0,8)+'…'+MINT.slice(-4);
   try {
-    const res = await fetch(`/api/cabal/internal?mint=${MINT}`, {
-      headers: { 'X-Internal-Secret': '' }  // public map — no secret required
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+    const res = await fetch(`/api/map-data?mint=${encodeURIComponent(MINT)}`);
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`HTTP ${res.status}: ${txt}`);
+    }
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     render(data);
   } catch(e) {
     document.getElementById('loading').style.display = 'none';
     document.getElementById('error-screen').style.display = 'flex';
-    document.getElementById('error-msg').textContent = 'Analysis unavailable for this token.\n'+e.message;
+    document.getElementById('error-msg').textContent = 'Analysis unavailable for this token.\n'+(e instanceof Error ? e.message : String(e));
   }
 }
 

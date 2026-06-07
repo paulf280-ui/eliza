@@ -35,12 +35,43 @@ export function createApp(): express.Application {
   app.use(express.json({ limit: "512kb" }))
 
   // ── Serve the bubble map page ─────────────────────────────────────────────────
-  // Free to VIEW — great marketing, shows what the tool returns
-  // GET /map?mint=<address>
   const publicDir = join(__dirname, "..", "public")
   app.use("/public", express.static(publicDir))
   app.get("/map", (_req, res) => {
     res.sendFile(join(publicDir, "map.html"))
+  })
+
+  // ── Map data endpoint — called by map.html JavaScript (no payment required) ──
+  // Always calls the Python bot's full get_cluster_map() which returns the complete
+  // holder list with cluster assignments needed for the visual rendering.
+  app.get("/api/map-data", async (req: Request, res: Response): Promise<void> => {
+    const mint = (req.query.mint as string ?? "").trim()
+    if (!mint || mint.length < 32) {
+      res.status(400).json({ error: "mint required" }); return
+    }
+    try {
+      const botUrl    = process.env.BOT_INTERNAL_URL ?? "http://127.0.0.1:3001"
+      const secret    = process.env.CABAL_INTERNAL_SECRET ?? ""
+      const createdTs = req.query.created_ts as string | undefined
+      const params    = new URLSearchParams({ mint })
+      if (createdTs) params.set("created_ts", createdTs)
+
+      const upstream = await fetch(`${botUrl}/api/cabal/internal?${params}`, {
+        headers: secret ? { "X-Internal-Secret": secret } : {},
+      })
+      if (!upstream.ok) {
+        const txt = await upstream.text().catch(() => "unknown")
+        res.status(upstream.status).json({ error: `upstream error: ${txt}` })
+        return
+      }
+      const data = await upstream.json()
+      res.json(data)
+    } catch (err) {
+      res.status(500).json({
+        error: "analysis_failed",
+        message: err instanceof Error ? err.message : "unknown error",
+      })
+    }
   })
 
   // ── Health check ─────────────────────────────────────────────────────────────

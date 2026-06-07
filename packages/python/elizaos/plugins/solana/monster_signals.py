@@ -965,10 +965,18 @@ async def _run_cluster_check_bg(
     pre-indexed results without re-running the analysis.
     """
     try:
-        from elizaos.plugins.solana.cluster_check import check_holder_clusters
-        result = await check_holder_clusters(session, mint, pair_created_ts)
-        lc_entry["cluster"] = result
-        # Persist to shared cache for the Cabal-Hunter SaaS
+        # Use get_cluster_map() so the cache has full holder data for the
+        # Cabal-Hunter SaaS bubble map visualization.
+        from elizaos.plugins.solana.cluster_check import get_cluster_map
+        result = await get_cluster_map(session, mint, pair_created_ts)
+        # lc_entry["cluster"] uses the summary keys (risk, clusters, wallets_checked)
+        lc_entry["cluster"] = {
+            "risk":            result.get("risk", "CLEAN"),
+            "clusters":        result.get("clusters", []),
+            "wallets_checked": result.get("wallets_checked", 0),
+            "skip_reason":     result.get("skip_reason"),
+        }
+        # Persist full result (including holders) to the SaaS cache
         try:
             from elizaos.plugins.solana.cabal_cache import save_result as _cache_save
             sym = lc_entry.get("sym") or mint[:8]

@@ -3005,11 +3005,14 @@ When adjusting a filter, always explain your reasoning based on the data above."
         if not mint:
             return web.json_response({"error": "mint required"}, status=400)
 
-        # Check pre-indexed cache first (sub-100ms)
+        # Check pre-indexed cache first (sub-100ms).
+        # Only use cache if it has full holder data (holders list populated).
+        # Cached results from check_holder_clusters() have empty holders —
+        # those need to run get_cluster_map() for the visual bubble map.
         try:
-            from elizaos.plugins.solana.cabal_cache import get_result as _cache_get, cache_size as _cache_size
+            from elizaos.plugins.solana.cabal_cache import get_result as _cache_get
             cached = _cache_get(mint)
-            if cached:
+            if cached and len(cached.get("holders") or []) > 0:
                 cached["source"] = "pre_indexed"
                 return web.json_response(cached)
         except Exception:
