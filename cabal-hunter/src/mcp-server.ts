@@ -1,3 +1,5 @@
+import { createRequire } from "module"
+const require = createRequire(import.meta.url)
 /**
  * mcp-server.ts — Model Context Protocol server for Cabal-Hunter.
  *
@@ -20,8 +22,8 @@
  *   }
  */
 
-import { McpServer }     from "@modelcontextprotocol/sdk/server/mcp.js"
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js"
+const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js")
+const { StreamableHTTPServerTransport } = require("@modelcontextprotocol/sdk/server/streamableHttp.js")
 import { Request, Response } from "express"
 import { z }             from "zod"
 import { getCabalReport } from "./detector.js"
@@ -31,7 +33,7 @@ import crypto from "crypto"
 const PRICE_USDC = parseFloat(process.env.PRICE_PER_QUERY_USDC ?? "0.05")
 
 /** Create and configure the MCP server instance */
-export function createMcpServer(): McpServer {
+export function createMcpServer() {
   const server = new McpServer({
     name:    process.env.MCP_SERVER_NAME    ?? "cabal-hunter",
     version: process.env.MCP_SERVER_VERSION ?? "1.0.0",
@@ -64,7 +66,7 @@ export function createMcpServer(): McpServer {
         .optional()
         .describe("Optional: DexScreener pairCreatedAt timestamp in milliseconds. Speeds up analysis when provided."),
     },
-    async ({ mintAddress, pairCreatedAt }, extra) => {
+    async ({ mintAddress, pairCreatedAt }: { mintAddress: string; pairCreatedAt?: number }, extra: Record<string, unknown>) => {
       const t0 = Date.now()
 
       // Extract payment signature from MCP request metadata or context

@@ -2995,7 +2995,10 @@ When adjusting a filter, always explain your reasoning based on the data above."
         Requires X-Internal-Secret header matching CABAL_INTERNAL_SECRET env var.
         """
         secret = os.getenv("CABAL_INTERNAL_SECRET", "")
-        if secret and request.headers.get("X-Internal-Secret") != secret:
+        # Allow localhost requests without secret (map page calls from same server)
+        peer = request.transport.get_extra_info("peername", ("",0))[0] if request.transport else ""
+        is_local = peer in ("127.0.0.1", "::1", "localhost")
+        if secret and not is_local and request.headers.get("X-Internal-Secret") != secret:
             return web.json_response({"error": "unauthorized"}, status=401)
 
         mint = request.rel_url.query.get("mint", "").strip()

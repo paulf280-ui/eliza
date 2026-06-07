@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cabal-Hunter — Holder Cluster Map</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  :root {
+    --bg:        #07080f;
+    --surface:   #0d0f1e;
+    --border:    rgba(255,255,255,0.07);
+    --text:      #e2e8f0;
+    --muted:     #64748b;
+    --c0: #ff4d6d; --c0g: rgba(255,77,109,0.18);
+    --c1: #7c3aed; --c1g: rgba(124,58,237,0.18);
+    --c2: #0ea5e9; --c2g: rgba(14,165,233,0.18);
+    --c3: #f59e0b; --c3g: rgba(245,158,11,0.18);
+    --c4: #10b981; --c4g: rgba(16,185,129,0.18);
+    --c5: #ec4899; --c5g: rgba(236,72,153,0.18);
+    --lp:  #1e293b;
+    --solo: #334155;
+    --high:   #ff4d6d;
+    --medium: #f59e0b;
+    --clean:  #10b981;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', 'SF Pro Display', system-ui, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .header-brand { display: flex; align-items: center; gap: 10px; }
+  .brand-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, #ff4d6d, #7c3aed);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 900; color: white; letter-spacing: -1px;
+  }
+  .brand-name { font-size: 15px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+  .brand-sub  { font-size: 11px; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; }
+  .header-token { font-family: monospace; font-size: 12px; color: var(--muted); }
+  .risk-badge {
+    padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 800;
+    letter-spacing: 1px; text-transform: uppercase;
+  }
+  .risk-HIGH   { background: rgba(255,77,109,0.15); color: #ff4d6d; border: 1px solid rgba(255,77,109,0.4); }
+  .risk-MEDIUM { background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.4); }
+  .risk-CLEAN  { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.4); }
+
+  /* ── Layout ── */
+  .main { display: flex; height: calc(100vh - 57px); }
+  .canvas-area { flex: 1; position: relative; overflow: hidden; }
+  .sidebar {
+    width: 300px; background: var(--surface); border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  }
+
+  /* ── Score Gauge ── */
+  .gauge-section {
+    padding: 20px; border-bottom: 1px solid var(--border); text-align: center;
+  }
+  .gauge-wrap { position: relative; width: 140px; height: 140px; margin: 0 auto 12px; }
+  .gauge-svg { width: 140px; height: 140px; }
+  .gauge-value {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .gauge-num { font-size: 32px; font-weight: 900; line-height: 1; }
+  .gauge-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
+  .verdict-text { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 8px; }
+
+  /* ── Stats row ── */
+  .stats-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+    background: var(--border); border-bottom: 1px solid var(--border);
+  }
+  .stat-cell {
+    background: var(--surface); padding: 12px 16px;
+  }
+  .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
+  .stat-value { font-size: 18px; font-weight: 700; }
+
+  /* ── Clusters list ── */
+  .section-title {
+    padding: 14px 16px 8px; font-size: 10px; font-weight: 700;
+    color: var(--muted); text-transform: uppercase; letter-spacing: 1px;
+  }
+  .cluster-card {
+    margin: 0 12px 8px; padding: 12px; border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .cluster-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .cluster-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-right: 8px; }
+  .cluster-name { font-size: 13px; font-weight: 600; display: flex; align-items: center; }
+  .cluster-risk { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+  .cluster-meta { font-size: 11px; color: var(--muted); }
+  .cluster-bar-bg { height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; margin-top: 8px; }
+  .cluster-bar-fill { height: 4px; border-radius: 2px; }
+
+  /* ── Holders table ── */
+  .holders-section { padding: 0 0 20px; }
+  .holder-row {
+    display: flex; align-items: center; padding: 8px 16px; gap: 10px;
+    transition: background 0.15s;
+  }
+  .holder-row:hover { background: rgba(255,255,255,0.03); }
+  .holder-rank { font-size: 11px; color: var(--muted); width: 20px; text-align: right; flex-shrink: 0; }
+  .holder-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .holder-addr { font-family: monospace; font-size: 11px; flex: 1; color: var(--text); }
+  .holder-pct { font-size: 12px; font-weight: 600; color: var(--text); }
+  .lp-badge { font-size: 9px; background: rgba(255,255,255,0.08); color: var(--muted); padding: 1px 5px; border-radius: 3px; }
+
+  /* ── Canvas ── */
+  #graph-canvas { width: 100%; height: 100%; display: block; }
+
+  /* ── Tooltip ── */
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 1000;
+    background: rgba(13,15,30,0.97); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px; padding: 12px 16px; min-width: 200px;
+    backdrop-filter: blur(16px); box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    display: none;
+  }
+  .tt-name  { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+  .tt-row   { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+  .tt-val   { color: var(--text); font-weight: 600; }
+  .tt-cluster { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 11px; }
+
+  /* ── Loading / Error ── */
+  .loading-screen, .error-screen {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; color: var(--muted);
+  }
+  .spinner {
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 3px solid rgba(255,77,109,0.2);
+    border-top-color: #ff4d6d;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 13px; letter-spacing: 0.5px; }
+  .error-icon { font-size: 36px; }
+  .error-msg { font-size: 14px; text-align: center; max-width: 280px; line-height: 1.6; }
+
+  /* ── Watermark ── */
+  .watermark {
+    position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; color: rgba(255,255,255,0.12); letter-spacing: 2px;
+    text-transform: uppercase; pointer-events: none; white-space: nowrap;
+  }
+
+  /* ── Analysis time badge ── */
+  .time-badge {
+    position: absolute; bottom: 12px; right: 12px;
+    font-size: 10px; color: var(--muted);
+    background: rgba(255,255,255,0.04); padding: 4px 10px; border-radius: 6px;
+  }
+
+  /* ── Legend ── */
+  .legend {
+    position: absolute; top: 12px; left: 12px;
+    background: rgba(13,15,30,0.85); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px; font-size: 11px;
+    backdrop-filter: blur(8px);
+  }
+  .legend-title { color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; font-size: 9px; margin-bottom: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; color: var(--muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .legend-line { width: 20px; height: 2px; border-radius: 1px; border-top: 2px dashed; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-brand">
+    <div class="brand-icon">CH</div>
+    <div>
+      <div class="brand-name">Cabal-Hunter</div>
+      <div class="brand-sub">Solana Token Cluster Analysis</div>
+    </div>
+  </div>
+  <div class="header-token" id="mint-display">Loading…</div>
+  <div class="risk-badge" id="risk-badge" style="display:none"></div>
+</div>
+
+<div class="main">
+  <!-- Graph canvas -->
+  <div class="canvas-area">
+    <div class="loading-screen" id="loading">
+      <div class="spinner"></div>
+      <div class="loading-text">Tracing wallet funding sources…</div>
+    </div>
+    <div class="error-screen" id="error-screen" style="display:none">
+      <div class="error-icon">⚠</div>
+      <div class="error-msg" id="error-msg">Analysis failed</div>
+    </div>
+    <svg id="graph-canvas" style="display:none"></svg>
+    <div class="legend" id="legend" style="display:none">
+      <div class="legend-title">Legend</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ff4d6d"></div>Cluster (HIGH risk)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Cluster (MEDIUM risk)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#334155"></div>Independent holder</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#1e293b"></div>LP Pool (locked)</div>
+      <div class="legend-item" id="legend-line-item" style="display:none">
+        <div class="legend-line" style="border-color:#ff4d6d;opacity:0.5"></div>
+        Shared funder link
+      </div>
+    </div>
+    <div class="watermark">api.cabal-hunter.com</div>
+    <div class="time-badge" id="time-badge" style="display:none"></div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar" style="display:none">
+    <!-- Score gauge -->
+    <div class="gauge-section">
+      <div class="gauge-wrap">
+        <svg class="gauge-svg" viewBox="0 0 140 140">
+          <circle cx="70" cy="70" r="54" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10"/>
+          <circle id="gauge-arc" cx="70" cy="70" r="54" fill="none" stroke="#ff4d6d" stroke-width="10"
+            stroke-linecap="round" stroke-dasharray="339.3" stroke-dashoffset="339.3"
+            transform="rotate(-90 70 70)" style="transition: stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1), stroke 0.5s"/>
+        </svg>
+        <div class="gauge-value">
+          <div class="gauge-num" id="gauge-num">0</div>
+          <div class="gauge-label">Cabal Score</div>
+        </div>
+      </div>
+      <div class="verdict-text" id="verdict-text"></div>
+    </div>
+
+    <!-- Stats row -->
+    <div class="stats-row">
+      <div class="stat-cell">
+        <div class="stat-label">Holders Traced</div>
+        <div class="stat-value" id="stat-wallets">—</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Clusters Found</div>
+        <div class="stat-value" id="stat-clusters">—</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Controlled %</div>
+        <div class="stat-value" id="stat-controlled">—</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Data Source</div>
+        <div class="stat-value" id="stat-source" style="font-size:12px">—</div>
+      </div>
+    </div>
+
+    <!-- Clusters -->
+    <div id="clusters-section"></div>
+
+    <!-- Holders -->
+    <div class="holders-section" id="holders-section"></div>
+  </div>
+</div>
+
+<!-- Tooltip -->
+<div class="tooltip" id="tooltip">
+  <div class="tt-name" id="tt-name"></div>
+  <div class="tt-row"><span>Holdings</span><span class="tt-val" id="tt-pct"></span></div>
+  <div class="tt-row"><span>Rank</span><span class="tt-val" id="tt-rank"></span></div>
+  <div class="tt-cluster" id="tt-cluster" style="display:none"></div>
+</div>
+
+<script>
+// ── Colour palette ────────────────────────────────────────────────────────────
+const CLUSTER_COLOURS = ['#ff4d6d','#7c3aed','#0ea5e9','#f59e0b','#10b981','#ec4899','#06b6d4'];
+const LP_COLOUR   = '#1e293b';
+const SOLO_COLOUR = '#334155';
+const RISK_COLOURS = { HIGH: '#ff4d6d', MEDIUM: '#f59e0b', CLEAN: '#10b981' };
+
+function clusterColour(id) {
+  if (id === null || id === undefined) return SOLO_COLOUR;
+  return CLUSTER_COLOURS[id % CLUSTER_COLOURS.length];
+}
+
+// ── URL params ────────────────────────────────────────────────────────────────
+const params = new URLSearchParams(location.search);
+const MINT = params.get('mint') || '';
+
+if (!MINT) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('error-screen').style.display = 'flex';
+  document.getElementById('error-msg').textContent = 'No mint address provided.\nUsage: /map?mint=<SOLANA_MINT_ADDRESS>';
+}
+
+// ── Fetch data ────────────────────────────────────────────────────────────────
+async function fetchData() {
+  if (!MINT) return;
+  document.getElementById('mint-display').textContent = MINT.slice(0,8)+'…'+MINT.slice(-4);
+  try {
+    const res = await fetch(`/api/cabal/internal?mint=${MINT}`, {
+      headers: { 'X-Internal-Secret': '' }  // public map — no secret required
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    render(data);
+  } catch(e) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error-screen').style.display = 'flex';
+    document.getElementById('error-msg').textContent = 'Analysis unavailable for this token.\n'+e.message;
+  }
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render(data) {
+  document.getElementById('loading').style.display = 'none';
+
+  const risk      = data.risk || 'CLEAN';
+  const score     = Math.round(data.cabal_score || 0);
+  const clusters  = data.clusters || [];
+  const holders   = data.holders  || [];
+  const checked   = data.wallets_checked || 0;
+  const verdict   = data.verdict  || '';
+  const source    = data.source   || 'real_time';
+  const timeMs    = data.analysis_time_ms;
+  const tokenName = data.token_name || MINT.slice(0,8);
+
+  // Header
+  document.title = `Cabal-Hunter — ${tokenName}`;
+  const badge = document.getElementById('risk-badge');
+  badge.textContent = risk;
+  badge.className = `risk-badge risk-${risk}`;
+  badge.style.display = '';
+
+  // Gauge
+  const arc = document.getElementById('gauge-arc');
+  const circumference = 339.3;
+  const offset = circumference - (score / 100) * circumference;
+  const arcColour = RISK_COLOURS[risk];
+  setTimeout(() => {
+    arc.style.strokeDashoffset = offset;
+    arc.style.stroke = arcColour;
+  }, 100);
+  document.getElementById('gauge-num').textContent = score;
+  document.getElementById('gauge-num').style.color = arcColour;
+  document.getElementById('verdict-text').textContent = verdict;
+
+  // Stats
+  const controlled = clusters.reduce((s,c) => s + (c.combined_pct||0), 0).toFixed(1);
+  document.getElementById('stat-wallets').textContent     = checked || '—';
+  document.getElementById('stat-clusters').textContent    = clusters.length;
+  document.getElementById('stat-controlled').textContent  = clusters.length ? controlled+'%' : '0%';
+  document.getElementById('stat-source').textContent      = source === 'pre_indexed' ? '⚡ Cached' : '🔍 Live';
+
+  if (timeMs) {
+    document.getElementById('time-badge').textContent = `Analysis: ${timeMs}ms`;
+    document.getElementById('time-badge').style.display = '';
+  }
+
+  // Clusters section
+  if (clusters.length) {
+    let html = `<div class="section-title">Coordinated Clusters (${clusters.length})</div>`;
+    clusters.forEach((c, i) => {
+      const col = CLUSTER_COLOURS[i % CLUSTER_COLOURS.length];
+      const riskClass = c.risk === 'HIGH' ? 'risk-HIGH' : 'risk-MEDIUM';
+      html += `
+        <div class="cluster-card" style="border-color:${col}33; background:${col}08">
+          <div class="cluster-header">
+            <div class="cluster-name">
+              <div class="cluster-dot" style="background:${col}"></div>
+              Cluster ${i+1} — ${c.wallet_count} wallets
+            </div>
+            <span class="cluster-risk risk-badge ${riskClass}">${c.risk}</span>
+          </div>
+          <div class="cluster-meta">Master: <code style="color:${col}">${c.master_short}</code></div>
+          <div class="cluster-meta" style="margin-top:4px">Combined supply: <strong>${c.combined_pct}%</strong></div>
+          <div class="cluster-bar-bg">
+            <div class="cluster-bar-fill" style="background:${col}; width:${Math.min(c.combined_pct,100)}%"></div>
+          </div>
+        </div>`;
+    });
+    document.getElementById('clusters-section').innerHTML = html;
+  }
+
+  // Holders section
+  if (holders.length) {
+    let html = `<div class="section-title">Top Holders (${holders.length})</div>`;
+    holders.forEach(h => {
+      const col = h.is_lp ? LP_COLOUR : clusterColour(h.cluster_id);
+      const extra = h.is_lp ? '<span class="lp-badge">LP</span>' : '';
+      html += `
+        <div class="holder-row">
+          <div class="holder-rank">#${h.rank}</div>
+          <div class="holder-dot" style="background:${col}"></div>
+          <div class="holder-addr">${h.label || h.address_short} ${extra}</div>
+          <div class="holder-pct" style="color:${col}">${h.pct.toFixed(2)}%</div>
+        </div>`;
+    });
+    document.getElementById('holders-section').innerHTML = html;
+  }
+
+  // Show sidebar + legend
+  document.getElementById('sidebar').style.display = '';
+  document.getElementById('legend').style.display  = '';
+  if (clusters.length) document.getElementById('legend-line-item').style.display = 'flex';
+
+  // Draw graph
+  document.getElementById('graph-canvas').style.display = '';
+  drawGraph(holders, clusters, data.total_supply_est || 0);
+}
+
+// ── D3 Force Graph ─────────────────────────────────────────────────────────────
+function drawGraph(holders, clusters, totalSupply) {
+  const svg = d3.select('#graph-canvas');
+  const W = svg.node().clientWidth  || window.innerWidth - 300;
+  const H = svg.node().clientHeight || window.innerHeight - 57;
+  svg.attr('viewBox', `0 0 ${W} ${H}`);
+
+  const maxPct = d3.max(holders, h => h.pct) || 1;
+  const rScale = d3.scaleSqrt().domain([0, maxPct]).range([6, 52]);
+
+  // nodes
+  const nodes = holders.map(h => ({
+    ...h,
+    r:     rScale(h.pct),
+    color: h.is_lp ? LP_COLOUR : clusterColour(h.cluster_id),
+  }));
+
+  // links — connect cluster members to each other
+  const links = [];
+  clusters.forEach((c, ci) => {
+    const members = nodes.filter(n => n.cluster_id === ci);
+    for (let i = 0; i < members.length; i++)
+      for (let j = i+1; j < members.length; j++)
+        links.push({ source: members[i].address, target: members[j].address, cluster: ci });
+  });
+
+  const nodeById = Object.fromEntries(nodes.map(n => [n.address, n]));
+
+  // defs — glow filters
+  const defs = svg.append('defs');
+  clusters.forEach((c, i) => {
+    const col = CLUSTER_COLOURS[i % CLUSTER_COLOURS.length];
+    const filt = defs.append('filter').attr('id', `glow-${i}`).attr('x','-50%').attr('y','-50%').attr('width','200%').attr('height','200%');
+    filt.append('feGaussianBlur').attr('stdDeviation','5').attr('result','blur');
+    filt.append('feComposite').attr('in','SourceGraphic').attr('in2','blur').attr('operator','over');
+  });
+
+  // Background grid (subtle)
+  const gridG = svg.append('g').attr('class','grid');
+  for (let x = 0; x < W; x += 80)
+    gridG.append('line').attr('x1',x).attr('y1',0).attr('x2',x).attr('y2',H).attr('stroke','rgba(255,255,255,0.015)').attr('stroke-width',1);
+  for (let y = 0; y < H; y += 80)
+    gridG.append('line').attr('x1',0).attr('y1',y).attr('x2',W).attr('y2',y).attr('stroke','rgba(255,255,255,0.015)').attr('stroke-width',1);
+
+  const linkG = svg.append('g').attr('class','links');
+  const nodeG = svg.append('g').attr('class','nodes');
+
+  // Simulation
+  const sim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links)
+      .id(d => d.address)
+      .distance(d => { const a = nodeById[d.source.address||d.source]; const b = nodeById[d.target.address||d.target]; return (a?.r||20)+(b?.r||20)+30; })
+      .strength(0.4))
+    .force('charge', d3.forceManyBody().strength(d => -d.r * 12))
+    .force('center', d3.forceCenter(W/2, H/2))
+    .force('collision', d3.forceCollide().radius(d => d.r + 6).strength(0.9))
+    .force('cluster', () => {
+      nodes.forEach(n => {
+        if (n.cluster_id !== null && n.cluster_id !== undefined) {
+          const members = nodes.filter(m => m.cluster_id === n.cluster_id);
+          const cx = d3.mean(members, m => m.x);
+          const cy = d3.mean(members, m => m.y);
+          n.vx += (cx - n.x) * 0.04;
+          n.vy += (cy - n.y) * 0.04;
+        }
+      });
+    });
+
+  // Draw links
+  const linkSel = linkG.selectAll('line').data(links).enter().append('line')
+    .attr('stroke', d => CLUSTER_COLOURS[d.cluster % CLUSTER_COLOURS.length])
+    .attr('stroke-opacity', 0.3)
+    .attr('stroke-width', 1.5)
+    .attr('stroke-dasharray', '5 4');
+
+  // Draw nodes
+  const nodeSel = nodeG.selectAll('g.node').data(nodes).enter()
+    .append('g').attr('class','node').style('cursor','pointer');
+
+  // Outer ring for cluster members
+  nodeSel.filter(d => d.cluster_id !== null && d.cluster_id !== undefined)
+    .append('circle')
+    .attr('r', d => d.r + 4)
+    .attr('fill','none')
+    .attr('stroke', d => d.color)
+    .attr('stroke-opacity', 0.4)
+    .attr('stroke-width', 1.5);
+
+  // Main bubble
+  nodeSel.append('circle')
+    .attr('r', d => d.r)
+    .attr('fill', d => d.color)
+    .attr('fill-opacity', d => d.is_lp ? 0.2 : 0.55)
+    .attr('stroke', d => d.color)
+    .attr('stroke-width', 1.5)
+    .attr('stroke-opacity', 0.8)
+    .attr('filter', d => (d.cluster_id !== null && d.cluster_id !== undefined) ? `url(#glow-${d.cluster_id})` : null);
+
+  // Label inside (only for big enough)
+  nodeSel.filter(d => d.r >= 18)
+    .append('text')
+    .attr('text-anchor','middle')
+    .attr('dominant-baseline','middle')
+    .attr('fill','white')
+    .attr('fill-opacity', 0.9)
+    .attr('font-size', d => Math.min(d.r * 0.32, 11))
+    .attr('font-weight', 700)
+    .attr('pointer-events','none')
+    .attr('dy', d => d.r >= 26 ? '-0.3em' : '0')
+    .text(d => d.label || d.address_short);
+
+  // % below label for bigger bubbles
+  nodeSel.filter(d => d.r >= 26)
+    .append('text')
+    .attr('text-anchor','middle')
+    .attr('fill','white')
+    .attr('fill-opacity',0.55)
+    .attr('font-size', d => Math.min(d.r * 0.25, 10))
+    .attr('pointer-events','none')
+    .attr('dy', '1em')
+    .text(d => d.pct.toFixed(1)+'%');
+
+  // Tooltip interaction
+  const tt = document.getElementById('tooltip');
+  nodeSel
+    .on('mousemove', (evt, d) => {
+      document.getElementById('tt-name').textContent = d.label || d.address_short;
+      document.getElementById('tt-pct').textContent  = d.pct.toFixed(3)+'%';
+      document.getElementById('tt-rank').textContent = '#'+d.rank;
+      const cEl = document.getElementById('tt-cluster');
+      if (d.cluster_id !== null && d.cluster_id !== undefined) {
+        const c = clusters[d.cluster_id];
+        cEl.style.display = '';
+        cEl.innerHTML = `<span style="color:${clusterColour(d.cluster_id)}">●</span> Cluster ${d.cluster_id+1} — ${c?.combined_pct?.toFixed(1)}% combined — ${c?.risk}`;
+      } else {
+        cEl.style.display = 'none';
+      }
+      const x = Math.min(evt.clientX + 16, window.innerWidth  - 230);
+      const y = Math.min(evt.clientY + 16, window.innerHeight - 120);
+      tt.style.left = x+'px'; tt.style.top = y+'px'; tt.style.display = '';
+    })
+    .on('mouseleave', () => { tt.style.display = 'none'; });
+
+  // Tick
+  sim.on('tick', () => {
+    nodes.forEach(n => {
+      n.x = Math.max(n.r+8, Math.min(W-n.r-8, n.x));
+      n.y = Math.max(n.r+8, Math.min(H-n.r-8, n.y));
+    });
+    linkSel
+      .attr('x1', d => (typeof d.source === 'object' ? d.source.x : nodeById[d.source]?.x) || 0)
+      .attr('y1', d => (typeof d.source === 'object' ? d.source.y : nodeById[d.source]?.y) || 0)
+      .attr('x2', d => (typeof d.target === 'object' ? d.target.x : nodeById[d.target]?.x) || 0)
+      .attr('y2', d => (typeof d.target === 'object' ? d.target.y : nodeById[d.target]?.y) || 0);
+    nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+if (MINT) fetchData();
+</script>
+</body>
+</html>

@@ -15,6 +15,9 @@
  */
 
 import crypto from "crypto"
+import { createRequire } from "module"
+const require = createRequire(import.meta.url)
+const Database = require("better-sqlite3")
 import { PaymentRequest, PaymentVerification } from "./types.js"
 
 const HELIUS_RPC  = process.env.HELIUS_RPC_URL ?? ""
@@ -26,8 +29,70 @@ const PRICE_RAW   = Math.round(PRICE_USDC * 1_000_000)   // USDC has 6 decimals
 const TX_MAX_AGE  = 120   // seconds — reject old payment proofs
 
 // In-memory nonce store (nonce → expiry_ms). Prevents replay attacks.
-// In production with multiple instances, use Redis. Single EC2 = Map is fine.
 const _usedNonces = new Map<string, number>()
+
+// ── Payment log (SQLite) ──────────────────────────────────────────────────────
+
+import { join, dirname } from "path"
+import { fileURLToPath } from "url"
+
+const __filename2 = fileURLToPath(import.meta.url)
+const __dirname2  = dirname(__filename2)
+
+let _logDb: ReturnType<typeof Database> | null = null
+
+function getLogDb(): ReturnType<typeof Database> {
+  if (_logDb) return _logDb
+  const dbPath = join(__dirname2, "..", "pnl.db")
+  _logDb = new Database(dbPath)
+  _logDb.exec(`
+    CREATE TABLE IF NOT EXISTS payments (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      tx_signature  TEXT UNIQUE,
+      mint_queried  TEXT,
+      amount_usdc   REAL,
+      timestamp     INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_ts ON payments(timestamp);
+  `)
+  return _logDb
+}
+
+export function logPayment(txSig: string, mint: string, amountUsdc: number): void {
+  try {
+    getLogDb().prepare(
+      "INSERT OR IGNORE INTO payments (tx_signature, mint_queried, amount_usdc, timestamp) VALUES (?,?,?,?)"
+    ).run(txSig, mint, amountUsdc, Math.floor(Date.now() / 1000))
+  } catch { /* non-fatal */ }
+}
+
+export function getPnlStats(): Record<string, unknown> {
+  try {
+    const db  = getLogDb()
+    const now = Math.floor(Date.now() / 1000)
+    const get = (since: number) => db.prepare(
+      "SELECT COUNT(*) as cnt, SUM(amount_usdc) as rev FROM payments WHERE timestamp > ?"
+    ).get(since) as { cnt: number; rev: number | null }
+
+    const today  = get(now - 86400)
+    const week   = get(now - 7*86400)
+    const month  = get(now - 30*86400)
+    const total  = get(0)
+    const top    = db.prepare(
+      "SELECT mint_queried, COUNT(*) as cnt FROM payments GROUP BY mint_queried ORDER BY cnt DESC LIMIT 10"
+    ).all() as Array<{ mint_queried: string; cnt: number }>
+
+    return {
+      today:  { queries: today.cnt,  revenue_usdc: +(today.rev  || 0).toFixed(4) },
+      week:   { queries: week.cnt,   revenue_usdc: +(week.rev   || 0).toFixed(4) },
+      month:  { queries: month.cnt,  revenue_usdc: +(month.rev  || 0).toFixed(4) },
+      total:  { queries: total.cnt,  revenue_usdc: +(total.rev  || 0).toFixed(4) },
+      top_mints: top,
+    }
+  } catch (e) {
+    return { error: String(e) }
+  }
+}
 
 function purgeExpiredNonces() {
   const now = Date.now()
@@ -83,7 +148,7 @@ export async function verifyPayment(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transactions: [txSignature] }),
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.abort() || (undefined as unknown as AbortSignal) || setTimeout(()=>{},10_000),
       }
     )
 
@@ -154,7 +219,7 @@ async function verifyViaRpc(
         method: "getTransaction",
         params: [txSignature, { encoding: "jsonParsed", commitment: "confirmed", maxSupportedTransactionVersion: 0 }],
       }),
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.abort() || (undefined as unknown as AbortSignal) || setTimeout(()=>{},10_000),
     })
 
     const data = await res.json() as { result?: Record<string, unknown> }

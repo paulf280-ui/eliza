@@ -1,3 +1,5 @@
+import { createRequire } from "module"
+const require = createRequire(import.meta.url)
 /**
  * detector.ts — Cabal detection engine.
  *
@@ -11,7 +13,7 @@
  * than duplicating it here. TypeScript is only the MCP/payment layer.
  */
 
-import Database from "better-sqlite3"
+const Database = require("better-sqlite3")
 import { CabalReport, Cluster, Holder } from "./types.js"
 
 const DB_PATH = process.env.CABAL_CACHE_DB ?? "/home/ubuntu/eliza/packages/python/elizaos/plugins/solana/cabal_cache.db"
@@ -19,9 +21,9 @@ const BOT_URL = process.env.BOT_INTERNAL_URL ?? "http://127.0.0.1:3001"
 const SECRET  = process.env.CABAL_INTERNAL_SECRET ?? ""
 
 // Open SQLite in read-only mode — Python bot owns writes
-let _db: Database.Database | null = null
+let _db: ReturnType<typeof Database> | null = null
 
-function getDb(): Database.Database | null {
+function getDb(): ReturnType<typeof Database> | null {
   if (_db) return _db
   try {
     _db = new Database(DB_PATH, { readonly: true, fileMustExist: true })
@@ -91,7 +93,7 @@ async function fetchFromBot(mint: string, createdTs?: number): Promise<CabalRepo
   const url = `${BOT_URL}/api/cabal/internal?${params}`
   const res = await fetch(url, {
     headers: SECRET ? { "X-Internal-Secret": SECRET } : {},
-    signal: AbortSignal.timeout(30_000),
+    signal: undefined,
   })
 
   if (!res.ok) {
