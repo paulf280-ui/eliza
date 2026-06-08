@@ -983,6 +983,18 @@ async def _run_cluster_check_bg(
             _cache_save(mint, sym, result, pair_created_ts)
         except Exception:
             pass
+
+        # Post to @CabalHunterAlerts Telegram channel if HIGH or MEDIUM risk
+        try:
+            if result.get("risk") in ("HIGH", "MEDIUM"):
+                from elizaos.plugins.solana.cabal_telegram import send_cabal_alert as _tg_alert
+                sym = lc_entry.get("sym") or mint[:8]
+                asyncio.create_task(
+                    _tg_alert(mint, sym, result, session),
+                    name=f"tg_cabal_alert_{mint[:8]}",
+                )
+        except Exception:
+            pass
         risk    = result.get("risk", "CLEAN")
         checked = result.get("wallets_checked", 0)
         reason  = result.get("skip_reason")
