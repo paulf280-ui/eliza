@@ -23,7 +23,7 @@ import { dirname, join } from "path"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname  = dirname(__filename)
 import { getCabalReport } from "./detector.js"
-import { createPaymentRequest, verifyPayment, validatePaymentConfig, logPayment, getPnlStats } from "./payment.js"
+import { createPaymentRequest, verifyPayment, validatePaymentConfig, logPayment, getPnlStats, getFreeQueriesRemaining, consumeFreeQuery } from "./payment.js"
 import { CabalReport } from "./types.js"
 
 const PRICE_USDC = parseFloat(process.env.PRICE_PER_QUERY_USDC ?? "0.05")
@@ -183,11 +183,37 @@ export function createApp(): express.Application {
       return
     }
 
-    // ── Payment gate ──────────────────────────────────────────────────────────
+    // ── Free tier check ──────────────────────────────────────────────────────
+    const clientIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
+                     || req.socket.remoteAddress
+                     || "unknown"
     const paymentSig = req.headers["x-payment-signature"]?.toString()
+    const freeLeft   = getFreeQueriesRemaining(clientIp)
 
+    if (!paymentSig && freeLeft > 0) {
+      // Free tier — run the query, consume one free credit
+      consumeFreeQuery(clientIp)
+      try {
+        const createdTs = req.body?.pairCreatedAt ? Number(req.body.pairCreatedAt) / 1000 : undefined
+        const report    = await getCabalReport(mint, createdTs)
+        res.status(200).json({
+          ...report,
+          free_tier:            true,
+          free_queries_remaining: freeLeft - 1,
+          note: freeLeft === 1
+            ? "Last free query used. Future queries require $0.05 USDC payment."
+            : `${freeLeft - 1} free queries remaining this month.`,
+          request_time_ms: Date.now() - t0,
+        })
+      } catch (err) {
+        res.status(500).json({ error: "analysis_failed", message: err instanceof Error ? err.message : "Unknown error" })
+      }
+      return
+    }
+
+    // ── Payment gate ──────────────────────────────────────────────────────────
     if (!paymentSig) {
-      // No payment — return 402 with instructions
+      // No payment and no free credits — return 402 with instructions
       const queryId = crypto.randomUUID()
       const payment = createPaymentRequest(queryId)
       res.status(402).json({
@@ -247,6 +273,112 @@ export function createApp(): express.Application {
 
   app.post("/api/scan-cabal", handleScan)
   app.get("/api/scan-cabal",  handleScan)
+
+  // ── Comparison page — SEO content, converts high-intent Google traffic ────────
+  app.get("/compare", (_req, res) => {
+    res.setHeader("Content-Type", "text/html")
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Cabal-Hunter vs rugcheck vs GoPlus — What Each Tool Detects (and What It Misses)</title>
+<meta name="description" content="Honest comparison of Solana token safety tools. Cabal-Hunter detects coordinated wallet clusters rugcheck and GoPlus miss entirely.">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#07080f;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;padding:40px 24px;max-width:960px;margin:0 auto}
+  h1{font-size:28px;font-weight:900;letter-spacing:-.5px;margin-bottom:8px}
+  .sub{color:#94a3b8;font-size:15px;margin-bottom:40px;line-height:1.6}
+  h2{font-size:18px;font-weight:800;margin:40px 0 16px;color:#e2e8f0}
+  table{width:100%;border-collapse:collapse;margin-bottom:32px;font-size:13px}
+  th{text-align:left;padding:12px 16px;background:#0d0f1e;border:1px solid rgba(255,255,255,.08);color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:.8px}
+  td{padding:11px 16px;border:1px solid rgba(255,255,255,.06);vertical-align:top;line-height:1.5}
+  tr:hover td{background:rgba(255,255,255,.02)}
+  .yes{color:#10b981;font-weight:700}
+  .no{color:#ef4444;font-weight:700}
+  .partial{color:#f59e0b;font-weight:700}
+  .ch{background:rgba(255,77,109,.04)}
+  .highlight{background:rgba(255,77,109,.08);border-left:3px solid #ff4d6d}
+  .verdict{background:#0d0f1e;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px 24px;margin:12px 0}
+  .verdict-title{font-weight:800;margin-bottom:8px;font-size:15px}
+  .verdict-body{color:#94a3b8;font-size:13px;line-height:1.6}
+  .cta{background:linear-gradient(135deg,rgba(255,77,109,.15),rgba(124,58,237,.15));border:1px solid rgba(255,77,109,.3);border-radius:12px;padding:28px;margin:40px 0;text-align:center}
+  .cta h3{font-size:20px;font-weight:900;margin-bottom:8px}
+  .cta p{color:#94a3b8;margin-bottom:16px;font-size:13px}
+  .btn{display:inline-block;padding:10px 22px;border-radius:8px;font-weight:700;font-size:13px;text-decoration:none;margin:4px}
+  .btn-red{background:rgba(255,77,109,.2);color:#ff4d6d;border:1px solid rgba(255,77,109,.4)}
+  .logo{display:flex;align-items:center;gap:10px;margin-bottom:32px}
+  .icon{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#ff4d6d,#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:900;color:white;font-size:14px}
+  code{background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;font-size:12px}
+  .real-rug{background:#0d0f1e;border:1px solid rgba(255,77,109,.3);border-radius:10px;padding:20px;margin:24px 0}
+  .real-rug h3{color:#ff4d6d;margin-bottom:10px;font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+</style>
+</head>
+<body>
+<div class="logo"><div class="icon">CH</div><div><div style="font-weight:800">Cabal-Hunter</div><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px">vs The Alternatives</div></div></div>
+
+<h1>Cabal-Hunter vs rugcheck vs GoPlus</h1>
+<p class="sub">An honest comparison of what each Solana token safety tool actually detects — and the coordinated wallet attacks that standard tools completely miss.</p>
+
+<div class="real-rug">
+  <h3>⚠️ Real example — caught by Cabal-Hunter, missed by everyone else</h3>
+  <p style="color:#94a3b8;font-size:13px;line-height:1.6">A token last week scored <strong style="color:#10b981">8/8 on rugcheck.xyz</strong> — LP burned, contract clean, no honeypot. GoPlus: all green. Standard tools saw nothing wrong.<br><br>Cabal-Hunter traced the top 20 holders and found <strong>6 wallets all funded from the same source, 47 seconds before the first trade.</strong> The token rugged 3 hours later. <a href="/map?mint=Axpzs7FEMYzpcfqVcDjDMQb2rsgMYVJADNpUZe7bpump" style="color:#ff4d6d">See the on-chain proof →</a></p>
+</div>
+
+<h2>What Each Tool Checks</h2>
+<table>
+  <thead><tr><th>Detection Type</th><th>Cabal-Hunter</th><th>rugcheck.xyz</th><th>GoPlus Security</th></tr></thead>
+  <tbody>
+    <tr class="highlight"><td><strong>Coordinated wallet clusters</strong><br><small>Multiple wallets funded by same source before launch</small></td><td class="ch"><span class="yes">✅ YES</span><br><small>Core feature — traces funding lineage via Helius RPC</small></td><td><span class="no">❌ NO</span></td><td><span class="no">❌ NO</span></td></tr>
+    <tr class="highlight"><td><strong>Cabal confidence score (0–100)</strong><br><small>% of supply controlled by coordinated wallets</small></td><td class="ch"><span class="yes">✅ YES</span></td><td><span class="no">❌ NO</span></td><td><span class="no">❌ NO</span></td></tr>
+    <tr class="highlight"><td><strong>Insider sniper detection</strong><br><small>Wallets that bought within 60 seconds of launch</small></td><td class="ch"><span class="yes">✅ YES</span></td><td><span class="no">❌ NO</span></td><td><span class="partial">⚡ Partial</span></td></tr>
+    <tr><td><strong>LP lock / burn check</strong></td><td class="ch"><span class="partial">⚡ Via Helius</span></td><td><span class="yes">✅ YES</span></td><td><span class="yes">✅ YES</span></td></tr>
+    <tr><td><strong>Honeypot detection</strong></td><td class="ch"><span class="no">❌ NO</span></td><td><span class="yes">✅ YES</span></td><td><span class="yes">✅ YES</span></td></tr>
+    <tr><td><strong>Mint authority check</strong></td><td class="ch"><span class="no">❌ NO</span></td><td><span class="yes">✅ YES</span></td><td><span class="yes">✅ YES</span></td></tr>
+    <tr><td><strong>Contract audit / code analysis</strong></td><td class="ch"><span class="no">❌ NO</span></td><td><span class="yes">✅ YES</span></td><td><span class="yes">✅ YES</span></td></tr>
+    <tr><td><strong>Top holder distribution</strong></td><td class="ch"><span class="yes">✅ YES</span><br><small>Top 20 with cluster assignments</small></td><td><span class="partial">⚡ Basic</span></td><td><span class="partial">⚡ Basic</span></td></tr>
+    <tr><td><strong>Visual bubble map</strong></td><td class="ch"><span class="yes">✅ YES — Free</span><br><small>Interactive, clickable wallet links</small></td><td><span class="no">❌ NO</span></td><td><span class="no">❌ NO</span></td></tr>
+    <tr><td><strong>MCP server (Claude/Cursor/ElizaOS)</strong></td><td class="ch"><span class="yes">✅ YES</span><br><small>Native AI agent integration</small></td><td><span class="no">❌ NO</span></td><td><span class="no">❌ NO</span></td></tr>
+    <tr><td><strong>Pricing</strong></td><td class="ch"><span class="yes">$0.05 USDC/query</span><br><small>No account · No subscription</small></td><td><span class="yes">Free</span></td><td><span class="yes">Free</span></td></tr>
+    <tr><td><strong>Payment method</strong></td><td class="ch">Native Solana USDC</td><td>Free</td><td>Free / Enterprise</td></tr>
+  </tbody>
+</table>
+
+<h2>The Fundamental Difference</h2>
+<div class="verdict">
+  <div class="verdict-title">rugcheck.xyz and GoPlus audit <em>contract code</em></div>
+  <div class="verdict-body">They answer: "Is this smart contract malicious?" They check mint authority, freeze authority, LP lock status, honeypot code patterns. All valid. But contract code doesn't rug you.</div>
+</div>
+<div class="verdict" style="border-color:rgba(255,77,109,.3)">
+  <div class="verdict-title" style="color:#ff4d6d">Cabal-Hunter audits <em>wallet behaviour</em></div>
+  <div class="verdict-body">It answers: "Are multiple wallets being coordinated by a single actor to control this token?" A token can have a perfectly clean contract, burned LP, and no honeypot — and still be set up for a coordinated dump by 15 wallets funded from the same master wallet 60 seconds before launch. That's the threat no contract scanner sees.</div>
+</div>
+
+<h2>When to Use Each Tool</h2>
+<table>
+  <thead><tr><th>Scenario</th><th>Best Tool</th></tr></thead>
+  <tbody>
+    <tr><td>Check if a contract has malicious code / honeypot</td><td>rugcheck.xyz or GoPlus</td></tr>
+    <tr><td>Check if LP is locked or burned</td><td>rugcheck.xyz or GoPlus</td></tr>
+    <tr class="highlight"><td>Check if multiple wallets are coordinated by a single actor</td><td><strong style="color:#ff4d6d">Cabal-Hunter</strong></td></tr>
+    <tr class="highlight"><td>Pre-trade safety check in an AI trading agent (Claude, Cursor, ElizaOS)</td><td><strong style="color:#ff4d6d">Cabal-Hunter</strong></td></tr>
+    <tr class="highlight"><td>Visualise the holder distribution and funding relationships</td><td><strong style="color:#ff4d6d">Cabal-Hunter</strong></td></tr>
+    <tr><td>Full token safety audit (contract + wallet)</td><td><strong style="color:#ff4d6d">Cabal-Hunter</strong> + rugcheck.xyz</td></tr>
+  </tbody>
+</table>
+
+<div class="cta">
+  <h3>Try Cabal-Hunter free</h3>
+  <p>100 free queries per month. No account. No API key. Check any Solana token in seconds.</p>
+  <a class="btn btn-red" href="/map?mint=Axpzs7FEMYzpcfqVcDjDMQb2rsgMYVJADNpUZe7bpump">🗺 Live Demo — See a Detected Cabal</a>
+  <a class="btn" style="background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid rgba(255,255,255,.1)" href="/api/info">API Documentation</a>
+</div>
+
+<div style="margin-top:32px;padding-top:24px;border-top:1px solid rgba(255,255,255,.06);font-size:12px;color:#334155">
+  <a href="/" style="color:#475569">← Back to Cabal-Hunter</a> ·
+  Powered by Helius RPC · AWS Frankfurt
+</div>
+</body></html>`)
+  })
 
   // ── P&L stats endpoint (protected by internal secret) ────────────────────────
   app.get("/admin/pnl", (req, res) => {

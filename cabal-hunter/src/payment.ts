@@ -31,6 +31,53 @@ const TX_MAX_AGE  = 120   // seconds — reject old payment proofs
 // In-memory nonce store (nonce → expiry_ms). Prevents replay attacks.
 const _usedNonces = new Map<string, number>()
 
+// ── Free tier tracking (SQLite) ───────────────────────────────────────────────
+// 100 free queries per IP per calendar month. No account required.
+// After 100, the standard $0.05 USDC payment gate applies.
+const FREE_QUERIES_PER_MONTH = 100
+
+let _freeDb: ReturnType<typeof Database> | null = null
+
+function getFreeDb(): ReturnType<typeof Database> {
+  if (_freeDb) return _freeDb
+  const dbPath = join(__dirname2, "..", "pnl.db")
+  _freeDb = new Database(dbPath)
+  _freeDb.exec(`
+    CREATE TABLE IF NOT EXISTS free_usage (
+      ip    TEXT NOT NULL,
+      month TEXT NOT NULL,
+      count INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (ip, month)
+    );
+  `)
+  return _freeDb
+}
+
+/** Returns how many free queries this IP has remaining this month (0 = none left). */
+export function getFreeQueriesRemaining(ip: string): number {
+  try {
+    const db    = getFreeDb()
+    const month = new Date().toISOString().slice(0, 7)   // "2026-06"
+    const row   = db.prepare(
+      "SELECT count FROM free_usage WHERE ip=? AND month=?"
+    ).get(ip, month) as { count: number } | undefined
+    const used = row?.count ?? 0
+    return Math.max(0, FREE_QUERIES_PER_MONTH - used)
+  } catch { return 0 }
+}
+
+/** Increments the free usage counter for this IP. */
+export function consumeFreeQuery(ip: string): void {
+  try {
+    const db    = getFreeDb()
+    const month = new Date().toISOString().slice(0, 7)
+    db.prepare(`
+      INSERT INTO free_usage (ip, month, count) VALUES (?, ?, 1)
+      ON CONFLICT(ip, month) DO UPDATE SET count = count + 1
+    `).run(ip, month)
+  } catch { /* non-fatal */ }
+}
+
 // ── Payment log (SQLite) ──────────────────────────────────────────────────────
 
 import { join, dirname } from "path"
