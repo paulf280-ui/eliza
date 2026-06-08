@@ -74,6 +74,75 @@ export function createApp(): express.Application {
     }
   })
 
+  // ── Root landing page — the public face of the product ───────────────────────
+  app.get("/", (_req, res) => {
+    res.setHeader("Content-Type", "text/html")
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Cabal-Hunter — Solana Token Cabal Detection</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#07080f;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;padding:40px 24px;max-width:780px;margin:0 auto}
+  .logo{display:flex;align-items:center;gap:12px;margin-bottom:40px}
+  .icon{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#ff4d6d,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:white;flex-shrink:0}
+  h1{font-size:32px;font-weight:900;line-height:1.1;margin-bottom:12px;letter-spacing:-0.5px}
+  .sub{font-size:16px;color:#94a3b8;margin-bottom:36px;line-height:1.6}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:36px}
+  .card{background:#0d0f1e;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px}
+  .card-title{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:8px}
+  .card-val{font-size:22px;font-weight:800}
+  .links{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:36px}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;transition:opacity .15s}
+  .btn:hover{opacity:.8}
+  .btn-primary{background:rgba(255,77,109,.15);color:#ff4d6d;border:1px solid rgba(255,77,109,.4)}
+  .btn-teal{background:rgba(20,184,166,.12);color:#2dd4bf;border:1px solid rgba(20,184,166,.35)}
+  .btn-purple{background:rgba(124,58,237,.12);color:#a78bfa;border:1px solid rgba(124,58,237,.35)}
+  .btn-gray{background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid rgba(255,255,255,.1)}
+  pre{background:#0d0f1e;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:16px;font-size:13px;overflow-x:auto;color:#7dd3fc;line-height:1.6}
+  .section-title{font-size:14px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+  .footer{margin-top:48px;padding-top:24px;border-top:1px solid rgba(255,255,255,.06);font-size:12px;color:#334155}
+</style>
+</head>
+<body>
+<div class="logo">
+  <div class="icon">CH</div>
+  <div>
+    <div style="font-size:20px;font-weight:800">Cabal-Hunter</div>
+    <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px">Solana Token Cabal Detection</div>
+  </div>
+</div>
+
+<h1>Detect coordinated wallet<br>cabals before your bot buys.</h1>
+<p class="sub">Real-time on-chain funding trace of the top 20 holders via Helius RPC.<br>Returns a cabal confidence score 0–100. <strong style="color:#e2e8f0">$0.05 USDC per query.</strong> No API key. No account.</p>
+
+<div class="cards">
+  <div class="card"><div class="card-title">Per Query</div><div class="card-val" style="color:#10b981">$0.05 USDC</div></div>
+  <div class="card"><div class="card-title">Response Time</div><div class="card-val" style="color:#0ea5e9">&lt;100ms</div></div>
+  <div class="card"><div class="card-title">Payment</div><div class="card-val" style="font-size:15px;color:#a78bfa">Native Solana</div></div>
+  <div class="card"><div class="card-title">MCP Compatible</div><div class="card-val" style="font-size:15px;color:#fb923c">Claude · Cursor · Eliza</div></div>
+</div>
+
+<div class="links">
+  <a class="btn btn-primary" href="/map?mint=Axpzs7FEMYzpcfqVcDjDMQb2rsgMYVJADNpUZe7bpump">🗺 Live Bubble Map Demo</a>
+  <a class="btn btn-teal" href="/api/info">📖 API Reference</a>
+  <a class="btn btn-purple" href="https://github.com/paulf280-ui/solana-safe-sniper-mcp-template" target="_blank">⚙ GitHub Template</a>
+</div>
+
+<div class="section-title">Add to Claude / Cursor / ElizaOS</div>
+<pre>{"mcpServers": {"cabal-hunter": {"url": "https://api.cabal-hunter.com/mcp"}}}</pre>
+
+<div class="footer">
+  Built on Helius RPC · AWS Frankfurt ·
+  <a href="/health" style="color:#475569">Status</a> ·
+  <a href="/api/info" style="color:#475569">API Docs</a>
+</div>
+</body>
+</html>`)
+  })
+
   // ── Health check ─────────────────────────────────────────────────────────────
   app.get("/health", (_req, res) => {
     res.json({

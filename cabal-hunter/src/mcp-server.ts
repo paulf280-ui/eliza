@@ -171,23 +171,49 @@ export function createMcpServer() {
 
 /** Mount the MCP server onto an Express app at /mcp */
 export async function mountMcp(app: import("express").Application): Promise<void> {
-  const mcpServer = createMcpServer()
-
-  // Streamable HTTP transport — required for remote MCP servers
+  // Create a NEW McpServer + transport per request — the SDK does not support
+  // reusing a single server instance across multiple HTTP connections.
+  // "Already connected to a transport" is thrown if you reuse the same instance.
   app.post("/mcp", async (req: Request, res: Response) => {
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => crypto.randomUUID(),
-    })
-    await mcpServer.connect(transport)
-    await transport.handleRequest(req, res, req.body)
+    try {
+      const server    = createMcpServer()
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => crypto.randomUUID(),
+      })
+      await server.connect(transport)
+      await transport.handleRequest(req, res, req.body)
+    } catch (err) {
+      console.error("[mcp] POST handler error:", err)
+      if (!res.headersSent) res.status(500).json({ error: "mcp_error", message: String(err) })
+    }
   })
 
   app.get("/mcp", async (req: Request, res: Response) => {
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => crypto.randomUUID(),
-    })
-    await mcpServer.connect(transport)
-    await transport.handleRequest(req, res)
+    // Health checkers (glama, uptime monitors) send plain GET without MCP Accept headers.
+    // Return server info so they get a clean 200 rather than 406 Not Acceptable.
+    const accept = req.headers.accept ?? ""
+    if (!accept.includes("text/event-stream")) {
+      res.json({
+        service:   "cabal-hunter",
+        version:   process.env.MCP_SERVER_VERSION ?? "1.0.0",
+        transport: "streamable-http",
+        endpoint:  "/mcp",
+        tool:      "check_cabal_risk",
+        status:    "ok",
+      })
+      return
+    }
+    try {
+      const server    = createMcpServer()
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => crypto.randomUUID(),
+      })
+      await server.connect(transport)
+      await transport.handleRequest(req, res)
+    } catch (err) {
+      console.error("[mcp] GET handler error:", err)
+      if (!res.headersSent) res.status(500).json({ error: "mcp_error", message: String(err) })
+    }
   })
 
   // MCP discovery manifest (used by Claude Desktop and mcp.so)
