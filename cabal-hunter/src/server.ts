@@ -143,6 +143,20 @@ export function createApp(): express.Application {
 </html>`)
   })
 
+  // ── Glama verification file ──────────────────────────────────────────────────
+  // Glama checks /.well-known/glama.json to verify domain ownership and
+  // confirm the connector is legitimate before marking it Healthy.
+  app.get("/.well-known/glama.json", (_req, res) => {
+    res.json({
+      name:        "Cabal-Hunter",
+      description: "Real-time on-chain coordinated wallet detection for Solana tokens",
+      url:         "https://api.cabal-hunter.com",
+      mcp:         "https://api.cabal-hunter.com/mcp",
+      version:     "1.0.0",
+      contact:     "paulf280@gmail.com",
+    })
+  })
+
   // ── Health check ─────────────────────────────────────────────────────────────
   app.get("/health", (_req, res) => {
     res.json({

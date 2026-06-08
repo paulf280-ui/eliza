@@ -175,10 +175,24 @@ export async function mountMcp(app: import("express").Application): Promise<void
   // reusing a single server instance across multiple HTTP connections.
   // "Already connected to a transport" is thrown if you reuse the same instance.
   app.post("/mcp", async (req: Request, res: Response) => {
+    // Health checkers (glama) send plain POST without MCP Accept headers.
+    const accept = req.headers.accept ?? ""
+    if (!accept.includes("text/event-stream") && !accept.includes("application/json")) {
+      res.json({
+        service:   "cabal-hunter",
+        version:   process.env.MCP_SERVER_VERSION ?? "1.0.0",
+        transport: "streamable-http",
+        endpoint:  "/mcp",
+        tool:      "check_cabal_risk",
+        status:    "ok",
+      })
+      return
+    }
     try {
       const server    = createMcpServer()
+      // stateless: false allows sequential requests (initialize + tools/list) in separate POSTs
       const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => crypto.randomUUID(),
+        sessionIdGenerator: undefined,  // stateless mode — no session tracking needed
       })
       await server.connect(transport)
       await transport.handleRequest(req, res, req.body)
