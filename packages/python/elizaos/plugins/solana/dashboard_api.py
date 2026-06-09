@@ -2698,12 +2698,18 @@ When adjusting a filter, always explain your reasoning based on the data above."
             from elizaos.plugins.solana.jarvis_agent import stream_jarvis
             async for event in stream_jarvis(message, history, status_context):
                 data = json.dumps(event, ensure_ascii=False)
-                await sse_response.write(f"data: {data}\n\n".encode())
+                try:
+                    await sse_response.write(f"data: {data}\n\n".encode())
+                except Exception:
+                    break  # client disconnected — stop streaming silently
         except Exception as exc:
-            err = json.dumps({"type": "error", "message": str(exc)})
-            await sse_response.write(f"data: {err}\n\n".encode())
-            done = json.dumps({"type": "done"})
-            await sse_response.write(f"data: {done}\n\n".encode())
+            try:
+                err = json.dumps({"type": "error", "message": str(exc)})
+                await sse_response.write(f"data: {err}\n\n".encode())
+                done = json.dumps({"type": "done"})
+                await sse_response.write(f"data: {done}\n\n".encode())
+            except Exception:
+                pass  # client already gone
 
         return sse_response
 
