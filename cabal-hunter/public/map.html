@@ -230,6 +230,8 @@
   </div>
 
   <div class="header-right">
+    <!-- LP Status badge — populated by fetchLpStatus() -->
+    <div id="lp-badge" style="display:none"></div>
     <!-- Live chart links -->
     <div class="chart-links" id="chart-links" style="display:none">
       <a class="chart-btn axiom-btn" id="axiom-link" target="_blank" rel="noopener" title="Open on Axiom">
@@ -290,6 +292,7 @@
         </div>
       </div>
       <div class="verdict-text" id="verdict-text"></div>
+      <div id="score-guide" style="margin-top:12px;padding:12px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid rgba(255,255,255,.06)"></div>
     </div>
 
     <!-- Stats row -->
@@ -414,6 +417,9 @@ function render(data) {
   document.getElementById('ds-link').href    = `https://dexscreener.com/solana/${MINT}`;
   document.getElementById('chart-links').style.display = '';
 
+  // Fetch LP status from DexScreener (non-blocking)
+  fetchLpStatus(MINT);
+
   // Risk badge
   const badge = document.getElementById('risk-badge');
   badge.textContent = risk;
@@ -432,6 +438,24 @@ function render(data) {
   document.getElementById('gauge-num').textContent = score;
   document.getElementById('gauge-num').style.color = arcColour;
   document.getElementById('verdict-text').textContent = verdict;
+
+  // Plain-English score guide
+  const guideEl = document.getElementById('score-guide');
+  if (guideEl) {
+    const meaning = score <= 35
+      ? { label: 'LOW RISK', msg: 'No significant wallet coordination found. Standard due diligence still applies.', col: '#10b981' }
+      : score <= 65
+      ? { label: 'CAUTION', msg: 'Some wallet coordination detected. Possible coordinated holders — watch for sudden sells.', col: '#f59e0b' }
+      : { label: 'HIGH RISK', msg: 'Strong evidence of coordinated wallets. High probability of a coordinated dump. Avoid.', col: '#ef4444' };
+    guideEl.innerHTML = `
+      <div style="font-weight:800;font-size:13px;color:${meaning.col};margin-bottom:6px">${meaning.label}</div>
+      <div style="font-size:12px;color:#94a3b8;line-height:1.5">${meaning.msg}</div>
+      <div style="margin-top:10px;display:flex;gap:6px;font-size:10px">
+        <span style="flex:1;text-align:center;padding:4px;border-radius:4px;background:rgba(16,185,129,.15);color:#10b981">0–35<br>Safe</span>
+        <span style="flex:1;text-align:center;padding:4px;border-radius:4px;background:rgba(245,158,11,.15);color:#f59e0b">35–65<br>Caution</span>
+        <span style="flex:1;text-align:center;padding:4px;border-radius:4px;background:rgba(239,68,68,.15);color:#ef4444">65–100<br>High Risk</span>
+      </div>`;
+  }
 
   // Stats
   const controlled = clusters.reduce((s,c) => s + (c.combined_pct||0), 0).toFixed(1);
@@ -668,6 +692,43 @@ function drawGraph(holders, clusters, totalSupply) {
       .attr('y2', d => (typeof d.target === 'object' ? d.target.y : nodeById[d.target]?.y) || 0);
     nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
   });
+}
+
+// ── LP Status fetch ────────────────────────────────────────────────────────────
+async function fetchLpStatus(mint) {
+  try {
+    const res = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${mint}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    if (!res.ok) return;
+    const pairs = await res.json();
+    const p = Array.isArray(pairs) ? pairs[0] : null;
+    if (!p) return;
+
+    const dexId  = (p.dexId || '').toLowerCase();
+    const isPump = dexId.includes('pump');
+
+    // Pump.fun / pump-amm: LP is burned at graduation by protocol (verifiable fact)
+    // Other DEXes: show a link to check manually
+    let html = '';
+    if (isPump) {
+      html = `<span style="
+        display:inline-flex;align-items:center;gap:5px;
+        padding:5px 10px;border-radius:8px;font-size:11px;font-weight:700;
+        background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.4)
+      ">✅ LP Burned</span>`;
+    } else {
+      html = `<a href="https://rugcheck.xyz/tokens/${mint}" target="_blank" rel="noopener" style="
+        display:inline-flex;align-items:center;gap:5px;
+        padding:5px 10px;border-radius:8px;font-size:11px;font-weight:700;
+        background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.35);
+        text-decoration:none
+      ">🔒 Check LP →</a>`;
+    }
+
+    const el = document.getElementById('lp-badge');
+    if (el) { el.innerHTML = html; el.style.display = ''; }
+  } catch { /* non-blocking — LP badge optional */ }
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
