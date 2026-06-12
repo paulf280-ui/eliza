@@ -59,6 +59,12 @@ def _get_conn() -> sqlite3.Connection:
         _conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_expires ON cabal_cache(expires_at)"
         )
+        # Migrations — additive columns for deployer reputation + time-sync flag
+        for col, decl in (("deployer_json", "TEXT"), ("time_sync", "INTEGER")):
+            try:
+                _conn.execute(f"ALTER TABLE cabal_cache ADD COLUMN {col} {decl}")
+            except sqlite3.OperationalError:
+                pass  # column already exists
         _conn.commit()
     return _conn
 
@@ -83,14 +89,26 @@ def save_result(
     Accepts either the compact check_holder_clusters() result or the full
     get_cluster_map() result (which includes the holders list).
     """
+    # Degraded results (owner lookups failed mid-scan) must not be cached —
+    # caching them once served 15×"LP Pool" garbage for 8 hours.
+    if cluster_result.get("degraded"):
+        print(f"[cabal-cache] skip caching degraded result for {mint[:8]}")
+        return
+
     now = time.time()
     risk     = cluster_result.get("risk", "CLEAN")
     clusters = cluster_result.get("clusters") or []
     holders  = cluster_result.get("holders") or []
     checked  = cluster_result.get("wallets_checked", 0)
 
-    cabal_score  = _cabal_score_from_clusters(clusters, holders)
+    # Respect the blended score when provided (includes deployer floor);
+    # only recompute from clusters for legacy callers that didn't set it.
+    cabal_score = cluster_result.get("cabal_score")
+    if cabal_score is None:
+        cabal_score = _cabal_score_from_clusters(clusters, holders)
     is_controlled = 1 if (risk == "HIGH" or cabal_score >= 35.0) else 0
+    deployer  = cluster_result.get("deployer")
+    time_sync = 1 if cluster_result.get("time_sync") else 0
 
     try:
         conn = _get_conn()
@@ -98,12 +116,14 @@ def save_result(
             INSERT OR REPLACE INTO cabal_cache
               (mint, token_name, risk, cabal_score, is_controlled,
                clusters_json, holders_json, wallets_checked,
-               pair_created_ts, computed_at, expires_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+               pair_created_ts, computed_at, expires_at,
+               deployer_json, time_sync)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             mint, token_name, risk, cabal_score, is_controlled,
             json.dumps(clusters), json.dumps(holders), checked,
             pair_created_ts, now, now + _TTL_SECS,
+            json.dumps(deployer) if deployer else None, time_sync,
         ))
         conn.commit()
     except Exception as e:
@@ -128,12 +148,14 @@ def get_result(mint: str) -> dict | None:
             "pair_created_ts","computed_at","expires_at"
         ]
         d = dict(zip(cols, row))
-        return {
+        out = {
             "mint":            d["mint"],
             "token_name":      d["token_name"],
             "risk":            d["risk"],
             "cabal_score":     d["cabal_score"],
             "is_controlled":   bool(d["is_controlled"]),
+            "time_sync":       bool(d.get("time_sync")),
+            "deployer":        json.loads(d["deployer_json"]) if d.get("deployer_json") else None,
             "clusters":        json.loads(d["clusters_json"] or "[]"),
             "holders":         json.loads(d["holders_json"] or "[]"),
             "wallets_checked": d["wallets_checked"],
@@ -142,6 +164,14 @@ def get_result(mint: str) -> dict | None:
             "cached":          True,
             "age_seconds":     round(time.time() - d["computed_at"]),
         }
+        # Re-apply the deployer score floor on read — covers rows cached
+        # before blending existed, so map/API/alerts always agree.
+        try:
+            from elizaos.plugins.solana.deployer_check import blend_deployer_into_score
+            blend_deployer_into_score(out, out.get("deployer"))
+        except Exception:
+            pass
+        return out
     except Exception as e:
         print(f"[cabal-cache] read failed for {mint[:8]}: {e}")
         return None

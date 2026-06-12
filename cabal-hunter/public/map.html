@@ -292,7 +292,9 @@
         </div>
       </div>
       <div class="verdict-text" id="verdict-text"></div>
+      <div id="bundle-badge" style="display:none;margin-top:10px"></div>
       <div id="score-guide" style="margin-top:12px;padding:12px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid rgba(255,255,255,.06)"></div>
+      <div id="deployer-panel" style="display:none;margin-top:10px;padding:12px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid rgba(255,255,255,.06);text-align:left"></div>
     </div>
 
     <!-- Stats row -->
@@ -430,7 +432,7 @@ function render(data) {
   const arc = document.getElementById('gauge-arc');
   const circumference = 339.3;
   const offset = circumference - (score / 100) * circumference;
-  const arcColour = RISK_COLOURS[risk];
+  const arcColour = score <= 35 ? '#10b981' : score <= 65 ? '#f59e0b' : '#ff4d6d';
   setTimeout(() => {
     arc.style.strokeDashoffset = offset;
     arc.style.stroke = arcColour;
@@ -447,6 +449,12 @@ function render(data) {
       : score <= 65
       ? { label: 'CAUTION', msg: 'Some wallet coordination detected. Possible coordinated holders — watch for sudden sells.', col: '#f59e0b' }
       : { label: 'HIGH RISK', msg: 'Strong evidence of coordinated wallets. High probability of a coordinated dump. Avoid.', col: '#ef4444' };
+    // When the score was raised by deployer history (not clusters), say so
+    const depG = data.deployer || {};
+    if (score > 35 && clusters.length === 0 &&
+        (depG.verdict === 'SERIAL_RUGGER' || depG.verdict === 'POOR_TRACK_RECORD')) {
+      meaning.msg = 'No wallet coordination found, but this deployer has a history of dead launches — score raised accordingly. See Deployer History below.';
+    }
     guideEl.innerHTML = `
       <div style="font-weight:800;font-size:13px;color:${meaning.col};margin-bottom:6px">${meaning.label}</div>
       <div style="font-size:12px;color:#94a3b8;line-height:1.5">${meaning.msg}</div>
@@ -455,6 +463,41 @@ function render(data) {
         <span style="flex:1;text-align:center;padding:4px;border-radius:4px;background:rgba(245,158,11,.15);color:#f59e0b">35–65<br>Caution</span>
         <span style="flex:1;text-align:center;padding:4px;border-radius:4px;background:rgba(239,68,68,.15);color:#ef4444">65–100<br>High Risk</span>
       </div>`;
+  }
+
+  // Same-block bundle badge — strongest single signal we detect
+  const hasBundle = data.time_sync || clusters.some(c => c.type === 'time_sync');
+  if (hasBundle) {
+    const bEl = document.getElementById('bundle-badge');
+    bEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;
+      border-radius:8px;font-size:11px;font-weight:800;letter-spacing:.5px;
+      background:rgba(255,77,109,.15);color:#ff4d6d;border:1px solid rgba(255,77,109,.45)">
+      ⚡ BUNDLED LAUNCH — wallets bought in the same block</span>`;
+    bEl.style.display = '';
+  }
+
+  // Deployer reputation panel
+  const dep = data.deployer;
+  if (dep && dep.creator) {
+    const v = dep.verdict || 'UNKNOWN';
+    const style = {
+      SERIAL_RUGGER:     { col:'#ef4444', label:'⛔ SERIAL RUGGER' },
+      POOR_TRACK_RECORD: { col:'#f59e0b', label:'⚠ POOR TRACK RECORD' },
+      FIRST_LAUNCH:      { col:'#94a3b8', label:'🆕 FIRST LAUNCH' },
+      NORMAL:            { col:'#10b981', label:'✓ NO RED FLAGS' },
+      UNKNOWN:           { col:'#94a3b8', label:'— UNKNOWN' },
+    }[v] || { col:'#94a3b8', label:v };
+    const histLine = dep.tokens_launched > 1
+      ? `${dep.tokens_launched} tokens launched · ${dep.dead}/${dep.sampled} checked are dead (${dep.dead_pct}%)`
+      : `First token from this wallet — no history to judge`;
+    const dEl = document.getElementById('deployer-panel');
+    dEl.innerHTML = `
+      <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Deployer History</div>
+      <div style="font-weight:800;font-size:13px;color:${style.col};margin-bottom:4px">${style.label}</div>
+      <div style="font-size:11px;color:#94a3b8;line-height:1.5">${histLine}</div>
+      <a href="https://solscan.io/account/${dep.creator}" target="_blank" rel="noopener"
+         style="font-family:monospace;font-size:10px;color:#60a5fa;text-decoration:none">${dep.creator_short} ↗</a>`;
+    dEl.style.display = '';
   }
 
   // Stats
@@ -484,7 +527,9 @@ function render(data) {
             </div>
             <span class="cluster-risk risk-badge ${riskClass}">${c.risk}</span>
           </div>
-          <div class="cluster-meta">Master: <code style="color:${col}">${c.master_short}</code></div>
+          <div class="cluster-meta">${c.type === 'time_sync'
+            ? `⚡ Bought in the <strong style="color:${col}">same block</strong> — bundle signature`
+            : `Master: <code style="color:${col}">${c.master_short}</code>`}</div>
           <div class="cluster-meta" style="margin-top:4px">Combined supply: <strong>${c.combined_pct}%</strong></div>
           <div class="cluster-bar-bg">
             <div class="cluster-bar-fill" style="background:${col}; width:${Math.min(c.combined_pct,100)}%"></div>
@@ -716,7 +761,7 @@ async function fetchLpStatus(mint) {
         display:inline-flex;align-items:center;gap:5px;
         padding:5px 10px;border-radius:8px;font-size:11px;font-weight:700;
         background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.4)
-      ">✅ LP Burned</span>`;
+      ">✅ LP 100% Burned</span>`;
     } else {
       html = `<a href="https://rugcheck.xyz/tokens/${mint}" target="_blank" rel="noopener" style="
         display:inline-flex;align-items:center;gap:5px;

@@ -116,19 +116,20 @@ export function createApp(): express.Application {
 </div>
 
 <h1>Detect coordinated wallet<br>cabals before your bot buys.</h1>
-<p class="sub">Real-time on-chain funding trace of the top 20 holders via Helius RPC.<br>Returns a cabal confidence score 0–100. <strong style="color:#e2e8f0">$0.05 USDC per query.</strong> No API key. No account.</p>
+<p class="sub">Three on-chain detection layers screeners don't have: <strong style="color:#e2e8f0">funding-source tracing</strong>, <strong style="color:#e2e8f0">same-block bundle detection</strong>, and <strong style="color:#e2e8f0">deployer track record</strong>.<br>One call, one 0–100 score. <strong style="color:#10b981">100 free queries/month</strong> — then $0.05 USDC per query. No API key. No account.</p>
 
 <div class="cards">
-  <div class="card"><div class="card-title">Per Query</div><div class="card-val" style="color:#10b981">$0.05 USDC</div></div>
-  <div class="card"><div class="card-title">Response Time</div><div class="card-val" style="color:#0ea5e9">&lt;100ms</div></div>
-  <div class="card"><div class="card-title">Payment</div><div class="card-val" style="font-size:15px;color:#a78bfa">Native Solana</div></div>
-  <div class="card"><div class="card-title">MCP Compatible</div><div class="card-val" style="font-size:15px;color:#fb923c">Claude · Cursor · Eliza</div></div>
+  <div class="card"><div class="card-title">🔍 Funding Trace</div><div class="card-val" style="font-size:14px;color:#e2e8f0">Top holders walked back to shared funding wallets</div></div>
+  <div class="card"><div class="card-title">⚡ Bundle Detection</div><div class="card-val" style="font-size:14px;color:#e2e8f0">Wallets that bought in the exact same block — Jito bundles can't hide</div></div>
+  <div class="card"><div class="card-title">⛔ Deployer History</div><div class="card-val" style="font-size:14px;color:#e2e8f0">"This dev launched 14 tokens — 13 are dead." Wallets rotate, deployers don't</div></div>
+  <div class="card"><div class="card-title">Built for Bots</div><div class="card-val" style="font-size:14px;color:#e2e8f0">&lt;100ms pre-indexed · JSON · MCP for Claude / Cursor / Eliza agents</div></div>
 </div>
 
 <div class="links">
   <a class="btn btn-primary" href="/map?mint=Axpzs7FEMYzpcfqVcDjDMQb2rsgMYVJADNpUZe7bpump">🗺 Live Bubble Map Demo</a>
   <a class="btn btn-teal" href="/api/info">📖 API Reference</a>
   <a class="btn btn-purple" href="https://github.com/paulf280-ui/solana-safe-sniper-mcp-template" target="_blank">⚙ GitHub Template</a>
+  <a class="btn btn-gray" href="/compare">⚖ vs rugcheck / GoPlus</a>
 </div>
 
 <div class="section-title">Add to Claude / Cursor / ElizaOS</div>
@@ -149,10 +150,10 @@ export function createApp(): express.Application {
   app.get("/.well-known/glama.json", (_req, res) => {
     res.json({
       name:        "Cabal-Hunter",
-      description: "Real-time on-chain coordinated wallet detection for Solana tokens",
+      description: "Solana token cabal detection: funding-source tracing, same-block bundle detection, and deployer track record in one call",
       url:         "https://api.cabal-hunter.com",
       mcp:         "https://api.cabal-hunter.com/mcp",
-      version:     "1.0.0",
+      version:     "1.1.0",
       contact:     "paulf280@gmail.com",
     })
   })
@@ -162,7 +163,7 @@ export function createApp(): express.Application {
     res.json({
       status:  "ok",
       service: "cabal-hunter",
-      version: "1.0.0",
+      version: "1.1.0",
       time:    new Date().toISOString(),
     })
   })
@@ -180,6 +181,13 @@ export function createApp(): express.Application {
         error: "invalid_mint",
         message: "mintAddress must be a valid Solana public key (32–44 base58 chars)",
       })
+      return
+    }
+
+    // Browser redirect — humans get the visual map, bots get JSON
+    const acceptsHtml = (req.headers.accept ?? "").includes("text/html")
+    if (acceptsHtml && req.method === "GET") {
+      res.redirect(302, `/map?mint=${encodeURIComponent(mint)}`)
       return
     }
 
@@ -331,6 +339,8 @@ export function createApp(): express.Application {
     <tr class="highlight"><td><strong>Coordinated wallet clusters</strong><br><small>Multiple wallets funded by same source before launch</small></td><td class="ch"><span class="yes">✅ YES</span><br><small>Core feature — traces funding lineage via Helius RPC</small></td><td><span class="no">❌ NO</span></td><td><span class="no">❌ NO</span></td></tr>
     <tr class="highlight"><td><strong>Cabal confidence score (0–100)</strong><br><small>% of supply controlled by coordinated wallets</small></td><td class="ch"><span class="yes">✅ YES</span></td><td><span class="no">❌ NO</span></td><td><span class="no">❌ NO</span></td></tr>
     <tr class="highlight"><td><strong>Insider sniper detection</strong><br><small>Wallets that bought within 60 seconds of launch</small></td><td class="ch"><span class="yes">✅ YES</span></td><td><span class="no">❌ NO</span></td><td><span class="partial">⚡ Partial</span></td></tr>
+    <tr class="highlight"><td><strong>Same-block bundle detection</strong><br><small>Holders that bought in the EXACT same block — Jito-bundled stealth launches that evade funding traces</small></td><td class="ch"><span class="yes">✅ YES</span><br><small>time_sync flag + cluster breakdown</small></td><td><span class="no">❌ NO</span></td><td><span class="no">❌ NO</span></td></tr>
+    <tr class="highlight"><td><strong>Deployer track record</strong><br><small>"This dev launched 14 tokens — 13 are dead." Creator resolved on-chain, works after graduation</small></td><td class="ch"><span class="yes">✅ YES</span><br><small>SERIAL_RUGGER / POOR_TRACK_RECORD verdicts</small></td><td><span class="partial">⚡ Partial</span><br><small>creator shown, no history analysis</small></td><td><span class="no">❌ NO</span></td></tr>
     <tr><td><strong>LP lock / burn check</strong></td><td class="ch"><span class="partial">⚡ Via Helius</span></td><td><span class="yes">✅ YES</span></td><td><span class="yes">✅ YES</span></td></tr>
     <tr><td><strong>Honeypot detection</strong></td><td class="ch"><span class="no">❌ NO</span></td><td><span class="yes">✅ YES</span></td><td><span class="yes">✅ YES</span></td></tr>
     <tr><td><strong>Mint authority check</strong></td><td class="ch"><span class="no">❌ NO</span></td><td><span class="yes">✅ YES</span></td><td><span class="yes">✅ YES</span></td></tr>
@@ -407,10 +417,17 @@ export function createApp(): express.Application {
     res.json({
       service:         "Cabal-Hunter",
       description:     "On-chain coordinated wallet detection for Solana meme tokens",
+      detection_layers: {
+        funding_trace:  "Top holders walked back to shared funding wallets (clusters[].type = 'funding')",
+        bundle_detect:  "Holders that bought in the exact same block — Jito bundle signature (time_sync: true, clusters[].type = 'time_sync')",
+        deployer:       "Token creator resolved on-chain + full launch history (deployer.verdict: FIRST_LAUNCH | NORMAL | POOR_TRACK_RECORD | SERIAL_RUGGER)",
+      },
+      free_tier:       "100 queries/month per IP — no key, no account",
       price_per_query: `${PRICE_USDC} USDC`,
       payment_method:  "Solana SPL USDC transfer + X-Payment-Signature header",
       mcp_endpoint:    "/mcp",
       rest_endpoint:   "/api/scan-cabal",
+      map_endpoint:    "/map?mint=<MINT> — free visual bubble map",
       example_request: {
         method: "POST",
         url:    "/api/scan-cabal",

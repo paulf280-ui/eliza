@@ -525,6 +525,46 @@ async def open_monster_position(
     mode = "PAPER" if MONSTER_PAPER_ONLY else "LIVE"
     print(f"[monster] 🎯 OPENING ({mode}) {token_name} ({mint[:8]}) {sol_size:.3f} SOL — src={signal_source}")
 
+    # Post to cabal-hunter alerts channel whenever we enter a token.
+    # This creates an audit trail of all trades and correlates entries with risk signals.
+    try:
+        import asyncio as _asyncio_alert
+        from elizaos.plugins.solana.cluster_check import get_cluster_map as _get_cabal
+        from elizaos.plugins.solana.deployer_check import (
+            blend_deployer_into_score as _blend,
+            get_deployer_report as _get_deployer,
+        )
+        from elizaos.plugins.solana.cabal_telegram import send_cabal_alert as _tg_alert_post
+        from elizaos.plugins.solana.cabal_cache import save_result as _cache_save_alert
+
+        async def _post_entry_alert():
+            try:
+                # Full cabal + deployer analysis (don't block trade execution)
+                cabal_result, _dep = await _asyncio_alert.gather(
+                    _get_cabal(session, mint, time.time()),
+                    _get_deployer(session, mint),
+                )
+                _blend(cabal_result, _dep)  # same score/risk the bubble map shows
+                sym = token_name or mint[:8]
+                # Cache for bubble map
+                try:
+                    _cache_save_alert(mint, sym, cabal_result, time.time())
+                except Exception:
+                    pass
+                # Always post to alerts channel (not just HIGH/MEDIUM) — audit trail of all entries
+                await _tg_alert_post(mint, sym, cabal_result, session, force_post=True)
+            except Exception as _alert_err:
+                print(f"[cabal-alert] entry post failed for {mint[:8]}: {_alert_err}")
+
+        # Fire async, don't block position opening on Telegram
+        try:
+            loop = _asyncio_alert.get_event_loop()
+            loop.create_task(_post_entry_alert())
+        except Exception:
+            pass
+    except Exception:
+        pass
+
     # Determine pool: explicit override (e.g. creator_alpha bonding-curve buy)
     # OR auto-detect via DexScreener.
     if pool is None:

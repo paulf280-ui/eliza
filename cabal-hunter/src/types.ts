@@ -6,6 +6,18 @@ export interface Cluster {
   wallet_count: number
   combined_pct: number
   risk: "HIGH" | "MEDIUM"
+  /** "funding" = shared funding source; "time_sync" = same-block (bundled) buys */
+  type?: "funding" | "time_sync"
+}
+
+export interface DeployerReport {
+  creator: string | null
+  creator_short: string | null
+  tokens_launched: number
+  dead: number
+  sampled: number
+  dead_pct: number
+  verdict: "FIRST_LAUNCH" | "SERIAL_RUGGER" | "POOR_TRACK_RECORD" | "NORMAL" | "UNKNOWN"
 }
 
 export interface Holder {
@@ -27,6 +39,10 @@ export interface CabalReport {
   verdict: string               // human-readable summary sentence
   coordinated_clusters: Cluster[]
   holders: Holder[]
+  /** true if ≥3 top holders bought in the exact same block (bundle signature) */
+  time_sync: boolean
+  /** deployer wallet track record — null when creator can't be resolved */
+  deployer: DeployerReport | null
   wallets_checked: number
   analysis_time_ms: number
   source: "pre_indexed" | "real_time"

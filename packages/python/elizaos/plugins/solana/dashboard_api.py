@@ -3049,10 +3049,19 @@ When adjusting a filter, always explain your reasoning based on the data above."
             created_ts = _t.time() - 3600
 
         try:
+            import asyncio as _aio_gather
             import aiohttp as _aio_cb
             from elizaos.plugins.solana.cluster_check import get_cluster_map
+            from elizaos.plugins.solana.deployer_check import (
+                blend_deployer_into_score,
+                get_deployer_report,
+            )
             async with _aio_cb.ClientSession() as _cb_sess:
-                result = await get_cluster_map(_cb_sess, mint, created_ts)
+                result, _deployer = await _aio_gather.gather(
+                    get_cluster_map(_cb_sess, mint, created_ts),
+                    get_deployer_report(_cb_sess, mint),
+                )
+            blend_deployer_into_score(result, _deployer)
             result["source"] = "real_time"
             # Save to cache for future requests
             try:

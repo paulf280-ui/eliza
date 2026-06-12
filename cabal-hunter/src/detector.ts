@@ -14,7 +14,7 @@ const require = createRequire(import.meta.url)
  */
 
 const Database = require("better-sqlite3")
-import { CabalReport, Cluster, Holder } from "./types.js"
+import { CabalReport, Cluster, DeployerReport, Holder } from "./types.js"
 
 const DB_PATH = process.env.CABAL_CACHE_DB ?? "/home/ubuntu/eliza/packages/python/elizaos/plugins/solana/cabal_cache.db"
 const BOT_URL = process.env.BOT_INTERNAL_URL ?? "http://127.0.0.1:3001"
@@ -36,14 +36,26 @@ function getDb(): ReturnType<typeof Database> | null {
 function buildVerdict(report: Partial<CabalReport>): string {
   const score = report.cabal_score ?? 0
   const clusters = report.coordinated_clusters ?? []
+  const deployer = report.deployer
+
+  let deployerNote = ""
+  if (deployer?.verdict === "SERIAL_RUGGER") {
+    deployerNote = ` DEPLOYER ALERT: this creator has launched ${deployer.tokens_launched} tokens, ${deployer.dead} of ${deployer.sampled} checked are dead (${deployer.dead_pct}%).`
+  } else if (deployer?.verdict === "POOR_TRACK_RECORD") {
+    deployerNote = ` Deployer track record is weak: ${deployer.dead}/${deployer.sampled} previous launches dead.`
+  }
+
   if (score === 0 || clusters.length === 0) {
-    return `CLEAN — No coordinated wallet clusters detected (${report.wallets_checked ?? 0} wallets traced).`
+    return `CLEAN — No coordinated wallet clusters detected (${report.wallets_checked ?? 0} wallets traced).${deployerNote}`
   }
   const top = clusters[0]
+  const how = top.type === "time_sync"
+    ? `${top.wallet_count} wallets bought in the EXACT same block (bundled launch)`
+    : `${top.wallet_count} wallets funded by the same source (${top.master_short})`
   if (report.risk === "HIGH") {
-    return `AVOID — ${top.wallet_count} wallets funded by the same source (${top.master_short}) control ${top.combined_pct.toFixed(1)}% of supply. High probability of coordinated dump.`
+    return `AVOID — ${how}, controlling ${top.combined_pct.toFixed(1)}% of supply. High probability of coordinated dump.${deployerNote}`
   }
-  return `CAUTION — Possible coordination: ${top.wallet_count} wallets from ${top.master_short} hold ${top.combined_pct.toFixed(1)}% combined. Monitor closely.`
+  return `CAUTION — Possible coordination: ${how}, ${top.combined_pct.toFixed(1)}% combined. Monitor closely.${deployerNote}`
 }
 
 /** Read from shared SQLite cache — fastest path (<1ms) */
@@ -60,16 +72,27 @@ function readFromCache(mint: string): CabalReport | null {
 
     const clusters: Cluster[] = JSON.parse((row.clusters_json as string) || "[]")
     const holders: Holder[]   = JSON.parse((row.holders_json as string)  || "[]")
-    const score = Number(row.cabal_score ?? 0)
-    const risk  = row.risk as "HIGH" | "MEDIUM" | "CLEAN"
+    const deployer: DeployerReport | null = row.deployer_json
+      ? JSON.parse(row.deployer_json as string) : null
+    const timeSync = Boolean(row.time_sync) || clusters.some(c => c.type === "time_sync")
+
+    // Deployer score floor — same blend as Python (covers pre-blend cache rows)
+    let score = Number(row.cabal_score ?? 0)
+    const floor = deployer?.verdict === "SERIAL_RUGGER" ? 55
+                : deployer?.verdict === "POOR_TRACK_RECORD" ? 40 : 0
+    if (score < floor) score = floor
+    const risk: "HIGH" | "MEDIUM" | "CLEAN" =
+      score >= 65 ? "HIGH" : score >= 35 ? "MEDIUM" : "CLEAN"
 
     const report: CabalReport = {
       mint,
       token_name:           String(row.token_name ?? ""),
       risk,
       cabal_score:          score,
-      is_controlled:        Boolean(row.is_controlled),
-      verdict:              buildVerdict({ risk, cabal_score: score, coordinated_clusters: clusters, wallets_checked: Number(row.wallets_checked ?? 0) }),
+      is_controlled:        score >= 35,
+      time_sync:            timeSync,
+      deployer,
+      verdict:              buildVerdict({ risk, cabal_score: score, coordinated_clusters: clusters, deployer, wallets_checked: Number(row.wallets_checked ?? 0) }),
       coordinated_clusters: clusters,
       holders,
       wallets_checked:      Number(row.wallets_checked ?? 0),
@@ -108,6 +131,8 @@ async function fetchFromBot(mint: string, createdTs?: number): Promise<CabalRepo
   const holders: Holder[]   = (data.holders  as Holder[])  ?? []
   const score = Number(data.cabal_score ?? 0)
   const risk  = (data.risk as "HIGH" | "MEDIUM" | "CLEAN") ?? "CLEAN"
+  const deployer = (data.deployer as DeployerReport | null) ?? null
+  const timeSync = Boolean(data.time_sync)
 
   return {
     mint,
@@ -115,7 +140,9 @@ async function fetchFromBot(mint: string, createdTs?: number): Promise<CabalRepo
     risk,
     cabal_score:          score,
     is_controlled:        Boolean(data.is_controlled),
-    verdict:              buildVerdict({ risk, cabal_score: score, coordinated_clusters: clusters, wallets_checked: Number(data.wallets_checked ?? 0) }),
+    time_sync:            timeSync,
+    deployer,
+    verdict:              buildVerdict({ risk, cabal_score: score, coordinated_clusters: clusters, deployer, wallets_checked: Number(data.wallets_checked ?? 0) }),
     coordinated_clusters: clusters,
     holders,
     wallets_checked:      Number(data.wallets_checked ?? 0),

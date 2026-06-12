@@ -43,8 +43,12 @@ _SKIP_OWNERS: frozenset[str] = frozenset({
 })
 
 # ── Tuning constants ─────────────────────────────────────────────────────────
-_WINDOW_BEFORE_SECS   = 600    # look 10 min before token creation
-_WINDOW_AFTER_SECS    = 1800   # and 30 min after (bundlers buy fast)
+# Funding window around PAIR creation. pair_created_ts is the graduation
+# moment, but cabal wallets are funded during the BONDING-CURVE phase which
+# can run hours earlier — a 10min pre-window missed nearly all real funding
+# (every token scored 0). 6h covers the curve phase of almost all launches.
+_WINDOW_BEFORE_SECS   = 6 * 3600  # look 6h before pair creation
+_WINDOW_AFTER_SECS    = 1800      # and 30 min after (snipers buy fast)
 _MAX_TOKEN_AGE_HOURS  = 8.0    # skip check for tokens older than this
 _MAX_SIGS_PER_WALLET  = 150    # cap pagination to control RPC cost
 _MIN_SOL_INFLOW       = 5_000_000  # 0.005 SOL minimum — ignore dust/rent
@@ -65,35 +69,65 @@ async def _rpc(
     url = os.getenv("SOLANA_RPC_URL", "")
     if not url:
         return None
-    try:
-        async with session.post(
-            url,
-            json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
-            timeout=aiohttp.ClientTimeout(total=timeout),
-        ) as r:
-            if r.status == 200:
-                return (await r.json()).get("result")
-    except Exception:
-        pass
+    for attempt in range(3):  # 1 try + 2 retries — survives 429 bursts
+        try:
+            async with _rpc_sem():
+                async with session.post(
+                    url,
+                    json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+                    timeout=aiohttp.ClientTimeout(total=timeout),
+                ) as r:
+                    if r.status == 200:
+                        return (await r.json()).get("result")
+                    if r.status not in (429, 500, 502, 503):
+                        return None  # 4xx errors won't improve on retry
+        except Exception:
+            pass
+        if attempt < 2:
+            await asyncio.sleep(0.4 * (attempt + 1))
     return None
 
 
+# Throttle concurrent RPC calls — pre-indexing + funder walks + slot checks
+# can burst 40+ parallel requests per token and trip Helius rate limits.
+_rpc_semaphore: asyncio.Semaphore | None = None
+
+def _rpc_sem() -> asyncio.Semaphore:
+    global _rpc_semaphore
+    if _rpc_semaphore is None:
+        _rpc_semaphore = asyncio.Semaphore(10)
+    return _rpc_semaphore
+
+
 # ── Step 1 helpers ───────────────────────────────────────────────────────────
+
+async def _resolve_owner_checked(
+    session: aiohttp.ClientSession, token_acct: str
+) -> tuple[str | None, bool]:
+    """Return (owner_wallet, lookup_ok) for a token account.
+
+    lookup_ok=False means the RPC call itself failed — the account is NOT
+    necessarily a pool. Callers must not label failures as "LP Pool";
+    that bug once cached 15×"LP Pool" garbage for 8 hours.
+    """
+    info = await _rpc(session, "getAccountInfo",
+                      [token_acct, {"encoding": "jsonParsed", "commitment": "confirmed"}])
+    if not info:
+        return None, False   # RPC failure — unknown, not a verified pool
+    val  = info.get("value") or {}
+    data = val.get("data") or {}
+    if not isinstance(data, dict):
+        return None, True    # raw (non-parsed) data = genuine program/pool account
+    owner = (data.get("parsed") or {}).get("info", {}).get("owner", "")
+    return (owner if owner and owner not in _SKIP_OWNERS else None), True
+
 
 async def _resolve_owner(
     session: aiohttp.ClientSession, token_acct: str
 ) -> str | None:
     """Return owner wallet of a token account, or None if it is a program/pool."""
-    info = await _rpc(session, "getAccountInfo",
-                      [token_acct, {"encoding": "jsonParsed", "commitment": "confirmed"}])
-    if not info:
-        return None
-    val  = info.get("value") or {}
-    data = val.get("data") or {}
-    if not isinstance(data, dict):
-        return None
-    owner = (data.get("parsed") or {}).get("info", {}).get("owner", "")
-    return owner if owner and owner not in _SKIP_OWNERS else None
+    owner, _ok = await _resolve_owner_checked(session, token_acct)
+    return owner
 
 
 # ── Step 2 helpers ───────────────────────────────────────────────────────────
@@ -136,6 +170,32 @@ def _parse_sol_sender(tx: dict, target_wallet: str) -> str | None:
             if sender and sender not in _SKIP_OWNERS:
                 return sender
     return None
+
+
+async def _first_slot_of_token_account(
+    session: aiohttp.ClientSession,
+    token_acct: str,
+) -> int | None:
+    """Return the slot of the OLDEST transaction on a token account.
+
+    Token accounts are per-token so histories are short; we page max 3×100.
+    The oldest tx is the account creation / first buy — if several top holders
+    share the same slot, they bought in the same block (Jito bundle signature).
+    """
+    before: str | None = None
+    oldest: dict | None = None
+    for _ in range(3):
+        params: dict = {"limit": 100, "commitment": "confirmed"}
+        if before:
+            params["before"] = before
+        sigs = await _rpc(session, "getSignaturesForAddress", [token_acct, params])
+        if not sigs:
+            break
+        oldest = sigs[-1]
+        if len(sigs) < 100:
+            break
+        before = oldest["signature"]
+    return (oldest or {}).get("slot")
 
 
 async def _find_funder_in_window(
@@ -369,7 +429,8 @@ async def get_cluster_map(
     h_result = await _rpc(session, "getTokenLargestAccounts",
                           [mint, {"commitment": "confirmed"}])
     if not h_result:
-        return {"risk": "CLEAN", "holders": [], "clusters": [],
+        return {"risk": "CLEAN", "cabal_score": 0.0, "is_controlled": False,
+                "token_name": "", "holders": [], "clusters": [],
                 "total_supply_est": 0, "wallets_checked": 0,
                 "skip_reason": "rpc_error", "computed_at": time.time()}
 
@@ -377,19 +438,22 @@ async def get_cluster_map(
     top_sum = sum(float(a.get("uiAmount") or 0) for a in accounts)
     total_supply_est = top_sum / 0.85 if top_sum > 0 else 1.0
 
-    # Resolve owner wallets concurrently
-    owners_raw = await asyncio.gather(
-        *[_resolve_owner(session, a["address"]) for a in accounts]
+    # Resolve owner wallets concurrently (lookup_ok distinguishes RPC failure
+    # from a genuine pool account — failures must never be labelled "LP Pool")
+    owners_checked = await asyncio.gather(
+        *[_resolve_owner_checked(session, a["address"]) for a in accounts]
     )
+    lookup_failures = sum(1 for _o, ok in owners_checked if not ok)
 
     # Build holder list with LP/pool detection
     raw_holders: list[dict] = []
     owner_wallets: list[tuple[str, float]] = []
-    for i, (acc, owner) in enumerate(zip(accounts, owners_raw)):
+    owner_token_accts: dict[str, str] = {}  # owner wallet → token account
+    for i, (acc, (owner, lookup_ok)) in enumerate(zip(accounts, owners_checked)):
         ui   = float(acc.get("uiAmount") or 0)
         pct  = round(ui / total_supply_est * 100, 2)
         addr = owner or acc["address"]
-        is_lp = (owner is None)  # owner == None means it's a program/pool account
+        is_lp = lookup_ok and (owner is None)  # verified program/pool account
         label = _KNOWN_LABELS.get(addr) or ("LP Pool" if is_lp else None)
         raw_holders.append({
             "rank":          i + 1,
@@ -401,32 +465,49 @@ async def get_cluster_map(
             "is_lp":         is_lp,
             "label":         label,
         })
-        if not is_lp:
+        if owner is not None:
             owner_wallets.append((addr, ui))
+            owner_token_accts[addr] = acc["address"]
 
     # ── Cluster detection ────────────────────────────────────────────────────
-    token_age_h = (time.time() - token_created_ts) / 3600
+    # No age cap here (unlike check_holder_clusters): the SaaS bubble map must
+    # work for any token a user pastes in. Cabal wallets are typically fresh
+    # one-shot wallets with short histories, so the bounded funder walk
+    # (_MAX_SIGS_PER_WALLET) stays cheap even for tokens that are months old.
     funder_map: dict[str, str] = {}
+    first_slot_map: dict[str, int] = {}  # owner wallet → slot of first buy
+    wallets_to_check = [w for w, _ in owner_wallets[:12]]
 
-    if token_age_h <= _MAX_TOKEN_AGE_HOURS:
-        wallets_to_check = [w for w, _ in owner_wallets[:12]]
-
-        async def _check_one(wallet: str) -> tuple[str, str | None]:
-            try:
-                return wallet, await _find_funder_in_window(
-                    session, wallet, window_start, window_end
-                )
-            except Exception:
-                return wallet, None
-
+    async def _check_one(wallet: str) -> tuple[str, str | None]:
         try:
-            async with asyncio.timeout(_CHECK_TIMEOUT_SECS):
-                results = await asyncio.gather(*[_check_one(w) for w in wallets_to_check])
-            for wallet, funder in results:
-                if funder:
-                    funder_map[wallet] = funder
-        except (asyncio.TimeoutError, Exception):
-            pass
+            return wallet, await _find_funder_in_window(
+                session, wallet, window_start, window_end
+            )
+        except Exception:
+            return wallet, None
+
+    async def _slot_one(wallet: str) -> tuple[str, int | None]:
+        try:
+            return wallet, await _first_slot_of_token_account(
+                session, owner_token_accts[wallet]
+            )
+        except Exception:
+            return wallet, None
+
+    try:
+        async with asyncio.timeout(_CHECK_TIMEOUT_SECS):
+            funder_results, slot_results = await asyncio.gather(
+                asyncio.gather(*[_check_one(w) for w in wallets_to_check]),
+                asyncio.gather(*[_slot_one(w) for w in wallets_to_check]),
+            )
+        for wallet, funder in funder_results:
+            if funder:
+                funder_map[wallet] = funder
+        for wallet, slot in slot_results:
+            if slot:
+                first_slot_map[wallet] = slot
+    except (asyncio.TimeoutError, Exception):
+        pass
 
     # Build cluster objects
     funder_groups: dict[str, list[str]] = {}
@@ -448,6 +529,7 @@ async def get_cluster_map(
         risk = "HIGH" if n >= _HIGH_RISK_WALLETS else "MEDIUM"
         clusters.append({
             "id":           cluster_id,
+            "type":         "funding",
             "master_short": funder[:6] + "…" + funder[-4:],
             "master_full":  funder,
             "wallet_count": n,
@@ -455,6 +537,38 @@ async def get_cluster_map(
             "risk":         risk,
         })
         for w in cluster_wallets:
+            wallet_to_cluster[w] = cluster_id
+        cluster_id += 1
+
+    # ── Time-sync detection: same-block (same-slot) first buys ──────────────
+    # ≥3 top holders whose token accounts were created in the EXACT same slot
+    # bought in the same block — the signature of a Jito-bundled multi-wallet
+    # launch. Catches stealth bundles that route funding through intermediaries
+    # (invisible to the funding trace above).
+    slot_groups: dict[int, list[str]] = {}
+    for wallet, slot in first_slot_map.items():
+        if wallet in wallet_to_cluster:
+            continue  # already in a funding cluster — don't double count
+        slot_groups.setdefault(slot, []).append(wallet)
+
+    time_sync = False
+    for slot, sync_wallets in sorted(slot_groups.items(), key=lambda kv: -len(kv[1])):
+        n = len(sync_wallets)
+        if n < 3:
+            continue
+        time_sync = True
+        combined_ui  = sum(amt for w, amt in owner_wallets if w in sync_wallets)
+        combined_pct = round(combined_ui / total_supply_est * 100, 1)
+        clusters.append({
+            "id":           cluster_id,
+            "type":         "time_sync",
+            "master_short": "same-block bundle",
+            "master_full":  f"slot {slot}",
+            "wallet_count": n,
+            "combined_pct": combined_pct,
+            "risk":         "HIGH" if n >= 4 else "MEDIUM",
+        })
+        for w in sync_wallets:
             wallet_to_cluster[w] = cluster_id
         cluster_id += 1
 
@@ -470,12 +584,26 @@ async def get_cluster_map(
     elif clusters:
         overall_risk = "MEDIUM"
 
+    # Compute cabal_score: % of supply held by coordinated wallets
+    coordinated_pct = sum(float(c.get("combined_pct", 0)) for c in clusters)
+    holder_pct_sum = sum(float(h.get("pct", 0)) for h in raw_holders) if raw_holders else 100.0
+    cabal_score = round(min(coordinated_pct / holder_pct_sum * 100, 100.0), 1) if holder_pct_sum > 0 else 0.0
+    is_controlled = (overall_risk == "HIGH" or cabal_score >= 35.0)
+
     return {
         "risk":             overall_risk,
+        "cabal_score":      cabal_score,
+        "is_controlled":    is_controlled,
+        "time_sync":        time_sync,
+        "token_name":       "",
         "holders":          raw_holders,
         "clusters":         clusters,
         "total_supply_est": round(total_supply_est),
-        "wallets_checked":  len(funder_map),
-        "skip_reason":      None if token_age_h <= _MAX_TOKEN_AGE_HOURS else "token_too_old",
+        "wallets_checked":  len(wallets_to_check),
+        "funders_found":    len(funder_map),
+        # degraded = too many owner lookups failed (RPC trouble) — callers
+        # must NOT cache this result; serve it once and let the next query retry
+        "degraded":         lookup_failures >= max(2, len(accounts) // 3),
+        "skip_reason":      None,
         "computed_at":      time.time(),
     }

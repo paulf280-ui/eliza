@@ -39,38 +39,71 @@ def _mark_posted(mint: str) -> None:
 
 
 def _build_message(mint: str, token_name: str, result: dict) -> str:
-    risk      = result.get("risk", "CLEAN")
-    score     = result.get("cabal_score", 0) or result.get("cabal_score", 0)
+    """Mirror EXACTLY what the bubble map shows: same score, same zone label
+    (LOW RISK / CAUTION / HIGH RISK at 35/65), same deployer history, same
+    bundle flag. The TG channel and the map must never disagree.
+    """
+    score     = float(result.get("cabal_score") or 0)
     clusters  = result.get("clusters") or result.get("coordinated_clusters") or []
-    controlled = result.get("is_controlled", False)
+    deployer  = result.get("deployer") or {}
+    time_sync = bool(result.get("time_sync")) or any(
+        c.get("type") == "time_sync" for c in clusters
+    )
 
-    icon = "🚨" if risk == "HIGH" else "⚠️"
-    risk_line = f"HIGH ⛔" if risk == "HIGH" else f"MEDIUM ⚡"
+    # Zone label — identical thresholds + wording to the map's score guide
+    if score >= 65:
+        icon, zone = "🚨", "HIGH RISK"
+    elif score >= 35:
+        icon, zone = "⚠️", "CAUTION"
+    else:
+        icon, zone = "✅", "LOW RISK"
 
     name_display = token_name.strip() if token_name and token_name.strip() else mint[:8] + "…"
 
     lines = [
-        f"{icon} *CABAL {risk} — {name_display}*",
+        f"{icon} *{zone} — {name_display}*",
         "",
-        f"Risk Level: {risk_line}",
-        f"Cabal Score: {score:.0f}/100",
-        f"Controlled: {'YES 🔴' if controlled else 'NO'}",
+        f"Cabal Score: *{score:.0f}/100*",
     ]
+
+    if time_sync:
+        lines.append("⚡ *BUNDLED LAUNCH* — wallets bought in the same block")
+
+    # Deployer history — same data as the map's Deployer History panel
+    dep_verdict = deployer.get("verdict")
+    if dep_verdict and dep_verdict != "UNKNOWN" and deployer.get("creator"):
+        dep_label = {
+            "SERIAL_RUGGER":     "⛔ SERIAL RUGGER",
+            "POOR_TRACK_RECORD": "⚠ POOR TRACK RECORD",
+            "FIRST_LAUNCH":      "🆕 FIRST LAUNCH",
+            "NORMAL":            "✓ NO RED FLAGS",
+        }.get(dep_verdict, dep_verdict)
+        lines.append("")
+        lines.append(f"👤 *Deployer:* {dep_label}")
+        launched = deployer.get("tokens_launched", 0)
+        if launched > 1:
+            lines.append(
+                f"   {launched} tokens launched · "
+                f"{deployer.get('dead', 0)}/{deployer.get('sampled', 0)} dead "
+                f"({deployer.get('dead_pct', 0):.0f}%)"
+            )
 
     if clusters:
         lines.append("")
         lines.append("📊 *Coordinated Clusters:*")
         for c in clusters[:3]:
             w   = c.get("wallet_count") or c.get("wallets", "?")
-            pct = c.get("combined_pct", 0)
-            funder = c.get("master_short") or c.get("master", "unknown")[:20]
-            r   = c.get("risk", "?")
-            lines.append(f"  • {w} wallets from `{funder}` — {pct:.1f}% supply [{r}]")
+            pct = float(c.get("combined_pct") or 0)
+            if c.get("type") == "time_sync":
+                lines.append(f"  • {w} wallets, same-block bundle — {pct:.1f}% supply")
+            else:
+                funder = c.get("master_short") or str(c.get("master", "unknown"))[:20]
+                lines.append(f"  • {w} wallets from `{funder}` — {pct:.1f}% supply")
 
     lines += [
         "",
         f"🗺 [Visual Bubble Map](https://api.cabal-hunter.com/map?mint={mint})",
-        f"🔍 [Free API](https://api.cabal-hunter.com) · $0.05/query",
+        "🔍 [Free API — 100 queries/month](https://api.cabal-hunter.com)",
         "",
         f"`{mint}`",
     ]
@@ -83,11 +116,13 @@ async def send_cabal_alert(
     token_name: str,
     result: dict,
     session: aiohttp.ClientSession | None = None,
+    force_post: bool = False,
 ) -> bool:
     """Post a cabal detection alert to @CabalHunterAlerts.
 
     Returns True if the message was sent, False otherwise.
-    Only fires for HIGH or MEDIUM risk. Deduplicates by mint over 24h.
+    By default, only fires for HIGH or MEDIUM risk. Deduplicates by mint over 24h.
+    If force_post=True (e.g., entry alerts), posts regardless of risk level.
     """
     bot_token = os.getenv("TELEGRAM_CABAL_BOT_TOKEN", "")
     channel   = os.getenv("TELEGRAM_CABAL_CHANNEL", "@CabalHunterAlerts")
@@ -96,8 +131,8 @@ async def send_cabal_alert(
         return False  # not configured
 
     risk = result.get("risk", "CLEAN")
-    if risk not in ("HIGH", "MEDIUM"):
-        return False  # CLEAN — don't post
+    if not force_post and risk not in ("HIGH", "MEDIUM"):
+        return False  # CLEAN — don't post unless forced
 
     if _already_posted(mint):
         return False  # already posted today

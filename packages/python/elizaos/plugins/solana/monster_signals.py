@@ -181,6 +181,10 @@ def _log_signal(entry: dict) -> None:
     SIGNAL_LOG_FILE.write_text(json.dumps(log[-500:], indent=2))
 
 
+# Cabal-Hunter pre-index: mints currently being background-scanned so the
+# SaaS API serves cached (<100ms) results for every fresh graduation.
+_preindex_inflight: set[str] = set()
+
 _recent_signalled: dict[str, float] = {}
 def _recently_signalled(mint: str) -> bool:
     ts = _recent_signalled.get(mint)
@@ -966,17 +970,29 @@ async def _run_cluster_check_bg(
     """
     try:
         # Use get_cluster_map() so the cache has full holder data for the
-        # Cabal-Hunter SaaS bubble map visualization.
+        # Cabal-Hunter SaaS bubble map visualization. Deployer reputation is
+        # fetched concurrently so pre-indexed cache entries are complete.
         from elizaos.plugins.solana.cluster_check import get_cluster_map
-        result = await get_cluster_map(session, mint, pair_created_ts)
-        # lc_entry["cluster"] uses the summary keys (risk, clusters, wallets_checked)
+        from elizaos.plugins.solana.deployer_check import (
+            blend_deployer_into_score,
+            get_deployer_report,
+        )
+        result, _deployer_rep = await asyncio.gather(
+            get_cluster_map(session, mint, pair_created_ts),
+            get_deployer_report(session, mint),
+        )
+        # lc_entry["cluster"] keeps the RAW cluster risk — the trading gate is
+        # unchanged by deployer blending (which only affects display/alerts).
         lc_entry["cluster"] = {
             "risk":            result.get("risk", "CLEAN"),
             "clusters":        result.get("clusters", []),
             "wallets_checked": result.get("wallets_checked", 0),
             "skip_reason":     result.get("skip_reason"),
         }
-        # Persist full result (including holders) to the SaaS cache
+        # Fold deployer verdict into score/risk — same numbers the bubble map shows
+        blend_deployer_into_score(result, _deployer_rep)
+
+        # Persist full result (including holders + deployer) to the SaaS cache
         try:
             from elizaos.plugins.solana.cabal_cache import save_result as _cache_save
             sym = lc_entry.get("sym") or mint[:8]
@@ -984,17 +1000,27 @@ async def _run_cluster_check_bg(
         except Exception:
             pass
 
-        # Post to @CabalHunterAlerts Telegram channel if HIGH or MEDIUM risk
-        try:
-            if result.get("risk") in ("HIGH", "MEDIUM"):
+        # Post to @CabalHunterAlerts (Telegram) and @CabalHunterAPI (X).
+        # result now carries the exact score/risk/deployer the bubble map shows.
+        if result.get("risk") in ("HIGH", "MEDIUM"):
+            sym = lc_entry.get("sym") or mint[:8]
+            # Telegram (async)
+            try:
                 from elizaos.plugins.solana.cabal_telegram import send_cabal_alert as _tg_alert
-                sym = lc_entry.get("sym") or mint[:8]
                 asyncio.create_task(
                     _tg_alert(mint, sym, result, session),
                     name=f"tg_cabal_alert_{mint[:8]}",
                 )
-        except Exception:
-            pass
+            except Exception:
+                pass
+            # X / Twitter (sync, runs in thread to avoid blocking event loop)
+            try:
+                import asyncio as _asyncio
+                from elizaos.plugins.solana.cabal_twitter import post_cabal_tweet as _tw_post
+                loop = _asyncio.get_event_loop()
+                loop.run_in_executor(None, _tw_post, mint, sym, result)
+            except Exception:
+                pass
         risk    = result.get("risk", "CLEAN")
         checked = result.get("wallets_checked", 0)
         reason  = result.get("skip_reason")
@@ -2233,6 +2259,31 @@ async def lifecycle_scout_loop(runtime: Any,
                         cycle_rejects["age"] += 1
                         continue
                     cycle_in_age_window += 1
+                    # ── Cabal-Hunter pre-index ────────────────────────────
+                    # Scan EVERY graduation in the age window (not just ones
+                    # we trade) so SaaS map/API lookups hit the cache in
+                    # <100ms instead of a 1-2s live trace. Dedup via the
+                    # 8h-TTL cache; max 3 concurrent background scans.
+                    try:
+                        if mint not in _preindex_inflight and len(_preindex_inflight) < 3:
+                            from elizaos.plugins.solana.cabal_cache import get_result as _pi_get
+                            if _pi_get(mint) is None:
+                                _preindex_inflight.add(mint)
+                                _pi_ts = float(p.get("pairCreatedAt") or 0) / 1000
+                                _pi_sym = ((p.get("baseToken") or {}).get("symbol") or "")
+
+                                async def _pi_run(m=mint, ts=_pi_ts, sym=_pi_sym):
+                                    try:
+                                        await _run_cluster_check_bg(session, m, ts, {"sym": sym})
+                                    except Exception:
+                                        pass
+                                    finally:
+                                        _preindex_inflight.discard(m)
+
+                                asyncio.create_task(_pi_run(), name=f"preindex_{mint[:8]}")
+                                print(f"[preindex] 📦 {mint[:8]} queued for Cabal-Hunter cache")
+                    except Exception:
+                        pass
                     liq_usd = float((p.get("liquidity") or {}).get("usd") or 0)
                     liq_min = _CREATOR_ALPHA_PRIORITY_LIQ_MIN if priority_rec else LIFECYCLE_MIN_LIQ_USD
                     if not (liq_min <= liq_usd <= LIFECYCLE_MAX_LIQ_USD):
