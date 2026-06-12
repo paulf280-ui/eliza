@@ -551,6 +551,11 @@ function render(data) {
   // its age every 30s — the banner returns by itself once the data ages past
   // 10 minutes, including after a recheck.
   _traceTs = data.computed_at || (ageSec !== null ? Date.now() / 1000 - ageSec : Date.now() / 1000);
+  // Adaptive threshold: in the trench window (token < 6h old) holders move in
+  // minutes, so warn at 2min. Mature tokens drift slowly — 15min is enough.
+  const _pairTs = Number(data.pair_created_ts || 0);
+  const _tokenAgeH = _pairTs > 0 ? (Date.now() / 1000 - _pairTs) / 3600 : null;
+  _staleThreshold = _tokenAgeH === null ? 600 : _tokenAgeH < 6 ? 120 : 900;
   document.getElementById('stale-banner').dataset.built = '';
   updateStaleBanner();
   if (!window._staleTimer) window._staleTimer = setInterval(updateStaleBanner, 30000);
@@ -642,13 +647,14 @@ function render(data) {
 }
 
 // ── Stale-trace banner — re-evaluates age on a timer ──────────────────────────
-let _traceTs = null;   // unix seconds when the current trace was computed
+let _traceTs = null;            // unix seconds when the current trace was computed
+let _staleThreshold = 600;      // seconds before a trace counts as stale
 
 function updateStaleBanner() {
   const staleEl = document.getElementById('stale-banner');
   if (!staleEl || !_traceTs) return;
   const ageSec = Date.now() / 1000 - _traceTs;
-  if (ageSec <= 600) {
+  if (ageSec <= _staleThreshold) {
     staleEl.style.display = 'none';
     staleEl.dataset.built = '';
     return;

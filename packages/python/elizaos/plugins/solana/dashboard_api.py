@@ -3065,6 +3065,8 @@ When adjusting a filter, always explain your reasoning based on the data above."
                 )
             blend_deployer_into_score(result, _deployer)
             result["source"] = "real_time"
+            # Token age drives the map's adaptive staleness threshold
+            result["pair_created_ts"] = created_ts
             # Save to cache for future requests
             try:
                 from elizaos.plugins.solana.cabal_cache import save_result as _cs
