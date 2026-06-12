@@ -55,6 +55,7 @@ export function createApp(): express.Application {
       const createdTs = req.query.created_ts as string | undefined
       const params    = new URLSearchParams({ mint })
       if (createdTs) params.set("created_ts", createdTs)
+      if (req.query.fresh === "1") params.set("fresh", "1")
 
       const upstream = await fetch(`${botUrl}/api/cabal/internal?${params}`, {
         headers: secret ? { "X-Internal-Secret": secret } : {},

@@ -56,7 +56,7 @@ def _build_message(mint: str, token_name: str, result: dict) -> str:
     elif score >= 35:
         icon, zone = "⚠️", "CAUTION"
     else:
-        icon, zone = "✅", "LOW RISK"
+        icon, zone = "✅", "LOW SIGNAL"
 
     name_display = token_name.strip() if token_name and token_name.strip() else mint[:8] + "…"
 

@@ -3013,16 +3013,18 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
         # Check pre-indexed cache first (sub-100ms).
         # Only use cache if it has full holder data (holders list populated).
-        # Cached results from check_holder_clusters() have empty holders —
-        # those need to run get_cluster_map() for the visual bubble map.
-        try:
-            from elizaos.plugins.solana.cabal_cache import get_result as _cache_get
-            cached = _cache_get(mint)
-            if cached and len(cached.get("holders") or []) > 0:
-                cached["source"] = "pre_indexed"
-                return web.json_response(cached)
-        except Exception:
-            pass
+        # fresh=1 bypasses the cache — the map's "Recheck now" button uses it
+        # when the cached trace is stale on a fast-moving launch.
+        force_fresh = request.rel_url.query.get("fresh") == "1"
+        if not force_fresh:
+            try:
+                from elizaos.plugins.solana.cabal_cache import get_result as _cache_get
+                cached = _cache_get(mint)
+                if cached and len(cached.get("holders") or []) > 0:
+                    cached["source"] = "pre_indexed"
+                    return web.json_response(cached)
+            except Exception:
+                pass
 
         # Cache miss — run full analysis in real-time
         created_ts_str = request.rel_url.query.get("created_ts", "")

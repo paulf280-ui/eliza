@@ -8,6 +8,8 @@ export interface Cluster {
   risk: "HIGH" | "MEDIUM"
   /** "funding" = shared funding source; "time_sync" = same-block (bundled) buys */
   type?: "funding" | "time_sync"
+  /** Solscan-verifiable funding transactions for cluster members (up to 3) */
+  evidence_txs?: string[]
 }
 
 export interface DeployerReport {

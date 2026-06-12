@@ -297,6 +297,9 @@
       <div id="deployer-panel" style="display:none;margin-top:10px;padding:12px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid rgba(255,255,255,.06);text-align:left"></div>
     </div>
 
+    <!-- Stale-data warning + recheck (shown when cached trace > 10 min old) -->
+    <div id="stale-banner" style="display:none;margin:10px 12px 0;padding:10px 12px;border-radius:8px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);font-size:11px;color:#f59e0b;line-height:1.5"></div>
+
     <!-- Stats row -->
     <div class="stats-row">
       <div class="stat-cell">
@@ -427,13 +430,16 @@ function render(data) {
   document.getElementById('mint-display').textContent = MINT.slice(0,8)+'…'+MINT.slice(-4);
   headerCenter.style.display = '';
 
-  // Copy mint button
-  document.getElementById('copy-mint-btn').addEventListener('click', () => {
-    navigator.clipboard.writeText(MINT).then(() => {
-      const btn = document.getElementById('copy-mint-btn');
-      btn.textContent = '✓'; setTimeout(() => { btn.textContent = '⎘'; }, 1500);
+  // Copy mint button (guard: render() can run again after a recheck)
+  if (!window._copyBound) {
+    window._copyBound = true;
+    document.getElementById('copy-mint-btn').addEventListener('click', () => {
+      navigator.clipboard.writeText(MINT).then(() => {
+        const btn = document.getElementById('copy-mint-btn');
+        btn.textContent = '✓'; setTimeout(() => { btn.textContent = '⎘'; }, 1500);
+      });
     });
-  });
+  }
 
   // Live chart links
   document.getElementById('axiom-link').href = `https://axiom.trade/t/${MINT}`;
@@ -467,7 +473,7 @@ function render(data) {
   const guideEl = document.getElementById('score-guide');
   if (guideEl) {
     const meaning = score <= 35
-      ? { label: 'LOW RISK', msg: 'No significant wallet coordination found. Standard due diligence still applies.', col: '#10b981' }
+      ? { label: 'LOW SIGNAL', msg: 'No obvious wallet coordination found. Not a guarantee — standard due diligence still applies.', col: '#10b981' }
       : score <= 65
       ? { label: 'CAUTION', msg: 'Some wallet coordination detected. Possible coordinated holders — watch for sudden sells.', col: '#f59e0b' }
       : { label: 'HIGH RISK', msg: 'Strong evidence of coordinated wallets. High probability of a coordinated dump. Avoid.', col: '#ef4444' };
@@ -481,7 +487,7 @@ function render(data) {
       <div style="font-weight:800;font-size:13px;color:${meaning.col};margin-bottom:6px">${meaning.label}</div>
       <div style="font-size:12px;color:#94a3b8;line-height:1.5">${meaning.msg}</div>
       <div style="margin-top:10px;display:flex;gap:6px;font-size:10px">
-        <span style="flex:1;text-align:center;padding:4px;border-radius:4px;background:rgba(16,185,129,.15);color:#10b981">0–35<br>Safe</span>
+        <span style="flex:1;text-align:center;padding:4px;border-radius:4px;background:rgba(16,185,129,.15);color:#10b981">0–35<br>Low signal</span>
         <span style="flex:1;text-align:center;padding:4px;border-radius:4px;background:rgba(245,158,11,.15);color:#f59e0b">35–65<br>Caution</span>
         <span style="flex:1;text-align:center;padding:4px;border-radius:4px;background:rgba(239,68,68,.15);color:#ef4444">65–100<br>High Risk</span>
       </div>`;
@@ -541,6 +547,35 @@ function render(data) {
     `${source === 'pre_indexed' ? '⚡ Cached' : '🔍 Live'}${ageTxt ? ' · ' + ageTxt : ''}` +
     `<div style="font-size:10px;color:#64748b;font-weight:400;margin-top:2px">${traceTxt}</div>`;
 
+  // Stale-data warning: on a fast launch, 10-min-old holder data can mislead.
+  // Offer a one-click fresh re-trace instead of letting users blame the tool.
+  const staleEl = document.getElementById('stale-banner');
+  if (ageSec !== null && ageSec > 600) {
+    const mins = Math.round(ageSec / 60);
+    staleEl.innerHTML =
+      `⚠ This trace is <strong>${mins} minutes old</strong> — holders may have changed on a fast-moving launch. ` +
+      `<button id="recheck-btn" style="margin-top:6px;display:block;width:100%;padding:6px;border-radius:6px;border:1px solid rgba(245,158,11,.5);background:rgba(245,158,11,.15);color:#f59e0b;font-weight:700;font-size:11px;cursor:pointer">⟳ Recheck now (live re-trace)</button>`;
+    staleEl.style.display = '';
+    document.getElementById('recheck-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('recheck-btn');
+      btn.disabled = true; btn.textContent = '⟳ Re-tracing on-chain… (5–30s)';
+      try {
+        const res = await fetch(`/api/map-data?mint=${encodeURIComponent(MINT)}&fresh=1`);
+        const fresh = await res.json();
+        if (res.ok && fresh && !fresh.error) {
+          staleEl.style.display = 'none';
+          render(fresh);
+        } else {
+          btn.disabled = false; btn.textContent = '⟳ Recheck failed — try again';
+        }
+      } catch {
+        btn.disabled = false; btn.textContent = '⟳ Recheck failed — try again';
+      }
+    });
+  } else {
+    staleEl.style.display = 'none';
+  }
+
   if (timeMs) {
     document.getElementById('time-badge').textContent = `Analysis: ${timeMs}ms`;
     document.getElementById('time-badge').style.display = '';
@@ -559,9 +594,15 @@ function render(data) {
         reason = `⚡ All ${c.wallet_count} wallets bought in the <strong style="color:${col}">same block</strong> (Jito bundle)` +
           (slot ? ` — <a href="https://solscan.io/block/${slot}" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:none">view block ↗</a>` : '');
       } else {
+        const evid = (c.evidence_txs || []);
+        const txLinks = evid.map((tx, n) =>
+          `<a href="https://solscan.io/tx/${tx}" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:none">tx ${n+1} ⛓</a>`
+        ).join(' · ');
         reason = `${c.wallet_count} wallets funded by the same source wallet before launch: ` +
           `<a href="https://solscan.io/account/${c.master_full || c.master_short}" target="_blank" rel="noopener" style="color:${col};font-family:monospace;text-decoration:none">${c.master_short} ↗</a>` +
-          `<br><span style="font-size:10px;color:#64748b">⛓ funding receipts on each wallet in the holder list below</span>`;
+          (txLinks
+            ? `<br><span style="font-size:10px;color:#64748b">verify the funding: ${txLinks}</span>`
+            : `<br><span style="font-size:10px;color:#64748b">⛓ funding receipts on each wallet in the holder list below</span>`);
       }
       html += `
         <div class="cluster-card" style="border-color:${col}33; background:${col}08">
@@ -624,6 +665,7 @@ function render(data) {
 // ── D3 Force Graph ─────────────────────────────────────────────────────────────
 function drawGraph(holders, clusters, totalSupply) {
   const svg = d3.select('#graph-canvas');
+  svg.selectAll('*').remove();  // idempotent — recheck re-renders cleanly
   const W = svg.node().clientWidth  || window.innerWidth - 300;
   const H = svg.node().clientHeight || window.innerHeight - 57;
   svg.attr('viewBox', `0 0 ${W} ${H}`);

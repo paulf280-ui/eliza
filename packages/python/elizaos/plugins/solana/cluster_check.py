@@ -542,6 +542,8 @@ async def get_cluster_map(
             "wallet_count": n,
             "combined_pct": combined_pct,
             "risk":         risk,
+            # The actual funding transactions — tx-level proof, not just the wallet
+            "evidence_txs": [funding_sigs[w] for w in cluster_wallets if w in funding_sigs][:3],
         })
         for w in cluster_wallets:
             wallet_to_cluster[w] = cluster_id
