@@ -547,34 +547,13 @@ function render(data) {
     `${source === 'pre_indexed' ? '⚡ Cached' : '🔍 Live'}${ageTxt ? ' · ' + ageTxt : ''}` +
     `<div style="font-size:10px;color:#64748b;font-weight:400;margin-top:2px">${traceTxt}</div>`;
 
-  // Stale-data warning: on a fast launch, 10-min-old holder data can mislead.
-  // Offer a one-click fresh re-trace instead of letting users blame the tool.
-  const staleEl = document.getElementById('stale-banner');
-  if (ageSec !== null && ageSec > 600) {
-    const mins = Math.round(ageSec / 60);
-    staleEl.innerHTML =
-      `⚠ This trace is <strong>${mins} minutes old</strong> — holders may have changed on a fast-moving launch. ` +
-      `<button id="recheck-btn" style="margin-top:6px;display:block;width:100%;padding:6px;border-radius:6px;border:1px solid rgba(245,158,11,.5);background:rgba(245,158,11,.15);color:#f59e0b;font-weight:700;font-size:11px;cursor:pointer">⟳ Recheck now (live re-trace)</button>`;
-    staleEl.style.display = '';
-    document.getElementById('recheck-btn').addEventListener('click', async () => {
-      const btn = document.getElementById('recheck-btn');
-      btn.disabled = true; btn.textContent = '⟳ Re-tracing on-chain… (5–30s)';
-      try {
-        const res = await fetch(`/api/map-data?mint=${encodeURIComponent(MINT)}&fresh=1`);
-        const fresh = await res.json();
-        if (res.ok && fresh && !fresh.error) {
-          staleEl.style.display = 'none';
-          render(fresh);
-        } else {
-          btn.disabled = false; btn.textContent = '⟳ Recheck failed — try again';
-        }
-      } catch {
-        btn.disabled = false; btn.textContent = '⟳ Recheck failed — try again';
-      }
-    });
-  } else {
-    staleEl.style.display = 'none';
-  }
+  // Stale-data warning: track WHEN this trace was computed, then re-evaluate
+  // its age every 30s — the banner returns by itself once the data ages past
+  // 10 minutes, including after a recheck.
+  _traceTs = data.computed_at || (ageSec !== null ? Date.now() / 1000 - ageSec : Date.now() / 1000);
+  document.getElementById('stale-banner').dataset.built = '';
+  updateStaleBanner();
+  if (!window._staleTimer) window._staleTimer = setInterval(updateStaleBanner, 30000);
 
   if (timeMs) {
     document.getElementById('time-badge').textContent = `Analysis: ${timeMs}ms`;
@@ -660,6 +639,50 @@ function render(data) {
   // Draw graph
   document.getElementById('graph-canvas').style.display = '';
   drawGraph(holders, clusters, data.total_supply_est || 0);
+}
+
+// ── Stale-trace banner — re-evaluates age on a timer ──────────────────────────
+let _traceTs = null;   // unix seconds when the current trace was computed
+
+function updateStaleBanner() {
+  const staleEl = document.getElementById('stale-banner');
+  if (!staleEl || !_traceTs) return;
+  const ageSec = Date.now() / 1000 - _traceTs;
+  if (ageSec <= 600) {
+    staleEl.style.display = 'none';
+    staleEl.dataset.built = '';
+    return;
+  }
+  const mins = Math.round(ageSec / 60);
+  if (!staleEl.dataset.built) {
+    staleEl.innerHTML =
+      `⚠ This trace is <strong>${mins} minutes old</strong> — holders may have changed on a fast-moving launch. ` +
+      `<button id="recheck-btn" style="margin-top:6px;display:block;width:100%;padding:6px;border-radius:6px;border:1px solid rgba(245,158,11,.5);background:rgba(245,158,11,.15);color:#f59e0b;font-weight:700;font-size:11px;cursor:pointer">⟳ Recheck now (live re-trace)</button>`;
+    staleEl.dataset.built = '1';
+    staleEl.style.display = '';
+    document.getElementById('recheck-btn').addEventListener('click', doRecheck);
+  } else {
+    // already visible — just keep the minute count current
+    const strong = staleEl.querySelector('strong');
+    if (strong) strong.textContent = `${mins} minutes old`;
+  }
+}
+
+async function doRecheck() {
+  const btn = document.getElementById('recheck-btn');
+  if (!btn) return;
+  btn.disabled = true; btn.textContent = '⟳ Re-tracing on-chain… (5–30s)';
+  try {
+    const res = await fetch(`/api/map-data?mint=${encodeURIComponent(MINT)}&fresh=1`);
+    const fresh = await res.json();
+    if (res.ok && fresh && !fresh.error) {
+      render(fresh);   // sets _traceTs to now → banner hides until stale again
+    } else {
+      btn.disabled = false; btn.textContent = '⟳ Recheck failed — try again';
+    }
+  } catch {
+    btn.disabled = false; btn.textContent = '⟳ Recheck failed — try again';
+  }
 }
 
 // ── D3 Force Graph ─────────────────────────────────────────────────────────────
