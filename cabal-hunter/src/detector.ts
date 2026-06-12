@@ -33,6 +33,22 @@ function getDb(): ReturnType<typeof Database> | null {
   }
 }
 
+/** Freshest interesting token for the landing-page demo link — prefers a
+ *  recent token with a meaningful score so the demo never shows a dead page. */
+export function getFreshDemoMint(): string | null {
+  const db = getDb()
+  if (!db) return null
+  try {
+    const row = db.prepare(
+      "SELECT mint FROM cabal_cache WHERE expires_at>unixepoch() " +
+      "ORDER BY (cabal_score>=40) DESC, computed_at DESC LIMIT 1"
+    ).get() as { mint?: string } | undefined
+    return row?.mint ?? null
+  } catch {
+    return null
+  }
+}
+
 function buildVerdict(report: Partial<CabalReport>): string {
   const score = report.cabal_score ?? 0
   const clusters = report.coordinated_clusters ?? []

@@ -22,7 +22,7 @@ import { dirname, join } from "path"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname  = dirname(__filename)
-import { getCabalReport } from "./detector.js"
+import { getCabalReport, getFreshDemoMint } from "./detector.js"
 import { createPaymentRequest, verifyPayment, validatePaymentConfig, logPayment, getPnlStats, getFreeQueriesRemaining, consumeFreeQuery } from "./payment.js"
 import { CabalReport } from "./types.js"
 
@@ -116,7 +116,9 @@ export function createApp(): express.Application {
 </div>
 
 <h1>Detect coordinated wallet<br>cabals before your bot buys.</h1>
-<p class="sub">Three on-chain detection layers screeners don't have: <strong style="color:#e2e8f0">funding-source tracing</strong>, <strong style="color:#e2e8f0">same-block bundle detection</strong>, and <strong style="color:#e2e8f0">deployer track record</strong>.<br>One call, one 0–100 score. <strong style="color:#10b981">100 free queries/month</strong> — then $0.05 USDC per query. No API key. No account.</p>
+<p class="sub">Three on-chain detection layers screeners don't have: <strong style="color:#e2e8f0">funding-source tracing</strong>, <strong style="color:#e2e8f0">same-block bundle detection</strong>, and <strong style="color:#e2e8f0">deployer track record</strong> — every red flag linked to its on-chain proof.<br>One call, one 0–100 score. <strong style="color:#10b981">100 free queries/month</strong> — then $0.05 USDC per query. No API key. No account.</p>
+
+<p style="font-size:13px;color:#64748b;margin:-20px 0 36px;line-height:1.6"><strong style="color:#94a3b8">Built for graduated entries, not 1-block snipes.</strong> Cabal-Hunter is the 5-second decision screen you check before committing size — when the launch is minutes-to-hours old and the question is "who actually holds this?"</p>
 
 <div class="cards">
   <div class="card"><div class="card-title">🔍 Funding Trace</div><div class="card-val" style="font-size:14px;color:#e2e8f0">Top holders walked back to shared funding wallets</div></div>
@@ -126,7 +128,7 @@ export function createApp(): express.Application {
 </div>
 
 <div class="links">
-  <a class="btn btn-primary" href="/map?mint=Axpzs7FEMYzpcfqVcDjDMQb2rsgMYVJADNpUZe7bpump">🗺 Live Bubble Map Demo</a>
+  <a class="btn btn-primary" href="/demo">🗺 Live Bubble Map Demo</a>
   <a class="btn btn-teal" href="/api/info">📖 API Reference</a>
   <a class="btn btn-purple" href="https://github.com/paulf280-ui/solana-safe-sniper-mcp-template" target="_blank">⚙ GitHub Template</a>
   <a class="btn btn-gray" href="/compare">⚖ vs rugcheck / GoPlus</a>
@@ -142,6 +144,12 @@ export function createApp(): express.Application {
 </div>
 </body>
 </html>`)
+  })
+
+  // ── Live demo — always points at a recently-scanned token, never a dead page
+  app.get("/demo", (_req, res) => {
+    const mint = getFreshDemoMint()
+    res.redirect(302, mint ? `/map?mint=${encodeURIComponent(mint)}` : "/")
   })
 
   // ── Glama verification file ──────────────────────────────────────────────────
@@ -329,7 +337,7 @@ export function createApp(): express.Application {
 
 <div class="real-rug">
   <h3>⚠️ Real example — caught by Cabal-Hunter, missed by everyone else</h3>
-  <p style="color:#94a3b8;font-size:13px;line-height:1.6">A token last week scored <strong style="color:#10b981">8/8 on rugcheck.xyz</strong> — LP burned, contract clean, no honeypot. GoPlus: all green. Standard tools saw nothing wrong.<br><br>Cabal-Hunter traced the top 20 holders and found <strong>6 wallets all funded from the same source, 47 seconds before the first trade.</strong> The token rugged 3 hours later. <a href="/map?mint=Axpzs7FEMYzpcfqVcDjDMQb2rsgMYVJADNpUZe7bpump" style="color:#ff4d6d">See the on-chain proof →</a></p>
+  <p style="color:#94a3b8;font-size:13px;line-height:1.6">A token last week scored <strong style="color:#10b981">8/8 on rugcheck.xyz</strong> — LP burned, contract clean, no honeypot. GoPlus: all green. Standard tools saw nothing wrong.<br><br>Cabal-Hunter traced the top 20 holders and found <strong>6 wallets all funded from the same source, 47 seconds before the first trade.</strong> The token rugged 3 hours later. <a href="/demo" style="color:#ff4d6d">See the on-chain proof →</a></p>
 </div>
 
 <h2>What Each Tool Checks</h2>
@@ -379,7 +387,7 @@ export function createApp(): express.Application {
 <div class="cta">
   <h3>Try Cabal-Hunter free</h3>
   <p>100 free queries per month. No account. No API key. Check any Solana token in seconds.</p>
-  <a class="btn btn-red" href="/map?mint=Axpzs7FEMYzpcfqVcDjDMQb2rsgMYVJADNpUZe7bpump">🗺 Live Demo — See a Detected Cabal</a>
+  <a class="btn btn-red" href="/demo">🗺 Live Demo — See a Detected Cabal</a>
   <a class="btn" style="background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid rgba(255,255,255,.1)" href="/api/info">API Documentation</a>
 </div>
 

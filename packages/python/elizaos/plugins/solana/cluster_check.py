@@ -203,10 +203,15 @@ async def _find_funder_in_window(
     wallet: str,
     window_start: float,
     window_end: float,
-) -> str | None:
+) -> tuple[str, str] | None:
     """
-    Walk backwards through a wallet's transaction history and return the first
-    SOL sender found within [window_start, window_end], or None.
+    Walk backwards through a wallet's transaction history and return
+    (funder_wallet, tx_signature) for the first SOL inflow found within
+    [window_start, window_end], or None.
+
+    The signature is the on-chain RECEIPT — every cluster claim links to
+    the actual funding transaction so users can verify on Solscan instead
+    of trusting the score.
 
     Iterates in pages (newest → oldest) and stops as soon as a matching
     transaction is found or the window is passed.
@@ -249,7 +254,7 @@ async def _find_funder_in_window(
 
             sender = _parse_sol_sender(tx, wallet)
             if sender:
-                return sender
+                return sender, sig_info["signature"]
 
         if len(sigs) < fetch:
             break  # no more history
@@ -328,12 +333,12 @@ async def check_holder_clusters(
     wallets_to_check = [w for w, _ in owner_wallets[:12]]
     funder_map: dict[str, str] = {}
 
-    async def _check_one(wallet: str) -> tuple[str, str | None]:
+    async def _check_one(wallet: str) -> tuple[str, tuple[str, str] | None]:
         try:
-            funder = await _find_funder_in_window(
+            found = await _find_funder_in_window(
                 session, wallet, window_start, window_end
             )
-            return wallet, funder
+            return wallet, found
         except Exception:
             return wallet, None
 
@@ -343,9 +348,9 @@ async def check_holder_clusters(
     except (asyncio.TimeoutError, Exception):
         return _clean("timeout")
 
-    for wallet, funder in results:
-        if funder:
-            funder_map[wallet] = funder
+    for wallet, found in results:
+        if found:
+            funder_map[wallet] = found[0]  # compact bot path needs no receipts
 
     if not funder_map:
         return _clean()  # no funding found in window → CLEAN
@@ -475,10 +480,11 @@ async def get_cluster_map(
     # one-shot wallets with short histories, so the bounded funder walk
     # (_MAX_SIGS_PER_WALLET) stays cheap even for tokens that are months old.
     funder_map: dict[str, str] = {}
+    funding_sigs: dict[str, str] = {}   # owner wallet → funding tx (the receipt)
     first_slot_map: dict[str, int] = {}  # owner wallet → slot of first buy
     wallets_to_check = [w for w, _ in owner_wallets[:12]]
 
-    async def _check_one(wallet: str) -> tuple[str, str | None]:
+    async def _check_one(wallet: str) -> tuple[str, tuple[str, str] | None]:
         try:
             return wallet, await _find_funder_in_window(
                 session, wallet, window_start, window_end
@@ -500,9 +506,10 @@ async def get_cluster_map(
                 asyncio.gather(*[_check_one(w) for w in wallets_to_check]),
                 asyncio.gather(*[_slot_one(w) for w in wallets_to_check]),
             )
-        for wallet, funder in funder_results:
-            if funder:
-                funder_map[wallet] = funder
+        for wallet, found in funder_results:
+            if found:
+                funder_map[wallet]   = found[0]
+                funding_sigs[wallet] = found[1]
         for wallet, slot in slot_results:
             if slot:
                 first_slot_map[wallet] = slot
@@ -572,11 +579,17 @@ async def get_cluster_map(
             wallet_to_cluster[w] = cluster_id
         cluster_id += 1
 
-    # Annotate holders with cluster IDs
+    # Annotate holders with cluster IDs + on-chain evidence (receipts)
     for h in raw_holders:
         cid = wallet_to_cluster.get(h["address"])
         if cid is not None:
             h["cluster_id"] = cid
+        sig = funding_sigs.get(h["address"])
+        if sig:
+            h["funding_tx"] = sig          # Solscan-verifiable funding receipt
+        slot = first_slot_map.get(h["address"])
+        if slot:
+            h["buy_slot"] = slot           # block of first buy (bundle evidence)
 
     overall_risk = "CLEAN"
     if any(c["risk"] == "HIGH" for c in clusters):
@@ -601,6 +614,8 @@ async def get_cluster_map(
         "total_supply_est": round(total_supply_est),
         "wallets_checked":  len(wallets_to_check),
         "funders_found":    len(funder_map),
+        "lookup_failures":  lookup_failures,
+        "lookups_total":    len(accounts),
         # degraded = too many owner lookups failed (RPC trouble) — callers
         # must NOT cache this result; serve it once and let the next query retry
         "degraded":         lookup_failures >= max(2, len(accounts) // 3),

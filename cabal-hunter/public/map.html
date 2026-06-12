@@ -354,31 +354,53 @@ function clusterColour(id, rank) {
 
 // ── URL params ────────────────────────────────────────────────────────────────
 const params = new URLSearchParams(location.search);
-const MINT = params.get('mint') || '';
+const MINT = (params.get('mint') || '').trim();
+const MINT_VALID = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(MINT);
 
-if (!MINT) {
+function showError(title, detail) {
   document.getElementById('loading').style.display = 'none';
   document.getElementById('error-screen').style.display = 'flex';
-  document.getElementById('error-msg').textContent = 'No mint address provided.\nUsage: /map?mint=<SOLANA_MINT_ADDRESS>';
+  document.getElementById('error-msg').innerHTML =
+    `<strong>${title}</strong>` + (detail ? `<br><span style="font-size:12px;color:#475569">${detail}</span>` : '');
+}
+
+if (!MINT) {
+  showError('No mint address provided', 'Usage: /map?mint=&lt;SOLANA_MINT_ADDRESS&gt;');
+} else if (!MINT_VALID) {
+  showError('That doesn\'t look like a Solana mint address',
+    'A mint is 32–44 base58 characters (no 0, O, I or l). Check for a copy-paste typo.');
 }
 
 // ── Fetch data ────────────────────────────────────────────────────────────────
 async function fetchData() {
-  if (!MINT) return;
+  if (!MINT || !MINT_VALID) return;
   document.getElementById('mint-display').textContent = MINT.slice(0,8)+'…'+MINT.slice(-4);
   try {
     const res = await fetch(`/api/map-data?mint=${encodeURIComponent(MINT)}`);
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(`HTTP ${res.status}: ${txt}`);
+    let data = null;
+    try { data = await res.json(); } catch { /* non-JSON body */ }
+
+    // Honest failure states — say WHAT failed, not just "failed"
+    if (res.status === 429) {
+      showError('Rate limited', 'Too many requests from your connection. Wait a minute and refresh.'); return;
     }
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
+    if (res.status >= 500 || (data && data.error === 'analysis_failed')) {
+      showError('Backend error during analysis', 'Our side, not yours. Refresh to retry — the trace will re-run.'); return;
+    }
+    if (!res.ok || !data || data.error) {
+      showError('Analysis unavailable', (data && (data.message || data.error)) || `HTTP ${res.status}`); return;
+    }
+    if (data.skip_reason === 'rpc_error' && !(data.holders || []).length) {
+      showError('Token not found on-chain',
+        'Either this mint doesn\'t exist, has no holders yet, or the RPC hiccuped. Double-check the address and refresh to retry.'); return;
+    }
+    if (data.degraded) {
+      // Partial scan — render what we have but say so prominently in the stats
+      data._partial = true;
+    }
     render(data);
   } catch(e) {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('error-screen').style.display = 'flex';
-    document.getElementById('error-msg').textContent = 'Analysis unavailable for this token.\n'+(e instanceof Error ? e.message : String(e));
+    showError('Network error', 'Could not reach the analysis server. Check your connection and refresh.');
   }
 }
 
@@ -505,7 +527,19 @@ function render(data) {
   document.getElementById('stat-wallets').textContent     = checked || '—';
   document.getElementById('stat-clusters').textContent    = clusters.length;
   document.getElementById('stat-controlled').textContent  = clusters.length ? controlled+'%' : '0%';
-  document.getElementById('stat-source').textContent      = source === 'pre_indexed' ? '⚡ Cached' : '🔍 Live';
+
+  // Freshness + trace integrity — "is this data current and complete?"
+  const ageSec = data.age_seconds ?? (data.computed_at ? Math.max(0, Date.now()/1000 - data.computed_at) : null);
+  const ageTxt = ageSec === null ? '' : ageSec < 90 ? 'just now' : `${Math.round(ageSec/60)}m ago`;
+  const lf = data.lookup_failures;
+  const lt = data.lookups_total;
+  let traceTxt;
+  if (data._partial)            traceTxt = `<span style="color:#f59e0b">⚠ partial — ${lf} lookups failed</span>`;
+  else if (lf !== undefined && lt) traceTxt = `${lt - lf}/${lt} lookups OK`;
+  else                          traceTxt = 'complete';
+  document.getElementById('stat-source').innerHTML =
+    `${source === 'pre_indexed' ? '⚡ Cached' : '🔍 Live'}${ageTxt ? ' · ' + ageTxt : ''}` +
+    `<div style="font-size:10px;color:#64748b;font-weight:400;margin-top:2px">${traceTxt}</div>`;
 
   if (timeMs) {
     document.getElementById('time-badge').textContent = `Analysis: ${timeMs}ms`;
@@ -518,19 +552,27 @@ function render(data) {
     clusters.forEach((c, i) => {
       const col = CLUSTER_COLOURS[i % CLUSTER_COLOURS.length];
       const riskClass = c.risk === 'HIGH' ? 'risk-HIGH' : 'risk-MEDIUM';
+      // Reason line: state the exact detection method + link to on-chain proof
+      let reason;
+      if (c.type === 'time_sync') {
+        const slot = String(c.master_full || '').replace(/\D/g, '');
+        reason = `⚡ All ${c.wallet_count} wallets bought in the <strong style="color:${col}">same block</strong> (Jito bundle)` +
+          (slot ? ` — <a href="https://solscan.io/block/${slot}" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:none">view block ↗</a>` : '');
+      } else {
+        reason = `${c.wallet_count} wallets funded by the same source wallet before launch: ` +
+          `<a href="https://solscan.io/account/${c.master_full || c.master_short}" target="_blank" rel="noopener" style="color:${col};font-family:monospace;text-decoration:none">${c.master_short} ↗</a>` +
+          `<br><span style="font-size:10px;color:#64748b">⛓ funding receipts on each wallet in the holder list below</span>`;
+      }
       html += `
         <div class="cluster-card" style="border-color:${col}33; background:${col}08">
           <div class="cluster-header">
-            <div class="cluster-name">
+            <div class="cluster-name" style="font-size:16px;font-weight:800;color:${col}">
               <div class="cluster-dot" style="background:${col}"></div>
-              Cluster ${i+1} — ${c.wallet_count} wallets
+              ${c.combined_pct}% of supply
             </div>
             <span class="cluster-risk risk-badge ${riskClass}">${c.risk}</span>
           </div>
-          <div class="cluster-meta">${c.type === 'time_sync'
-            ? `⚡ Bought in the <strong style="color:${col}">same block</strong> — bundle signature`
-            : `Master: <code style="color:${col}">${c.master_short}</code>`}</div>
-          <div class="cluster-meta" style="margin-top:4px">Combined supply: <strong>${c.combined_pct}%</strong></div>
+          <div class="cluster-meta" style="line-height:1.5">${reason}</div>
           <div class="cluster-bar-bg">
             <div class="cluster-bar-fill" style="background:${col}; width:${Math.min(c.combined_pct,100)}%"></div>
           </div>
@@ -546,6 +588,12 @@ function render(data) {
       const col   = h.is_lp ? LP_COLOUR : clusterColour(h.cluster_id, h.rank);
       const extra = h.is_lp ? '<span class="lp-badge">LP</span>' : '';
       const addr  = h.address || h.address_short;
+      // On-chain receipt: link straight to the funding transaction we traced
+      const receipt = h.funding_tx
+        ? `<a href="https://solscan.io/tx/${h.funding_tx}" target="_blank" rel="noopener"
+             title="View the funding transaction we traced for this wallet"
+             style="font-size:11px;text-decoration:none;color:#60a5fa">⛓</a>`
+        : '';
       html += `
         <div class="holder-row">
           <div class="holder-rank">#${h.rank}</div>
@@ -556,6 +604,7 @@ function render(data) {
              title="View ${h.label || h.address_short} on Solscan">
             ${h.label || h.address_short} ${extra}
           </a>
+          ${receipt}
           <div class="holder-pct" style="color:${col}">${h.pct.toFixed(2)}%</div>
         </div>`;
     });

@@ -28,6 +28,10 @@ export interface Holder {
   cluster_id: number | null
   is_lp: boolean
   label: string | null
+  /** Solscan-verifiable funding transaction found by the trace */
+  funding_tx?: string
+  /** slot of this wallet's first buy — same slot across holders = bundle */
+  buy_slot?: number
 }
 
 export interface CabalReport {
