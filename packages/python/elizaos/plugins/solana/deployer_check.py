@@ -236,22 +236,38 @@ async def _count_dead(session: aiohttp.ClientSession, mints: list[str]) -> tuple
 
 
 def blend_deployer_into_score(result: dict, deployer: dict | None) -> dict:
-    """Fold the deployer verdict into the cabal score so the displayed risk
-    is coherent — a SERIAL_RUGGER token must never show "LOW RISK 0/100".
+    """Compute the final cabal score from the token's OWN numbers — no fixed
+    floors (a flat 55 made every serial-rugger token score identically).
 
-    Applies a score FLOOR (not additive): SERIAL_RUGGER ≥ 55 (CAUTION zone),
-    POOR_TRACK_RECORD ≥ 40. Risk + is_controlled are re-derived from the
-    final score using the same thresholds as the bubble map (35 / 65).
-    Mutates and returns `result`.
+    score = cluster component + deployer component, capped at 100
+      cluster component  = % of traced supply held by coordinated wallets
+      deployer component = excess death rate × sample confidence × 75
+        - excess death rate: (dead_pct − 40) / 60 — most meme tokens die
+          naturally, so only a dead-rate ABOVE the ~40% baseline adds risk
+        - sample confidence: min(1, sampled/10) — 5 launches is weaker
+          evidence than 25 launches
+
+    Idempotent: recomputes the cluster component from clusters/holders every
+    time, so re-blending a cached result never double-counts.
+    Risk and is_controlled re-derived at the map's thresholds (35 / 65).
     """
     result["deployer"] = deployer
-    floor = {"SERIAL_RUGGER": 55.0, "POOR_TRACK_RECORD": 40.0}.get(
-        (deployer or {}).get("verdict", "")
-    )
-    score = float(result.get("cabal_score") or 0.0)
-    if floor and score < floor:
-        score = floor
-        result["cabal_score"] = floor
+
+    clusters = result.get("clusters") or result.get("coordinated_clusters") or []
+    holders  = result.get("holders") or []
+    total_pct = sum(float(h.get("pct", 0)) for h in holders) if holders else 100.0
+    coord_pct = sum(float(c.get("combined_pct", 0)) for c in clusters)
+    base = min(coord_pct / total_pct * 100.0, 100.0) if total_pct > 0 else 0.0
+
+    dep      = deployer or {}
+    dead_pct = float(dep.get("dead_pct") or 0)
+    sampled  = int(dep.get("sampled") or 0)
+    excess     = max(0.0, dead_pct - 40.0) / 60.0
+    confidence = min(1.0, sampled / 10.0)
+    dep_component = excess * confidence * 75.0
+
+    score = round(min(100.0, base + dep_component), 1)
+    result["cabal_score"] = score
     result["risk"] = "HIGH" if score >= 65 else "MEDIUM" if score >= 35 else "CLEAN"
     result["is_controlled"] = score >= 35
     return result

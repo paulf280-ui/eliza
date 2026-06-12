@@ -76,11 +76,15 @@ function readFromCache(mint: string): CabalReport | null {
       ? JSON.parse(row.deployer_json as string) : null
     const timeSync = Boolean(row.time_sync) || clusters.some(c => c.type === "time_sync")
 
-    // Deployer score floor — same blend as Python (covers pre-blend cache rows)
-    let score = Number(row.cabal_score ?? 0)
-    const floor = deployer?.verdict === "SERIAL_RUGGER" ? 55
-                : deployer?.verdict === "POOR_TRACK_RECORD" ? 40 : 0
-    if (score < floor) score = floor
+    // Recompute the blended score from the row's own data — identical formula
+    // to Python's blend_deployer_into_score (idempotent, no fixed floors)
+    const totalPct = holders.length ? holders.reduce((s, h) => s + (h.pct || 0), 0) : 100
+    const coordPct = clusters.reduce((s, c) => s + (c.combined_pct || 0), 0)
+    const base = totalPct > 0 ? Math.min((coordPct / totalPct) * 100, 100) : 0
+    const deadPct = Number(deployer?.dead_pct ?? 0)
+    const sampled = Number(deployer?.sampled ?? 0)
+    const depComponent = (Math.max(0, deadPct - 40) / 60) * Math.min(1, sampled / 10) * 75
+    const score = Math.round(Math.min(100, base + depComponent) * 10) / 10
     const risk: "HIGH" | "MEDIUM" | "CLEAN" =
       score >= 65 ? "HIGH" : score >= 35 ? "MEDIUM" : "CLEAN"
 
