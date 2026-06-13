@@ -124,6 +124,7 @@ export function createApp(): express.Application {
 <div class="cards" style="grid-template-columns:1fr 1fr 1fr">
   <div class="card"><div class="card-title">🔍 Funding Trace</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Top holders walked back to shared funding wallets</div></div>
   <div class="card"><div class="card-title">⚡ Bundle Detection</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Wallets that bought in the exact same block — Jito bundles can't hide</div></div>
+  <div class="card"><div class="card-title">🚨 Coordinated Dump</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Multiple holders selling in the EXACT same block — a cabal exiting in real time</div></div>
   <div class="card"><div class="card-title">⛔ Deployer History</div><div class="card-val" style="font-size:13px;color:#e2e8f0">"Launched 14 tokens — 13 dead." Wallets rotate, deployers don't</div></div>
   <div class="card"><div class="card-title">🛡 CEX-Noise Filter</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Holders funded from the same exchange aren't a cabal — we exclude them, transparently</div></div>
   <div class="card"><div class="card-title">⛓ On-Chain Receipts</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Every red flag links to the actual Solscan tx — verify, don't trust the score</div></div>
@@ -134,7 +135,7 @@ export function createApp(): express.Application {
 <p style="font-size:13px;color:#94a3b8;line-height:1.7;margin-bottom:36px">
   A <strong style="color:#e2e8f0">0–100 cabal score</strong> with a plain-English verdict, a live bubble map of holder clusters,
   the deployer's track record, a <strong style="color:#e2e8f0">freshness stamp + one-click recheck</strong> so you never act on stale data,
-  and a <strong style="color:#e2e8f0">detection summary</strong> showing all four checks that ran — even the ones that came back clean.
+  and a <strong style="color:#e2e8f0">detection summary</strong> showing all five checks that ran — even the ones that came back clean.
   Every cluster and red flag links straight to the on-chain proof.
 </p>
 
@@ -439,6 +440,7 @@ export function createApp(): express.Application {
       detection_layers: {
         funding_trace:  "Top holders walked back to shared funding wallets (clusters[].type='funding'). Each cluster carries evidence_txs[] — the actual funding transactions.",
         bundle_detect:  "Holders that bought in the exact same block — Jito bundle signature (time_sync:true, clusters[].type='time_sync')",
+        coordinated_exit: "Multiple holders that DUMPED (≥25% of their bag each) in the exact same block — a cabal exiting in real time (coordinated_exit:true, clusters[].type='coordinated_exit', sold_pct = % of supply dumped)",
         deployer:       "Token creator resolved on-chain + full launch history (deployer.verdict: FIRST_LAUNCH | NORMAL | POOR_TRACK_RECORD | SERIAL_RUGGER)",
         cex_filter:     "Holders funded from a shared exchange / high-volume wallet are excluded from the score and surfaced in filtered_clusters[] — no false positives from CEX withdrawals",
       },
@@ -448,7 +450,8 @@ export function createApp(): express.Application {
         is_controlled:      "true when score ≥ 35",
         verdict:            "plain-English summary string",
         time_sync:          "true if a same-block (bundled) buy group was found",
-        clusters:           "[] scored coordination groups; each has wallet_count, combined_pct, master_full, type, evidence_txs[]",
+        coordinated_exit:   "true if a same-block coordinated dump was found",
+        clusters:           "[] scored coordination groups; each has wallet_count, combined_pct, master_full, type ('funding'|'time_sync'|'coordinated_exit'), sold_pct (exits), evidence_txs[]",
         filtered_clusters:  "[] CEX/infra groups excluded from the score (funder_label, wallet_count, combined_pct)",
         deployer:           "{ creator, tokens_launched, dead, sampled, dead_pct, verdict }",
         holders:            "[] top holders; cluster members carry funding_tx + buy_slot (on-chain receipts)",

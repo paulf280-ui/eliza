@@ -69,6 +69,13 @@ def _build_message(mint: str, token_name: str, result: dict) -> str:
     if time_sync:
         lines.append("⚡ *BUNDLED LAUNCH* — wallets bought in the same block")
 
+    exit_cluster = next((c for c in clusters if c.get("type") == "coordinated_exit"), None)
+    if exit_cluster:
+        lines.append(
+            f"🚨 *COORDINATED DUMP* — {exit_cluster.get('wallet_count', '?')} wallets sold "
+            f"{exit_cluster.get('sold_pct', 0):.1f}% of supply in the same block"
+        )
+
     # Deployer history — same data as the map's Deployer History panel
     dep_verdict = deployer.get("verdict")
     if dep_verdict and dep_verdict != "UNKNOWN" and deployer.get("creator"):

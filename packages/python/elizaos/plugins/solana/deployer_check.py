@@ -256,7 +256,14 @@ def blend_deployer_into_score(result: dict, deployer: dict | None) -> dict:
     clusters = result.get("clusters") or result.get("coordinated_clusters") or []
     holders  = result.get("holders") or []
     total_pct = sum(float(h.get("pct", 0)) for h in holders) if holders else 100.0
-    coord_pct = sum(float(c.get("combined_pct", 0)) for c in clusters)
+    # For a coordinated_exit the dump magnitude (sold_pct) is the real signal —
+    # current holdings may be near-zero after they sold. Count whichever is larger.
+    def _cluster_weight(c: dict) -> float:
+        w = float(c.get("combined_pct", 0))
+        if c.get("type") == "coordinated_exit":
+            w = max(w, float(c.get("sold_pct", 0)))
+        return w
+    coord_pct = sum(_cluster_weight(c) for c in clusters)
     base = min(coord_pct / total_pct * 100.0, 100.0) if total_pct > 0 else 0.0
 
     dep      = deployer or {}

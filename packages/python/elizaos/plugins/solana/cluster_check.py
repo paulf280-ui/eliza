@@ -61,6 +61,9 @@ _CEX_FUNDERS: dict[str, str] = {
 # cap) AND high-rate (≥ this many txns/hour across those signatures).
 _INFRA_MIN_SIGS      = 900    # must hit the page cap → genuinely high volume
 _INFRA_MIN_RATE_PER_H = 50    # ≥1200 txns/day sustained — no human, only infra/bots
+_EXIT_SIGS_PER_WALLET = 30    # recent token-account sigs scanned per holder for exits
+_EXIT_MAX_TX_CONFIRMS = 16    # cap getTransaction confirmations — bounds RPC cost
+_EXIT_MIN_SELL_FRAC   = 0.25  # a leg must dump ≥25% of its bag — ignore dust trims
 
 # ── Tuning constants ─────────────────────────────────────────────────────────
 # Funding window around PAIR creation. pair_created_ts is the graduation
@@ -190,6 +193,29 @@ def _parse_sol_sender(tx: dict, target_wallet: str) -> str | None:
             if sender and sender not in _SKIP_OWNERS:
                 return sender
     return None
+
+
+def _sell_amount(tx: dict, owner: str, mint: str) -> tuple[float, float] | None:
+    """If `owner` reduced its `mint` balance in this tx, return
+    (ui_amount_sold, fraction_of_holding_sold); else None.
+
+    Uses pre/post token balances from tx meta — the authoritative on-chain
+    record. Magnitude lets callers ignore dust trims and keep only real exits.
+    """
+    meta = tx.get("meta") or {}
+    if meta.get("err"):
+        return None
+    def _amt(balances):
+        for b in balances or []:
+            if b.get("owner") == owner and b.get("mint") == mint:
+                return float((b.get("uiTokenAmount") or {}).get("uiAmount") or 0)
+        return None
+    pre  = _amt(meta.get("preTokenBalances"))
+    post = _amt(meta.get("postTokenBalances"))
+    if pre is None or post is None or post >= pre - 1e-9:
+        return None
+    sold = pre - post
+    return sold, (sold / pre if pre > 0 else 0.0)
 
 
 async def _first_slot_of_token_account(
@@ -455,6 +481,86 @@ async def _infra_funder_label(
     return None                          # old-but-active human wallet — keep it
 
 
+async def _detect_coordinated_exits(
+    session: "aiohttp.ClientSession",
+    exit_wallets: list[str],
+    owner_token_accts: dict[str, str],
+    owner_wallets: list[tuple[str, float]],
+    mint: str,
+    total_supply_est: float,
+    already_clustered: dict[str, int],
+) -> list[dict]:
+    """Find same-slot coordinated dumps among the given holders.
+
+    Returns a list of coordinated_exit cluster dicts (each with a temporary
+    '_members' key the caller pops). Design-risk controls: requires the EXACT
+    same slot, DISTINCT wallets, and each leg dumping ≥ _EXIT_MIN_SELL_FRAC of
+    its bag — so dust trims and a single wallet's repeated sigs never qualify.
+    """
+    out: list[dict] = []
+    try:
+        async with asyncio.timeout(_CHECK_TIMEOUT_SECS):
+            sig_lists = await asyncio.gather(*[
+                _rpc(session, "getSignaturesForAddress",
+                     [owner_token_accts[w], {"limit": _EXIT_SIGS_PER_WALLET}])
+                for w in exit_wallets
+            ])
+        exit_slot_map: dict[int, list[tuple[str, str]]] = {}
+        for w, sigs in zip(exit_wallets, sig_lists):
+            if not isinstance(sigs, list):
+                continue
+            for s in sigs:
+                sl = s.get("slot")
+                if sl:
+                    exit_slot_map.setdefault(sl, []).append((w, s["signature"]))
+
+        confirms = 0
+        for sl, entries in sorted(exit_slot_map.items(),
+                                  key=lambda kv: -len({w for w, _ in kv[1]})):
+            if len({w for w, _ in entries}) < 2:
+                continue
+            # Per DISTINCT wallet, keep its single biggest qualifying sell.
+            wallet_sell: dict[str, tuple[float, str]] = {}
+            for w, sig in entries:
+                if w in already_clustered:
+                    continue
+                if confirms >= _EXIT_MAX_TX_CONFIRMS:
+                    break
+                confirms += 1
+                tx = await _rpc(session, "getTransaction", [
+                    sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}])
+                res = _sell_amount(tx, w, mint) if tx else None
+                if not res:
+                    continue
+                sold_ui, frac = res
+                if frac < _EXIT_MIN_SELL_FRAC:
+                    continue
+                if w not in wallet_sell or sold_ui > wallet_sell[w][0]:
+                    wallet_sell[w] = (sold_ui, sig)
+            if len(wallet_sell) < 2:
+                continue
+            members = list(wallet_sell.keys())
+            sold_pct     = round(sum(v[0] for v in wallet_sell.values()) / total_supply_est * 100, 1)
+            combined_ui  = sum(amt for ww, amt in owner_wallets if ww in members)
+            combined_pct = round(combined_ui / total_supply_est * 100, 1)
+            out.append({
+                "type":         "coordinated_exit",
+                "master_short": "same-block dump",
+                "master_full":  f"slot {sl}",
+                "wallet_count": len(members),
+                "combined_pct": combined_pct,   # current holdings of dumpers
+                "sold_pct":     sold_pct,        # % of supply dumped in this slot
+                "risk":         "HIGH",
+                "evidence_txs": [v[1] for v in wallet_sell.values()][:3],
+                "_members":     members,
+            })
+            if confirms >= _EXIT_MAX_TX_CONFIRMS:
+                break
+    except (asyncio.TimeoutError, Exception):
+        pass
+    return out
+
+
 async def get_cluster_map(
     session: aiohttp.ClientSession,
     mint: str,
@@ -482,7 +588,9 @@ async def get_cluster_map(
                           [mint, {"commitment": "confirmed"}])
     if not h_result:
         return {"risk": "CLEAN", "cabal_score": 0.0, "is_controlled": False,
+                "time_sync": False, "coordinated_exit": False,
                 "token_name": "", "holders": [], "clusters": [],
+                "filtered_clusters": [],
                 "total_supply_est": 0, "wallets_checked": 0,
                 "skip_reason": "rpc_error", "computed_at": time.time()}
 
@@ -646,6 +754,25 @@ async def get_cluster_map(
             wallet_to_cluster[w] = cluster_id
         cluster_id += 1
 
+    # ── Coordinated-exit detection: same-slot SELLS by multiple holders ──────
+    # Shared profit-taking — the coordinated dump. Independent wallets virtually
+    # never sell in the EXACT same block; ≥2 of the top holders dumping in one
+    # slot is a bundled exit or one entity. Design-risk control: we require the
+    # same SLOT (not same minute) AND confirm each leg is a real balance
+    # decrease, so false positives are near-zero. Catches cabals mid-dump while
+    # they still appear as holders (a partial sell leaves them in the list).
+    exit_events = await _detect_coordinated_exits(
+        session, [w for w, _ in owner_wallets[:12]], owner_token_accts,
+        owner_wallets, mint, total_supply_est, wallet_to_cluster)
+    coordinated_exit = bool(exit_events)
+    for ev in exit_events:
+        members = ev.pop("_members")
+        ev["id"] = cluster_id
+        clusters.append(ev)
+        for w in members:
+            wallet_to_cluster[w] = cluster_id
+        cluster_id += 1
+
     # Annotate holders with cluster IDs + on-chain evidence (receipts)
     for h in raw_holders:
         cid = wallet_to_cluster.get(h["address"])
@@ -675,6 +802,7 @@ async def get_cluster_map(
         "cabal_score":      cabal_score,
         "is_controlled":    is_controlled,
         "time_sync":        time_sync,
+        "coordinated_exit": coordinated_exit,
         "token_name":       "",
         "holders":          raw_holders,
         "clusters":         clusters,

@@ -6,9 +6,12 @@ export interface Cluster {
   wallet_count: number
   combined_pct: number
   risk: "HIGH" | "MEDIUM"
-  /** "funding" = shared funding source; "time_sync" = same-block (bundled) buys */
-  type?: "funding" | "time_sync"
-  /** Solscan-verifiable funding transactions for cluster members (up to 3) */
+  /** "funding" = shared funder; "time_sync" = same-block buys;
+   *  "coordinated_exit" = same-block coordinated dump */
+  type?: "funding" | "time_sync" | "coordinated_exit"
+  /** for coordinated_exit: % of total supply dumped in the same slot */
+  sold_pct?: number
+  /** Solscan-verifiable transactions for cluster members (up to 3) */
   evidence_txs?: string[]
 }
 
@@ -59,6 +62,8 @@ export interface CabalReport {
   holders: Holder[]
   /** true if ≥3 top holders bought in the exact same block (bundle signature) */
   time_sync: boolean
+  /** true if ≥2 holders dumped a meaningful chunk in the exact same block */
+  coordinated_exit: boolean
   /** deployer wallet track record — null when creator can't be resolved */
   deployer: DeployerReport | null
   wallets_checked: number

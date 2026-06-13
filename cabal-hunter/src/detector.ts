@@ -61,6 +61,12 @@ function buildVerdict(report: Partial<CabalReport>): string {
     deployerNote = ` Deployer track record is weak: ${deployer.dead}/${deployer.sampled} previous launches dead.`
   }
 
+  // A coordinated dump in progress is the most urgent signal — lead with it.
+  const exit = clusters.find(c => c.type === "coordinated_exit")
+  if (exit) {
+    return `AVOID — coordinated dump in progress: ${exit.wallet_count} wallets sold ${(exit.sold_pct ?? 0).toFixed(1)}% of supply in the EXACT same block.${deployerNote}`
+  }
+
   if (score === 0 || clusters.length === 0) {
     return `CLEAN — No coordinated wallet clusters detected (${report.wallets_checked ?? 0} wallets traced).${deployerNote}`
   }
@@ -92,11 +98,16 @@ function readFromCache(mint: string): CabalReport | null {
       ? JSON.parse(row.deployer_json as string) : null
     const filtered: FilteredCluster[] = JSON.parse((row.filtered_json as string) || "[]")
     const timeSync = Boolean(row.time_sync) || clusters.some(c => c.type === "time_sync")
+    const coordExit = clusters.some(c => c.type === "coordinated_exit")
 
     // Recompute the blended score from the row's own data — identical formula
     // to Python's blend_deployer_into_score (idempotent, no fixed floors)
     const totalPct = holders.length ? holders.reduce((s, h) => s + (h.pct || 0), 0) : 100
-    const coordPct = clusters.reduce((s, c) => s + (c.combined_pct || 0), 0)
+    const coordPct = clusters.reduce((s, c) => {
+      let w = c.combined_pct || 0
+      if (c.type === "coordinated_exit") w = Math.max(w, c.sold_pct || 0)
+      return s + w
+    }, 0)
     const base = totalPct > 0 ? Math.min((coordPct / totalPct) * 100, 100) : 0
     const deadPct = Number(deployer?.dead_pct ?? 0)
     const sampled = Number(deployer?.sampled ?? 0)
@@ -112,6 +123,7 @@ function readFromCache(mint: string): CabalReport | null {
       cabal_score:          score,
       is_controlled:        score >= 35,
       time_sync:            timeSync,
+      coordinated_exit:     coordExit,
       deployer,
       verdict:              buildVerdict({ risk, cabal_score: score, coordinated_clusters: clusters, deployer, wallets_checked: Number(row.wallets_checked ?? 0) }),
       coordinated_clusters: clusters,
@@ -156,6 +168,7 @@ async function fetchFromBot(mint: string, createdTs?: number): Promise<CabalRepo
   const risk  = (data.risk as "HIGH" | "MEDIUM" | "CLEAN") ?? "CLEAN"
   const deployer = (data.deployer as DeployerReport | null) ?? null
   const timeSync = Boolean(data.time_sync)
+  const coordExit = Boolean(data.coordinated_exit)
 
   return {
     mint,
@@ -164,6 +177,7 @@ async function fetchFromBot(mint: string, createdTs?: number): Promise<CabalRepo
     cabal_score:          score,
     is_controlled:        Boolean(data.is_controlled),
     time_sync:            timeSync,
+    coordinated_exit:     coordExit,
     deployer,
     verdict:              buildVerdict({ risk, cabal_score: score, coordinated_clusters: clusters, deployer, wallets_checked: Number(data.wallets_checked ?? 0) }),
     coordinated_clusters: clusters,

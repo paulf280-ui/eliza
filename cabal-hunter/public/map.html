@@ -195,9 +195,9 @@
     background: rgba(255,255,255,0.04); padding: 4px 10px; border-radius: 6px;
   }
 
-  /* ── Legend ── */
+  /* ── Legend (moved bottom-left to free the top-left for the findings HUD) ── */
   .legend {
-    position: absolute; top: 12px; left: 12px;
+    position: absolute; bottom: 12px; left: 12px;
     background: rgba(13,15,30,0.85); border: 1px solid var(--border);
     border-radius: 8px; padding: 10px 12px; font-size: 11px;
     backdrop-filter: blur(8px);
@@ -206,6 +206,23 @@
   .legend-item { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; color: var(--muted); }
   .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
   .legend-line { width: 20px; height: 2px; border-radius: 1px; border-top: 2px dashed; flex-shrink: 0; }
+
+  /* ── Key Findings HUD — top-left over the map, the 5-second read ── */
+  .findings-hud {
+    position: absolute; top: 16px; left: 16px; width: 300px; max-width: 38vw;
+    background: rgba(13,15,30,0.92); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 18px; backdrop-filter: blur(14px);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  }
+  .findings-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .findings-score { font-size: 38px; font-weight: 900; line-height: 1; letter-spacing: -1px; }
+  .findings-risk { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+  .findings-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .finding-flag {
+    display: flex; align-items: flex-start; gap: 9px; padding: 8px 10px; margin-top: 7px;
+    border-radius: 8px; font-size: 12px; line-height: 1.4;
+  }
+  .finding-flag .ff-icon { flex-shrink: 0; font-weight: 800; }
 </style>
 </head>
 <body>
@@ -260,6 +277,8 @@
       <div class="error-msg" id="error-msg">Analysis failed</div>
     </div>
     <svg id="graph-canvas" style="display:none"></svg>
+    <!-- Key Findings HUD — populated by render(), uses the empty left space -->
+    <div class="findings-hud" id="findings-hud" style="display:none"></div>
     <div class="legend" id="legend" style="display:none">
       <div class="legend-title">Legend</div>
       <div class="legend-item"><div class="legend-dot" style="background:#ff4d6d"></div>Cluster (HIGH risk)</div>
@@ -537,7 +556,8 @@ function render(data) {
   const filteredList = data.filtered_clusters || [];
   const dep2 = data.deployer || {};
   const hasBundle2 = (data.time_sync) || clusters.some(c => c.type === 'time_sync');
-  const fundingClusters = clusters.filter(c => c.type !== 'time_sync');
+  const hasExit = (data.coordinated_exit) || clusters.some(c => c.type === 'coordinated_exit');
+  const fundingClusters = clusters.filter(c => c.type === 'funding' || (!c.type));
   const rows = [
     fundingClusters.length
       ? ['⛔', '#ff4d6d', `${fundingClusters.length} shared-funder cluster${fundingClusters.length>1?'s':''} found`]
@@ -545,6 +565,9 @@ function render(data) {
     hasBundle2
       ? ['⛔', '#ff4d6d', 'Same-block bundle detected']
       : ['✓', '#10b981', 'No same-block bundle'],
+    hasExit
+      ? ['🚨', '#ff4d6d', 'Coordinated dump — wallets sold in the same block']
+      : ['✓', '#10b981', 'No coordinated dump detected'],
     filteredList.length
       ? ['ℹ', '#94a3b8', `${filteredList.length} exchange/infra group${filteredList.length>1?'s':''} filtered out`]
       : ['✓', '#10b981', 'No CEX-funded false positives'],
@@ -557,15 +580,47 @@ function render(data) {
       : ['•', '#64748b', 'Deployer: history unavailable'],
   ];
   document.getElementById('detection-summary').innerHTML =
-    `<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Detection Summary — 4 on-chain checks</div>` +
+    `<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Detection Summary — 5 on-chain checks</div>` +
     rows.map(([icon, col, txt]) =>
       `<div style="display:flex;align-items:flex-start;gap:8px;font-size:11px;line-height:1.5;margin-bottom:5px">
          <span style="color:${col};flex-shrink:0;font-weight:700">${icon}</span>
          <span style="color:#cbd5e1">${txt}</span></div>`).join('');
   document.getElementById('detection-summary').style.display = '';
 
-  // Stats
+  // ── Key Findings HUD (left side, over the map) — the 5-second read ──────────
   const controlled = clusters.reduce((s,c) => s + (c.combined_pct||0), 0).toFixed(1);
+  const scoreCol = score <= 35 ? '#10b981' : score <= 65 ? '#f59e0b' : '#ff4d6d';
+  const zoneLabel = score <= 35 ? 'LOW SIGNAL' : score <= 65 ? 'CAUTION' : 'HIGH RISK';
+  const flags = [];
+  if (hasExit)
+    flags.push(['🚨', '#ff4d6d', 'rgba(255,77,109,.12)', '<strong>Coordinated dump</strong> — holders sold in the same block']);
+  if (hasBundle2)
+    flags.push(['⚡', '#ff4d6d', 'rgba(255,77,109,.12)', '<strong>Bundled launch</strong> — same-block buys']);
+  if (fundingClusters.length)
+    flags.push(['⛔', '#ff4d6d', 'rgba(255,77,109,.12)', `<strong>${fundingClusters.length} funding cluster${fundingClusters.length>1?'s':''}</strong> — ${controlled}% controlled`]);
+  if (dep2.verdict === 'SERIAL_RUGGER')
+    flags.push(['⛔', '#ef4444', 'rgba(239,68,68,.12)', `<strong>Serial rugger dev</strong> — ${dep2.dead}/${dep2.sampled} past launches dead`]);
+  else if (dep2.verdict === 'POOR_TRACK_RECORD')
+    flags.push(['⚠', '#f59e0b', 'rgba(245,158,11,.12)', `<strong>Weak deployer</strong> — ${dep2.dead}/${dep2.sampled} past launches dead`]);
+  if (filteredList.length)
+    flags.push(['ℹ', '#94a3b8', 'rgba(100,116,139,.1)', `${filteredList.length} exchange group${filteredList.length>1?'s':''} filtered (not a cabal)`]);
+  if (!flags.length)
+    flags.push(['✓', '#10b981', 'rgba(16,185,129,.1)', 'No major red flags found in 5 on-chain checks']);
+
+  document.getElementById('findings-hud').innerHTML =
+    `<div class="findings-head">
+       <div class="findings-score" style="color:${scoreCol}">${score}</div>
+       <div>
+         <div class="findings-risk" style="color:${scoreCol}">${zoneLabel}</div>
+         <div class="findings-sub">${tokenName} · cabal score /100</div>
+       </div>
+     </div>` +
+    flags.map(([icon, col, bg, txt]) =>
+      `<div class="finding-flag" style="background:${bg};color:#cbd5e1">
+         <span class="ff-icon" style="color:${col}">${icon}</span><span>${txt}</span></div>`).join('');
+  document.getElementById('findings-hud').style.display = '';
+
+  // Stats
   document.getElementById('stat-wallets').textContent     = checked || '—';
   document.getElementById('stat-clusters').textContent    = clusters.length;
   document.getElementById('stat-controlled').textContent  = clusters.length ? controlled+'%' : '0%';
@@ -609,7 +664,17 @@ function render(data) {
       const riskClass = c.risk === 'HIGH' ? 'risk-HIGH' : 'risk-MEDIUM';
       // Reason line: state the exact detection method + link to on-chain proof
       let reason;
-      if (c.type === 'time_sync') {
+      const headlinePct = c.type === 'coordinated_exit' ? `${c.sold_pct}% dumped` : `${c.combined_pct}% of supply`;
+      if (c.type === 'coordinated_exit') {
+        const slot = String(c.master_full || '').replace(/\D/g, '');
+        const evid = (c.evidence_txs || []);
+        const txLinks = evid.map((tx, n) =>
+          `<a href="https://solscan.io/tx/${tx}" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:none">sell ${n+1} ⛓</a>`
+        ).join(' · ');
+        reason = `🚨 <strong style="color:${col}">Coordinated dump</strong> — ${c.wallet_count} wallets sold in the EXACT same block` +
+          (slot ? ` (<a href="https://solscan.io/block/${slot}" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:none">slot ${slot} ↗</a>)` : '') +
+          (txLinks ? `<br><span style="font-size:10px;color:#64748b">verify the sells: ${txLinks}</span>` : '');
+      } else if (c.type === 'time_sync') {
         const slot = String(c.master_full || '').replace(/\D/g, '');
         reason = `⚡ All ${c.wallet_count} wallets bought in the <strong style="color:${col}">same block</strong> (Jito bundle)` +
           (slot ? ` — <a href="https://solscan.io/block/${slot}" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:none">view block ↗</a>` : '');
@@ -629,7 +694,7 @@ function render(data) {
           <div class="cluster-header">
             <div class="cluster-name" style="font-size:16px;font-weight:800;color:${col}">
               <div class="cluster-dot" style="background:${col}"></div>
-              ${c.combined_pct}% of supply
+              ${headlinePct}
             </div>
             <span class="cluster-risk risk-badge ${riskClass}">${c.risk}</span>
           </div>
