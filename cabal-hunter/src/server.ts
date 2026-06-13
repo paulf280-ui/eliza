@@ -23,6 +23,7 @@ import { dirname, join } from "path"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname  = dirname(__filename)
 import { getCabalReport, getFreshDemoMint } from "./detector.js"
+import { recordVisit, getAnalytics } from "./analytics.js"
 import { createPaymentRequest, verifyPayment, validatePaymentConfig, logPayment, getPnlStats, getFreeQueriesRemaining, consumeFreeQuery } from "./payment.js"
 import { CabalReport } from "./types.js"
 
@@ -33,6 +34,28 @@ export function createApp(): express.Application {
 
   app.use(cors({ origin: "*", methods: ["GET", "POST", "OPTIONS"] }))
   app.use(express.json({ limit: "512kb" }))
+
+  // ── Visit analytics (Cloudflare can't see us — we're DNS-only) ───────────────
+  app.use((req, _res, next) => {
+    try {
+      const p = req.path
+      // Don't log admin, health, static, or internal-noise paths
+      if (p.startsWith("/admin") || p === "/health" || p.startsWith("/public") ||
+          p === "/favicon.ico" || p.startsWith("/.well-known")) return next()
+      let category = "other"
+      let mint: string | undefined
+      if (p === "/" || p === "/demo" || p === "/compare") category = "landing"
+      else if (p === "/map") { category = "map"; mint = (req.query.mint as string)?.slice(0, 44) }
+      else if (p.startsWith("/api/")) {
+        category = "api"
+        mint = ((req.query.mint as string) || (req.query.mintAddress as string))?.slice(0, 44)
+      }
+      const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
+                 || req.socket.remoteAddress || ""
+      recordVisit({ category, mint, ip, referer: req.headers["referer"] as string })
+    } catch { /* never break a request on analytics */ }
+    next()
+  })
 
   // ── Serve the bubble map page ─────────────────────────────────────────────────
   const publicDir = join(__dirname, "..", "public")
@@ -499,6 +522,37 @@ export function createApp(): express.Application {
       }
     }
     res.json(getPnlStats())
+  })
+
+  // ── Site analytics (JSON + dashboard) ────────────────────────────────────────
+  app.get("/admin/analytics", (req, res) => {
+    const secret = process.env.CABAL_INTERNAL_SECRET ?? ""
+    if (secret && req.query.key !== secret && req.headers["x-internal-secret"] !== secret) {
+      res.status(401).json({ error: "unauthorized" }); return
+    }
+    res.json(getAnalytics())
+  })
+
+  app.get("/admin/traffic", (req, res) => {
+    const secret = process.env.CABAL_INTERNAL_SECRET ?? ""
+    const key = req.query.key as string ?? ""
+    if (secret && key !== secret) { res.status(401).send("<h1>Unauthorized</h1>"); return }
+    const a = getAnalytics() as any
+    const t = a.totals ?? {}, td = a.today ?? {}
+    const card = (label: string, val: unknown, col: string) =>
+      `<div style="background:#0d0f1e;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:18px"><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px">${label}</div><div style="font-size:30px;font-weight:800;color:${col}">${val ?? 0}</div></div>`
+    const rows = (arr: any[], cols: string[], keys: string[]) =>
+      `<table style="width:100%;border-collapse:collapse;font-size:13px"><tr>${cols.map(c=>`<th style="text-align:left;padding:8px;color:#64748b;border-bottom:1px solid rgba(255,255,255,.08)">${c}</th>`).join("")}</tr>${(arr||[]).map(r=>`<tr>${keys.map(k=>`<td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.04);font-family:${k==='mint'||k==='referer'?'monospace':'inherit'};font-size:12px">${r[k]??''}</td>`).join("")}</tr>`).join("")}</table>`
+    res.setHeader("Content-Type","text/html")
+    res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cabal-Hunter Traffic</title>
+<style>body{background:#07080f;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;padding:28px;max-width:1000px;margin:0 auto}h1{font-size:22px;margin-bottom:4px}.sub{color:#64748b;font-size:12px;margin-bottom:24px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}h2{font-size:13px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin:28px 0 10px}</style></head>
+<body><h1>Cabal-Hunter — Traffic</h1><div class="sub">Server-side · counts every visit (Cloudflare can't see us — DNS-only)</div>
+<div class="grid">${card("Total Visits",t.visits,"#e2e8f0")}${card("Unique Visitors",t.unique_visitors,"#10b981")}${card("Map Views",t.map_views,"#7c3aed")}${card("API Calls",t.api_calls,"#0ea5e9")}</div>
+<div class="grid">${card("Today Visits",td.visits,"#e2e8f0")}${card("Today Unique",td.unique_visitors,"#10b981")}${card("Landing Views",t.landing_views,"#f59e0b")}${card("Tokens Searched",(a.top_mints||[]).length,"#ec4899")}</div>
+<h2>Most-searched tokens</h2>${rows(a.top_mints,["Mint","Searches","Unique"],["mint","n","u"])}
+<h2>Where visitors come from (referrers)</h2>${rows(a.top_referers,["Referrer","Hits"],["referer","n"])}
+<h2>Last 30 days</h2>${rows(a.by_day,["Day","Visits","Unique"],["day","visits","uniques"])}
+</body></html>`)
   })
 
   // ── P&L dashboard page ────────────────────────────────────────────────────────
