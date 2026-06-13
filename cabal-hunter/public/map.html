@@ -364,6 +364,8 @@
     <!-- Clusters -->
     <div id="clusters-section"></div>
     <div id="filtered-section"></div>
+    <!-- Cohort PnL (Team / Snipers / Insiders) — lazy-loaded -->
+    <div id="cohort-section"></div>
 
     <!-- Holders -->
     <div class="holders-section" id="holders-section"></div>
@@ -445,6 +447,7 @@ async function fetchData() {
     }
     render(data);
     fetchCexFunding();   // lazy — heavier trace, loads into the bottom-left panel
+    fetchCohorts(data.pair_created_ts);   // lazy — cohort PnL into the sidebar
   } catch(e) {
     showError('Network error', 'Could not reach the analysis server. Check your connection and refresh.');
   }
@@ -788,6 +791,56 @@ function render(data) {
   // Draw graph
   document.getElementById('graph-canvas').style.display = '';
   drawGraph(holders, clusters, data.total_supply_est || 0);
+}
+
+// ── Cohort PnL panel (lazy) ───────────────────────────────────────────────────
+const COHORT_STYLE = {
+  Team:     { col:'#ef4444', icon:'👥' },
+  Snipers:  { col:'#f59e0b', icon:'🎯' },
+  Insiders: { col:'#a78bfa', icon:'🕵️' },
+};
+async function fetchCohorts(createdTs) {
+  if (!MINT || !MINT_VALID) return;
+  const el = document.getElementById('cohort-section');
+  el.innerHTML = `<div class="section-title">Cohort Holdings & Realized PnL</div>
+    <div style="padding:0 16px 8px;font-size:11px;color:#64748b;display:flex;align-items:center;gap:8px">
+      <div class="spinner" style="width:14px;height:14px;border-width:2px"></div>Reconstructing trades from the pool…</div>`;
+  try {
+    const q = createdTs ? `&created_ts=${createdTs}` : '';
+    const res = await fetch(`/api/cohorts?mint=${encodeURIComponent(MINT)}${q}`);
+    const d = await res.json();
+    const rows = d.cohorts || [];
+    if (!res.ok) { el.innerHTML = ''; return; }
+    if (!rows.length) {
+      el.innerHTML = d.partial
+        ? `<div class="section-title">Cohort Holdings & Realized PnL</div>
+           <div style="padding:0 16px 14px;font-size:11px;color:#64748b;line-height:1.5">High-activity token — sniper/insider cohorts are detected from the launch window, which is beyond the ${d.swaps_analyzed} most-recent trades we analyzed. Available on fresher / lower-volume tokens.</div>`
+        : '';
+      return;
+    }
+    let html = `<div class="section-title">Cohort Holdings & Realized PnL</div>`;
+    rows.forEach(c => {
+      const st = COHORT_STYLE[c.cohort] || { col:'#94a3b8', icon:'•' };
+      const sold = 100 - c.current_pct_of_buy;
+      const pnlCol = c.realized_sol > 0 ? '#10b981' : c.realized_sol < 0 ? '#ff4d6d' : '#94a3b8';
+      html += `
+        <div class="cluster-card" style="border-color:${st.col}33;background:${st.col}08">
+          <div class="cluster-header">
+            <div class="cluster-name" style="color:${st.col};font-weight:800">
+              ${st.icon} ${c.cohort} <span style="color:#64748b;font-weight:500;font-size:11px">· ${c.wallets} wallets</span>
+            </div>
+            <span style="font-size:12px;font-weight:800;color:${pnlCol}">${c.realized_sol>0?'+':''}${c.realized_sol} SOL</span>
+          </div>
+          <div class="cluster-meta" style="line-height:1.6">
+            Bought <strong style="color:#cbd5e1">${c.initial_buy_pct}%</strong> of supply ·
+            <strong style="color:${sold>50?'#ff4d6d':'#cbd5e1'}">sold ${sold.toFixed(0)}%</strong> of their bag
+          </div>
+          <div class="cluster-bar-bg"><div class="cluster-bar-fill" style="background:${st.col};width:${Math.min(c.initial_buy_pct,100)}%"></div></div>
+        </div>`;
+    });
+    html += `<div style="padding:4px 16px 12px;font-size:9px;color:#475569">Realized = net SOL out of the position (sells − buys). ${d.partial ? 'High activity — analyzed most recent '+d.swaps_analyzed+' trades.' : d.swaps_analyzed+' trades analyzed.'}</div>`;
+    el.innerHTML = html;
+  } catch { el.innerHTML = ''; }
 }
 
 // ── CEX Funding panel (lazy) ──────────────────────────────────────────────────

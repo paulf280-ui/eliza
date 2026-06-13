@@ -3112,6 +3112,49 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
     app.router.add_get("/api/cex/internal", handle_cex_internal)
 
+    # ── Cohort PnL (Team/Insiders/Snipers) — lazy / on-demand ────────────────
+    _cohort_cache: dict[str, dict] = {}
+    _COHORT_TTL = 1800
+
+    async def handle_cohort_internal(request: web.Request) -> web.Response:
+        """GET /api/cohorts/internal?mint=<mint>[&created_ts=]
+        Team/Insiders/Snipers cohort breakdown with realized PnL."""
+        secret = os.getenv("CABAL_INTERNAL_SECRET", "")
+        peer = request.transport.get_extra_info("peername", ("", 0))[0] if request.transport else ""
+        is_local = peer in ("127.0.0.1", "::1", "localhost")
+        if secret and not is_local and request.headers.get("X-Internal-Secret") != secret:
+            return web.json_response({"error": "unauthorized"}, status=401)
+        mint = request.rel_url.query.get("mint", "").strip()
+        if not mint:
+            return web.json_response({"error": "mint required"}, status=400)
+
+        cached = _cohort_cache.get(mint)
+        if cached and time.time() - cached.get("computed_at", 0) < _COHORT_TTL:
+            return web.json_response(cached)
+        created_ts = float(request.rel_url.query.get("created_ts") or 0)
+        try:
+            import aiohttp as _aio
+            from elizaos.plugins.solana.cohort_pnl import get_cohort_pnl
+            from elizaos.plugins.solana.deployer_check import _resolve_creator
+            async with _aio.ClientSession() as _s:
+                if not created_ts:
+                    try:
+                        async with _s.get(f"https://api.dexscreener.com/tokens/v1/solana/{mint}",
+                                          headers={"User-Agent": "Mozilla/5.0"},
+                                          timeout=_aio.ClientTimeout(total=6)) as r:
+                            pp = await r.json()
+                            created_ts = float((pp[0].get("pairCreatedAt") or 0)) / 1000 if isinstance(pp, list) and pp else 0
+                    except Exception:
+                        pass
+                dep = await _resolve_creator(_s, mint)
+                res = await get_cohort_pnl(_s, mint, created_ts, dep)
+            _cohort_cache[mint] = res
+            return web.json_response(res)
+        except Exception as exc:
+            return web.json_response({"error": str(exc)}, status=500)
+
+    app.router.add_get("/api/cohorts/internal", handle_cohort_internal)
+
     app.router.add_get("/ws", handle_ws)
 
     if os.path.isdir(dashboard_dist):
