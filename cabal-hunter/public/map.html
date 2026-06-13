@@ -364,8 +364,10 @@
     <!-- Clusters -->
     <div id="clusters-section"></div>
     <div id="filtered-section"></div>
-    <!-- Cohort PnL (Team / Snipers / Insiders) — lazy-loaded -->
+    <!-- Cohort PnL / Wash / Liquidity — lazy-loaded (combined call) -->
     <div id="cohort-section"></div>
+    <div id="wash-section"></div>
+    <div id="liquidity-section"></div>
 
     <!-- Holders -->
     <div class="holders-section" id="holders-section"></div>
@@ -447,7 +449,7 @@ async function fetchData() {
     }
     render(data);
     fetchCexFunding();   // lazy — heavier trace, loads into the bottom-left panel
-    fetchCohorts(data.pair_created_ts);   // lazy — cohort PnL into the sidebar
+    fetchTradeAnalysis(data.pair_created_ts);   // lazy — cohorts + wash + liquidity
   } catch(e) {
     showError('Network error', 'Could not reach the analysis server. Check your connection and refresh.');
   }
@@ -799,20 +801,23 @@ const COHORT_STYLE = {
   Snipers:  { col:'#f59e0b', icon:'🎯' },
   Insiders: { col:'#a78bfa', icon:'🕵️' },
 };
-async function fetchCohorts(createdTs) {
+async function fetchTradeAnalysis(createdTs) {
   if (!MINT || !MINT_VALID) return;
-  const el = document.getElementById('cohort-section');
-  el.innerHTML = `<div class="section-title">Cohort Holdings & Realized PnL</div>
+  const cEl = document.getElementById('cohort-section');
+  cEl.innerHTML = `<div class="section-title">Cohort PnL · Wash · Liquidity</div>
     <div style="padding:0 16px 8px;font-size:11px;color:#64748b;display:flex;align-items:center;gap:8px">
       <div class="spinner" style="width:14px;height:14px;border-width:2px"></div>Reconstructing trades from the pool…</div>`;
   try {
     const q = createdTs ? `&created_ts=${createdTs}` : '';
-    const res = await fetch(`/api/cohorts?mint=${encodeURIComponent(MINT)}${q}`);
-    const d = await res.json();
+    const res = await fetch(`/api/trade-analysis?mint=${encodeURIComponent(MINT)}${q}`);
+    const all = await res.json();
+    if (!res.ok) { cEl.innerHTML=''; return; }
+    renderWash(all.wash || {});
+    renderLiquidity(all.liquidity || {});
+    const d = all.cohorts || {};
     const rows = d.cohorts || [];
-    if (!res.ok) { el.innerHTML = ''; return; }
     if (!rows.length) {
-      el.innerHTML = d.partial
+      cEl.innerHTML = d.partial
         ? `<div class="section-title">Cohort Holdings & Realized PnL</div>
            <div style="padding:0 16px 14px;font-size:11px;color:#64748b;line-height:1.5">High-activity token — sniper/insider cohorts are detected from the launch window, which is beyond the ${d.swaps_analyzed} most-recent trades we analyzed. Available on fresher / lower-volume tokens.</div>`
         : '';
@@ -839,8 +844,52 @@ async function fetchCohorts(createdTs) {
         </div>`;
     });
     html += `<div style="padding:4px 16px 12px;font-size:9px;color:#475569">Realized = net SOL out of the position (sells − buys). ${d.partial ? 'High activity — analyzed most recent '+d.swaps_analyzed+' trades.' : d.swaps_analyzed+' trades analyzed.'}</div>`;
-    el.innerHTML = html;
-  } catch { el.innerHTML = ''; }
+    cEl.innerHTML = html;
+  } catch { cEl.innerHTML = ''; }
+}
+
+function renderWash(d) {
+  const el = document.getElementById('wash-section');
+  if (!d.swaps_analyzed) { el.innerHTML = ''; return; }
+  const score = d.wash_score || 0;
+  const col = score >= 50 ? '#ff4d6d' : score >= 25 ? '#f59e0b' : '#10b981';
+  const label = score >= 50 ? 'HEAVY WASH TRADING' : score >= 25 ? 'SOME ARTIFICIAL VOLUME' : 'VOLUME LOOKS ORGANIC';
+  let html = `<div class="section-title">Volume Authenticity</div>
+    <div class="cluster-card" style="border-color:${col}33;background:${col}08">
+      <div class="cluster-header">
+        <div class="cluster-name" style="color:${col};font-weight:800">${label}</div>
+        <span style="font-size:14px;font-weight:900;color:${col}">${score}/100</span>
+      </div>
+      <div class="cluster-meta" style="line-height:1.6">
+        <strong style="color:#cbd5e1">${d.wash_volume_pct}%</strong> of volume is wallets round-tripping ·
+        top 5 makers = <strong style="color:#cbd5e1">${d.top5_maker_pct}%</strong> · ${d.unique_makers} unique makers
+      </div>`;
+  (d.offenders || []).slice(0,3).forEach(o => {
+    html += `<div style="font-size:10px;color:#64748b;margin-top:4px">
+       <a href="https://solscan.io/account/${o.wallet_full}" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:none;font-family:monospace">${o.wallet}</a>
+       — ${o.trades} round-trip trades, ${o.vol_pct}% of volume</div>`;
+  });
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+function renderLiquidity(d) {
+  const el = document.getElementById('liquidity-section');
+  const sells = d.sells || [];
+  if (!d.liquidity_usd || !sells.length) { el.innerHTML = ''; return; }
+  const lp = d.lp_burned ? `<span style="color:#10b981">✅ LP burned</span>` : `<span style="color:#f59e0b">🔒 check LP lock</span>`;
+  let html = `<div class="section-title">Exit Liquidity — price impact of a sell</div>
+    <div style="padding:0 16px 6px;font-size:11px;color:#94a3b8">Pool liquidity <strong style="color:#cbd5e1">$${Number(d.liquidity_usd).toLocaleString()}</strong> · ${lp}</div>`;
+  sells.forEach(s => {
+    const col = s.impact_pct >= 15 ? '#ff4d6d' : s.impact_pct >= 5 ? '#f59e0b' : '#10b981';
+    html += `<div class="cex-row" style="padding:0 16px">
+        <div class="cex-name">Sell ${s.sol} SOL</div>
+        <div class="cex-bar-bg"><div class="cex-bar" style="width:${Math.min(s.impact_pct*4,100)}%;background:${col}"></div></div>
+        <div class="cex-pct" style="color:${col}">−${s.impact_pct}%</div>
+      </div>`;
+  });
+  html += `<div style="padding:4px 16px 12px;font-size:9px;color:#475569">Estimated price drop if you market-sell that size now (constant-product model).</div>`;
+  el.innerHTML = html;
 }
 
 // ── CEX Funding panel (lazy) ──────────────────────────────────────────────────

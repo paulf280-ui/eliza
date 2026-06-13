@@ -123,13 +123,15 @@ async def get_cohort_pnl(
     mint: str,
     created_ts: float = 0.0,
     deployer_addr: str | None = None,
+    swaps: list[dict] | None = None,
 ) -> dict:
     empty = {"cohorts": [], "swaps_analyzed": 0, "partial": False,
              "computed_at": time.time()}
-    pool = await _get_pool_address(session, mint)
-    if not pool:
-        return empty
-    swaps = await _fetch_pool_swaps(session, pool)
+    if swaps is None:
+        pool = await _get_pool_address(session, mint)
+        if not pool:
+            return empty
+        swaps = await _fetch_pool_swaps(session, pool)
     if not swaps:
         return empty
     partial = len(swaps) >= _MAX_PAGES * 100

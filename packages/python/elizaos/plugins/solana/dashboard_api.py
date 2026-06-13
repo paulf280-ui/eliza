@@ -3155,6 +3155,51 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
     app.router.add_get("/api/cohorts/internal", handle_cohort_internal)
 
+    # ── Combined trade analysis (cohorts + wash + liquidity) — one swap fetch ──
+    _trade_cache: dict[str, dict] = {}
+    _TRADE_TTL = 1800
+
+    async def handle_trade_analysis(request: web.Request) -> web.Response:
+        """GET /api/trade-analysis/internal?mint=<mint>[&created_ts=]
+        Cohort PnL + wash-trading + liquidity sim — pool swaps fetched once."""
+        secret = os.getenv("CABAL_INTERNAL_SECRET", "")
+        peer = request.transport.get_extra_info("peername", ("", 0))[0] if request.transport else ""
+        is_local = peer in ("127.0.0.1", "::1", "localhost")
+        if secret and not is_local and request.headers.get("X-Internal-Secret") != secret:
+            return web.json_response({"error": "unauthorized"}, status=401)
+        mint = request.rel_url.query.get("mint", "").strip()
+        if not mint:
+            return web.json_response({"error": "mint required"}, status=400)
+
+        cached = _trade_cache.get(mint)
+        if cached and time.time() - cached.get("computed_at", 0) < _TRADE_TTL:
+            return web.json_response(cached)
+        created_ts = float(request.rel_url.query.get("created_ts") or 0)
+        try:
+            import aiohttp as _aio
+            from elizaos.plugins.solana.cohort_pnl import (
+                get_cohort_pnl, _get_pool_address, _fetch_pool_swaps)
+            from elizaos.plugins.solana.wash_check import get_wash_analysis
+            from elizaos.plugins.solana.liquidity_check import get_liquidity_sim
+            from elizaos.plugins.solana.deployer_check import _resolve_creator
+            async with _aio.ClientSession() as _s:
+                pool = await _get_pool_address(_s, mint)
+                swaps = await _fetch_pool_swaps(_s, pool) if pool else []
+                dep = await _resolve_creator(_s, mint)
+                cohorts, wash, liquidity = await asyncio.gather(
+                    get_cohort_pnl(_s, mint, created_ts, dep, swaps=swaps),
+                    get_wash_analysis(_s, mint, swaps=swaps),
+                    get_liquidity_sim(_s, mint),
+                )
+            out = {"cohorts": cohorts, "wash": wash, "liquidity": liquidity,
+                   "computed_at": time.time()}
+            _trade_cache[mint] = out
+            return web.json_response(out)
+        except Exception as exc:
+            return web.json_response({"error": str(exc)}, status=500)
+
+    app.router.add_get("/api/trade-analysis/internal", handle_trade_analysis)
+
     app.router.add_get("/ws", handle_ws)
 
     if os.path.isdir(dashboard_dist):
