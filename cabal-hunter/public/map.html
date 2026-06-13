@@ -297,6 +297,9 @@
       <div id="deployer-panel" style="display:none;margin-top:10px;padding:12px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid rgba(255,255,255,.06);text-align:left"></div>
     </div>
 
+    <!-- Detection summary — always shows every layer that ran -->
+    <div id="detection-summary" style="display:none;margin:12px;padding:12px;background:rgba(255,255,255,.02);border-radius:8px;border:1px solid rgba(255,255,255,.06)"></div>
+
     <!-- Stale-data warning + recheck (shown when cached trace > 10 min old) -->
     <div id="stale-banner" style="display:none;margin:10px 12px 0;padding:10px 12px;border-radius:8px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);font-size:11px;color:#f59e0b;line-height:1.5"></div>
 
@@ -528,6 +531,38 @@ function render(data) {
          style="font-family:monospace;font-size:10px;color:#60a5fa;text-decoration:none">${dep.creator_short} ↗</a>`;
     dEl.style.display = '';
   }
+
+  // Detection Summary — every layer that ran, so users see the full scan even
+  // when a layer comes back clean. This is the "I can see it works" panel.
+  const filteredList = data.filtered_clusters || [];
+  const dep2 = data.deployer || {};
+  const hasBundle2 = (data.time_sync) || clusters.some(c => c.type === 'time_sync');
+  const fundingClusters = clusters.filter(c => c.type !== 'time_sync');
+  const rows = [
+    fundingClusters.length
+      ? ['⛔', '#ff4d6d', `${fundingClusters.length} shared-funder cluster${fundingClusters.length>1?'s':''} found`]
+      : ['✓', '#10b981', 'Funding traced — no shared-funder clusters'],
+    hasBundle2
+      ? ['⛔', '#ff4d6d', 'Same-block bundle detected']
+      : ['✓', '#10b981', 'No same-block bundle'],
+    filteredList.length
+      ? ['ℹ', '#94a3b8', `${filteredList.length} exchange/infra group${filteredList.length>1?'s':''} filtered out`]
+      : ['✓', '#10b981', 'No CEX-funded false positives'],
+    (dep2.verdict === 'SERIAL_RUGGER' || dep2.verdict === 'POOR_TRACK_RECORD')
+      ? ['⛔', '#ff4d6d', `Deployer flagged — ${dep2.dead}/${dep2.sampled} past launches dead`]
+      : dep2.verdict === 'FIRST_LAUNCH'
+      ? ['ℹ', '#94a3b8', 'Deployer: first launch — no history']
+      : dep2.creator
+      ? ['✓', '#10b981', 'Deployer: no red flags in launch history']
+      : ['•', '#64748b', 'Deployer: history unavailable'],
+  ];
+  document.getElementById('detection-summary').innerHTML =
+    `<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Detection Summary — 4 on-chain checks</div>` +
+    rows.map(([icon, col, txt]) =>
+      `<div style="display:flex;align-items:flex-start;gap:8px;font-size:11px;line-height:1.5;margin-bottom:5px">
+         <span style="color:${col};flex-shrink:0;font-weight:700">${icon}</span>
+         <span style="color:#cbd5e1">${txt}</span></div>`).join('');
+  document.getElementById('detection-summary').style.display = '';
 
   // Stats
   const controlled = clusters.reduce((s,c) => s + (c.combined_pct||0), 0).toFixed(1);

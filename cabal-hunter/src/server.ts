@@ -121,12 +121,22 @@ export function createApp(): express.Application {
 
 <p style="font-size:13px;color:#64748b;margin:-20px 0 36px;line-height:1.6"><strong style="color:#94a3b8">Built for graduated entries, not 1-block snipes.</strong> Cabal-Hunter is the 5-second decision screen you check before committing size — when the launch is minutes-to-hours old and the question is "who actually holds this?"</p>
 
-<div class="cards">
-  <div class="card"><div class="card-title">🔍 Funding Trace</div><div class="card-val" style="font-size:14px;color:#e2e8f0">Top holders walked back to shared funding wallets</div></div>
-  <div class="card"><div class="card-title">⚡ Bundle Detection</div><div class="card-val" style="font-size:14px;color:#e2e8f0">Wallets that bought in the exact same block — Jito bundles can't hide</div></div>
-  <div class="card"><div class="card-title">⛔ Deployer History</div><div class="card-val" style="font-size:14px;color:#e2e8f0">"This dev launched 14 tokens — 13 are dead." Wallets rotate, deployers don't</div></div>
-  <div class="card"><div class="card-title">Built for Bots</div><div class="card-val" style="font-size:14px;color:#e2e8f0">&lt;100ms pre-indexed · JSON · MCP for Claude / Cursor / Eliza agents</div></div>
+<div class="cards" style="grid-template-columns:1fr 1fr 1fr">
+  <div class="card"><div class="card-title">🔍 Funding Trace</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Top holders walked back to shared funding wallets</div></div>
+  <div class="card"><div class="card-title">⚡ Bundle Detection</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Wallets that bought in the exact same block — Jito bundles can't hide</div></div>
+  <div class="card"><div class="card-title">⛔ Deployer History</div><div class="card-val" style="font-size:13px;color:#e2e8f0">"Launched 14 tokens — 13 dead." Wallets rotate, deployers don't</div></div>
+  <div class="card"><div class="card-title">🛡 CEX-Noise Filter</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Holders funded from the same exchange aren't a cabal — we exclude them, transparently</div></div>
+  <div class="card"><div class="card-title">⛓ On-Chain Receipts</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Every red flag links to the actual Solscan tx — verify, don't trust the score</div></div>
+  <div class="card"><div class="card-title">⚡ Built for Bots</div><div class="card-val" style="font-size:13px;color:#e2e8f0">&lt;100ms pre-indexed · JSON · MCP for Claude / Cursor / Eliza</div></div>
 </div>
+
+<div class="section-title">What you see in one scan</div>
+<p style="font-size:13px;color:#94a3b8;line-height:1.7;margin-bottom:36px">
+  A <strong style="color:#e2e8f0">0–100 cabal score</strong> with a plain-English verdict, a live bubble map of holder clusters,
+  the deployer's track record, a <strong style="color:#e2e8f0">freshness stamp + one-click recheck</strong> so you never act on stale data,
+  and a <strong style="color:#e2e8f0">detection summary</strong> showing all four checks that ran — even the ones that came back clean.
+  Every cluster and red flag links straight to the on-chain proof.
+</p>
 
 <div class="links">
   <a class="btn btn-primary" href="/demo">🗺 Live Bubble Map Demo</a>
@@ -427,9 +437,23 @@ export function createApp(): express.Application {
       service:         "Cabal-Hunter",
       description:     "On-chain coordinated wallet detection for Solana meme tokens",
       detection_layers: {
-        funding_trace:  "Top holders walked back to shared funding wallets (clusters[].type = 'funding')",
-        bundle_detect:  "Holders that bought in the exact same block — Jito bundle signature (time_sync: true, clusters[].type = 'time_sync')",
+        funding_trace:  "Top holders walked back to shared funding wallets (clusters[].type='funding'). Each cluster carries evidence_txs[] — the actual funding transactions.",
+        bundle_detect:  "Holders that bought in the exact same block — Jito bundle signature (time_sync:true, clusters[].type='time_sync')",
         deployer:       "Token creator resolved on-chain + full launch history (deployer.verdict: FIRST_LAUNCH | NORMAL | POOR_TRACK_RECORD | SERIAL_RUGGER)",
+        cex_filter:     "Holders funded from a shared exchange / high-volume wallet are excluded from the score and surfaced in filtered_clusters[] — no false positives from CEX withdrawals",
+      },
+      response_fields: {
+        cabal_score:        "0–100. ≥65 HIGH, ≥35 CAUTION, else LOW SIGNAL",
+        risk:               "HIGH | MEDIUM | CLEAN",
+        is_controlled:      "true when score ≥ 35",
+        verdict:            "plain-English summary string",
+        time_sync:          "true if a same-block (bundled) buy group was found",
+        clusters:           "[] scored coordination groups; each has wallet_count, combined_pct, master_full, type, evidence_txs[]",
+        filtered_clusters:  "[] CEX/infra groups excluded from the score (funder_label, wallet_count, combined_pct)",
+        deployer:           "{ creator, tokens_launched, dead, sampled, dead_pct, verdict }",
+        holders:            "[] top holders; cluster members carry funding_tx + buy_slot (on-chain receipts)",
+        computed_at:        "unix seconds — use with the freshness/recheck flow",
+        source:             "pre_indexed (<100ms) | real_time",
       },
       free_tier:       "100 queries/month per IP — no key, no account",
       price_per_query: `${PRICE_USDC} USDC`,
@@ -437,6 +461,7 @@ export function createApp(): express.Application {
       mcp_endpoint:    "/mcp",
       rest_endpoint:   "/api/scan-cabal",
       map_endpoint:    "/map?mint=<MINT> — free visual bubble map",
+      recheck:         "/api/map-data?mint=<MINT>&fresh=1 — force a live re-trace, bypass cache",
       example_request: {
         method: "POST",
         url:    "/api/scan-cabal",
