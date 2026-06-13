@@ -59,8 +59,9 @@ def _get_conn() -> sqlite3.Connection:
         _conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_expires ON cabal_cache(expires_at)"
         )
-        # Migrations — additive columns for deployer reputation + time-sync flag
-        for col, decl in (("deployer_json", "TEXT"), ("time_sync", "INTEGER")):
+        # Migrations — additive columns for deployer rep, time-sync, CEX filter
+        for col, decl in (("deployer_json", "TEXT"), ("time_sync", "INTEGER"),
+                          ("filtered_json", "TEXT")):
             try:
                 _conn.execute(f"ALTER TABLE cabal_cache ADD COLUMN {col} {decl}")
             except sqlite3.OperationalError:
@@ -109,6 +110,7 @@ def save_result(
     is_controlled = 1 if (risk == "HIGH" or cabal_score >= 35.0) else 0
     deployer  = cluster_result.get("deployer")
     time_sync = 1 if cluster_result.get("time_sync") else 0
+    filtered  = cluster_result.get("filtered_clusters") or []
 
     try:
         conn = _get_conn()
@@ -117,13 +119,14 @@ def save_result(
               (mint, token_name, risk, cabal_score, is_controlled,
                clusters_json, holders_json, wallets_checked,
                pair_created_ts, computed_at, expires_at,
-               deployer_json, time_sync)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+               deployer_json, time_sync, filtered_json)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             mint, token_name, risk, cabal_score, is_controlled,
             json.dumps(clusters), json.dumps(holders), checked,
             pair_created_ts, now, now + _TTL_SECS,
             json.dumps(deployer) if deployer else None, time_sync,
+            json.dumps(filtered) if filtered else None,
         ))
         conn.commit()
     except Exception as e:
@@ -156,6 +159,7 @@ def get_result(mint: str) -> dict | None:
             "is_controlled":   bool(d["is_controlled"]),
             "time_sync":       bool(d.get("time_sync")),
             "deployer":        json.loads(d["deployer_json"]) if d.get("deployer_json") else None,
+            "filtered_clusters": json.loads(d["filtered_json"]) if d.get("filtered_json") else [],
             "clusters":        json.loads(d["clusters_json"] or "[]"),
             "holders":         json.loads(d["holders_json"] or "[]"),
             "wallets_checked": d["wallets_checked"],

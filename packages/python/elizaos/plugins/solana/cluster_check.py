@@ -42,6 +42,26 @@ _SKIP_OWNERS: frozenset[str] = frozenset({
     "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe8bv",  # Associated Token program
 })
 
+# Known CEX hot/withdrawal wallets. If several holders were funded from one of
+# these, that is NOT coordination — it is just people withdrawing from the same
+# exchange. These are excluded as cluster masters and shown as filtered noise.
+# (Both Reddit reviewers explicitly warned: "expect false positives from
+#  exchanges, bots, and wallets funded from the same CEX path.")
+_CEX_FUNDERS: dict[str, str] = {
+    "5Q4aF1UefAcZMkKRnrYiLZhFrR7dZ3bsYvBKsUMGFVN": "Binance",
+    "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM": "Coinbase",
+    "AC5RDfQFmDS1deWZos921JfqscXdByf8BKHs5ACWjtW2": "Kraken",
+    "H8sMJSCQxfKiFTCfDR3DUMLPwcRbM61LGFJ8N4dK3WjS": "OKX",
+    "GugU1tP7doLeTw9hQP51xmJyg5uYTBign4K4BbsBug6K": "Bybit",
+}
+# Behavioral CEX/infra detection. Raw signature COUNT is a poor signal — an
+# active degen easily has 1000 lifetime txns. The real tell is THROUGHPUT: a
+# CEX hot wallet does its last 1000 txns in minutes-to-hours; a person takes
+# weeks. We flag a funder as infra only if it is BOTH high-volume (hit the page
+# cap) AND high-rate (≥ this many txns/hour across those signatures).
+_INFRA_MIN_SIGS      = 900    # must hit the page cap → genuinely high volume
+_INFRA_MIN_RATE_PER_H = 50    # ≥1200 txns/day sustained — no human, only infra/bots
+
 # ── Tuning constants ─────────────────────────────────────────────────────────
 # Funding window around PAIR creation. pair_created_ts is the graduation
 # moment, but cabal wallets are funded during the BONDING-CURVE phase which
@@ -367,6 +387,8 @@ async def check_holder_clusters(
             continue
         if n > _EXCHANGE_THRESHOLD:
             continue  # exchange / CEX hot wallet — not a bundler
+        if funder in _CEX_FUNDERS:
+            continue  # known exchange withdrawal path — not coordination
 
         combined_ui = sum(amt for w, amt in owner_wallets if w in cluster_wallets)
         combined_pct = round(combined_ui / total_supply_est * 100, 1)
@@ -398,14 +420,39 @@ async def check_holder_clusters(
 
 # ── Visual map entry point ────────────────────────────────────────────────────
 
-# Known CEX / infrastructure addresses to label specially
-_KNOWN_LABELS: dict[str, str] = {
-    "5Q4aF1UefAcZMkKRnrYiLZhFrR7dZ3bsYvBKsUMGFVN": "Binance",
-    "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM": "Coinbase",
-    "AC5RDfQFmDS1deWZos921JfqscXdByf8BKHs5ACWjtW2": "Kraken",
-    "H8sMJSCQxfKiFTCfDR3DUMLPwcRbM61LGFJ8N4dK3WjS": "OKX",
-    "GugU1tP7doLeTw9hQP51xmJyg5uYTBign4K4BbsBug6K": "Bybit",
-}
+# Known CEX / infrastructure addresses to label specially (same source as the
+# funder denylist so display labels and cluster filtering never diverge)
+_KNOWN_LABELS: dict[str, str] = dict(_CEX_FUNDERS)
+
+
+async def _infra_funder_label(
+    session: "aiohttp.ClientSession", funder: str
+) -> str | None:
+    """Return a label if `funder` is an exchange / high-volume infra wallet
+    (so it should NOT be treated as a cabal master), else None.
+
+    1. Known CEX denylist  — instant, no RPC.
+    2. Behavioral fallback — a single getSignaturesForAddress; a hot wallet
+       has a huge dense history, a cabal burner does not.
+    """
+    known = _CEX_FUNDERS.get(funder)
+    if known:
+        return known
+    sigs = await _rpc(session, "getSignaturesForAddress",
+                      [funder, {"limit": 1000}])
+    if not isinstance(sigs, list) or len(sigs) < _INFRA_MIN_SIGS:
+        return None                      # not high-volume → could be a real cabal
+    # High volume — but is it high RATE? (CEX/bot) or just an old active wallet?
+    times = [s.get("blockTime") for s in sigs if s.get("blockTime")]
+    if len(times) < 2:
+        return None
+    span_h = (max(times) - min(times)) / 3600.0
+    if span_h <= 0:
+        return "high-volume wallet"      # 1000 txns in one block = pure infra
+    rate = len(times) / span_h
+    if rate >= _INFRA_MIN_RATE_PER_H:
+        return "high-volume wallet"      # CEX/bot/shared infra, not a single cabal
+    return None                          # old-but-active human wallet — keep it
 
 
 async def get_cluster_map(
@@ -522,17 +569,35 @@ async def get_cluster_map(
         funder_groups.setdefault(funder, []).append(wallet)
 
     clusters: list[dict] = []
+    filtered_clusters: list[dict] = []   # CEX/infra-funded groups — shown, not scored
     cluster_id = 0
     wallet_to_cluster: dict[str, int] = {}
 
-    for funder, cluster_wallets in sorted(
-        funder_groups.items(), key=lambda kv: -len(kv[1])
-    ):
+    # Candidate funders that look like a cluster (2..threshold members)
+    candidates = [
+        (f, ws) for f, ws in sorted(funder_groups.items(), key=lambda kv: -len(kv[1]))
+        if _MEDIUM_RISK_WALLETS <= len(ws) <= _EXCHANGE_THRESHOLD
+    ]
+    # Resolve which candidate funders are exchanges / infra (concurrent)
+    infra_labels = await asyncio.gather(
+        *[_infra_funder_label(session, f) for f, _ in candidates]
+    )
+
+    for (funder, cluster_wallets), infra in zip(candidates, infra_labels):
         n = len(cluster_wallets)
-        if n < _MEDIUM_RISK_WALLETS or n > _EXCHANGE_THRESHOLD:
-            continue
         combined_ui  = sum(amt for w, amt in owner_wallets if w in cluster_wallets)
         combined_pct = round(combined_ui / total_supply_est * 100, 1)
+        if infra:
+            # Same exchange funded several holders = NOT coordination. Surface it
+            # transparently so users see we filter CEX noise, but don't score it.
+            filtered_clusters.append({
+                "funder_label": infra,
+                "master_short": funder[:6] + "…" + funder[-4:],
+                "master_full":  funder,
+                "wallet_count": n,
+                "combined_pct": combined_pct,
+            })
+            continue
         risk = "HIGH" if n >= _HIGH_RISK_WALLETS else "MEDIUM"
         clusters.append({
             "id":           cluster_id,
@@ -613,6 +678,7 @@ async def get_cluster_map(
         "token_name":       "",
         "holders":          raw_holders,
         "clusters":         clusters,
+        "filtered_clusters": filtered_clusters,  # CEX/infra-funded, excluded from score
         "total_supply_est": round(total_supply_est),
         "wallets_checked":  len(wallets_to_check),
         "funders_found":    len(funder_map),

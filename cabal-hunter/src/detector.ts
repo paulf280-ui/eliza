@@ -14,7 +14,7 @@ const require = createRequire(import.meta.url)
  */
 
 const Database = require("better-sqlite3")
-import { CabalReport, Cluster, DeployerReport, Holder } from "./types.js"
+import { CabalReport, Cluster, DeployerReport, FilteredCluster, Holder } from "./types.js"
 
 const DB_PATH = process.env.CABAL_CACHE_DB ?? "/home/ubuntu/eliza/packages/python/elizaos/plugins/solana/cabal_cache.db"
 const BOT_URL = process.env.BOT_INTERNAL_URL ?? "http://127.0.0.1:3001"
@@ -90,6 +90,7 @@ function readFromCache(mint: string): CabalReport | null {
     const holders: Holder[]   = JSON.parse((row.holders_json as string)  || "[]")
     const deployer: DeployerReport | null = row.deployer_json
       ? JSON.parse(row.deployer_json as string) : null
+    const filtered: FilteredCluster[] = JSON.parse((row.filtered_json as string) || "[]")
     const timeSync = Boolean(row.time_sync) || clusters.some(c => c.type === "time_sync")
 
     // Recompute the blended score from the row's own data — identical formula
@@ -114,6 +115,7 @@ function readFromCache(mint: string): CabalReport | null {
       deployer,
       verdict:              buildVerdict({ risk, cabal_score: score, coordinated_clusters: clusters, deployer, wallets_checked: Number(row.wallets_checked ?? 0) }),
       coordinated_clusters: clusters,
+      filtered_clusters:    filtered,
       holders,
       wallets_checked:      Number(row.wallets_checked ?? 0),
       analysis_time_ms:     0,
@@ -148,6 +150,7 @@ async function fetchFromBot(mint: string, createdTs?: number): Promise<CabalRepo
   if (data.error) throw new Error(String(data.error))
 
   const clusters: Cluster[] = (data.clusters as Cluster[]) ?? []
+  const filtered: FilteredCluster[] = (data.filtered_clusters as FilteredCluster[]) ?? []
   const holders: Holder[]   = (data.holders  as Holder[])  ?? []
   const score = Number(data.cabal_score ?? 0)
   const risk  = (data.risk as "HIGH" | "MEDIUM" | "CLEAN") ?? "CLEAN"
@@ -164,6 +167,7 @@ async function fetchFromBot(mint: string, createdTs?: number): Promise<CabalRepo
     deployer,
     verdict:              buildVerdict({ risk, cabal_score: score, coordinated_clusters: clusters, deployer, wallets_checked: Number(data.wallets_checked ?? 0) }),
     coordinated_clusters: clusters,
+    filtered_clusters:    filtered,
     holders,
     wallets_checked:      Number(data.wallets_checked ?? 0),
     analysis_time_ms:     0,

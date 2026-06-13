@@ -12,6 +12,16 @@ export interface Cluster {
   evidence_txs?: string[]
 }
 
+/** A funder group excluded from the score because the funder is an exchange
+ *  or high-volume infra wallet — shown for transparency, not counted. */
+export interface FilteredCluster {
+  funder_label: string        // "Binance" | "high-volume wallet" | …
+  master_short: string
+  master_full: string
+  wallet_count: number
+  combined_pct: number
+}
+
 export interface DeployerReport {
   creator: string | null
   creator_short: string | null
@@ -44,6 +54,8 @@ export interface CabalReport {
   is_controlled: boolean        // true if score >= 35
   verdict: string               // human-readable summary sentence
   coordinated_clusters: Cluster[]
+  /** funder groups removed as CEX/infra noise — shown but not scored */
+  filtered_clusters: FilteredCluster[]
   holders: Holder[]
   /** true if ≥3 top holders bought in the exact same block (bundle signature) */
   time_sync: boolean

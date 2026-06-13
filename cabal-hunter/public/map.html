@@ -322,6 +322,7 @@
 
     <!-- Clusters -->
     <div id="clusters-section"></div>
+    <div id="filtered-section"></div>
 
     <!-- Holders -->
     <div class="holders-section" id="holders-section"></div>
@@ -604,6 +605,29 @@ function render(data) {
         </div>`;
     });
     document.getElementById('clusters-section').innerHTML = html;
+  }
+
+  // Filtered (CEX/infra) groups — shown for transparency, NOT scored. This is
+  // how we prove we don't cry "cabal" on people who just withdrew from Binance.
+  const filtered = data.filtered_clusters || [];
+  if (filtered.length) {
+    let fhtml = `<div class="section-title">Filtered — not counted (${filtered.length})</div>`;
+    filtered.forEach(f => {
+      fhtml += `
+        <div class="cluster-card" style="border-color:rgba(100,116,139,.25);background:rgba(100,116,139,.06)">
+          <div class="cluster-meta" style="color:#94a3b8;line-height:1.5">
+            <strong style="color:#cbd5e1">${f.wallet_count} holders (${f.combined_pct}%)</strong>
+            funded via <strong style="color:#cbd5e1">${f.funder_label}</strong> —
+            a shared exchange / high-volume wallet, not coordination.
+            <a href="https://solscan.io/account/${f.master_full}" target="_blank" rel="noopener"
+               style="color:#60a5fa;text-decoration:none;font-family:monospace;font-size:10px">${f.master_short} ↗</a>
+            <div style="font-size:10px;color:#64748b;margin-top:4px">Excluded from the cabal score to avoid a false positive.</div>
+          </div>
+        </div>`;
+    });
+    document.getElementById('filtered-section').innerHTML = fhtml;
+  } else {
+    document.getElementById('filtered-section').innerHTML = '';
   }
 
   // Holders section — addresses link to Solscan for copy-trading research
