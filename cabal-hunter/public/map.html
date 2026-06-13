@@ -195,9 +195,9 @@
     background: rgba(255,255,255,0.04); padding: 4px 10px; border-radius: 6px;
   }
 
-  /* ── Legend (moved bottom-left to free the top-left for the findings HUD) ── */
+  /* ── Legend (top-right — findings HUD owns top-left, CEX panel bottom-left) ── */
   .legend {
-    position: absolute; bottom: 12px; left: 12px;
+    position: absolute; top: 12px; right: 12px;
     background: rgba(13,15,30,0.85); border: 1px solid var(--border);
     border-radius: 8px; padding: 10px 12px; font-size: 11px;
     backdrop-filter: blur(8px);
@@ -223,6 +223,23 @@
     border-radius: 8px; font-size: 12px; line-height: 1.4;
   }
   .finding-flag .ff-icon { flex-shrink: 0; font-weight: 800; }
+
+  /* ── CEX Funding panel — bottom-left, badattrading-style bars ── */
+  .cex-panel {
+    position: absolute; bottom: 12px; left: 12px; width: 320px; max-width: 40vw;
+    background: rgba(13,15,30,0.92); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px; backdrop-filter: blur(14px);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5); max-height: 46vh; overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  }
+  .cex-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; }
+  .cex-total { font-size: 26px; font-weight: 900; color: #34d399; letter-spacing: -0.5px; }
+  .cex-total-sub { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .cex-row { display: grid; grid-template-columns: 64px 1fr 42px; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .cex-name { font-size: 11px; color: #cbd5e1; text-transform: capitalize; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cex-bar-bg { height: 14px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; }
+  .cex-bar { height: 14px; border-radius: 4px; }
+  .cex-pct { font-size: 11px; font-weight: 700; color: #e2e8f0; text-align: right; }
 </style>
 </head>
 <body>
@@ -279,6 +296,8 @@
     <svg id="graph-canvas" style="display:none"></svg>
     <!-- Key Findings HUD — populated by render(), uses the empty left space -->
     <div class="findings-hud" id="findings-hud" style="display:none"></div>
+    <!-- CEX Funding panel — lazy-loaded after the main scan -->
+    <div class="cex-panel" id="cex-panel" style="display:none"></div>
     <div class="legend" id="legend" style="display:none">
       <div class="legend-title">Legend</div>
       <div class="legend-item"><div class="legend-dot" style="background:#ff4d6d"></div>Cluster (HIGH risk)</div>
@@ -425,6 +444,7 @@ async function fetchData() {
       data._partial = true;
     }
     render(data);
+    fetchCexFunding();   // lazy — heavier trace, loads into the bottom-left panel
   } catch(e) {
     showError('Network error', 'Could not reach the analysis server. Check your connection and refresh.');
   }
@@ -768,6 +788,43 @@ function render(data) {
   // Draw graph
   document.getElementById('graph-canvas').style.display = '';
   drawGraph(holders, clusters, data.total_supply_est || 0);
+}
+
+// ── CEX Funding panel (lazy) ──────────────────────────────────────────────────
+const CEX_COLOURS = ['#f0b90b','#1652f0','#0098ea','#00c2a8','#7b3ff2','#8b95a5','#26a17b','#f7931a','#2ebd85','#3b82f6','#a78bfa','#ec4899'];
+async function fetchCexFunding() {
+  if (!MINT || !MINT_VALID) return;
+  const el = document.getElementById('cex-panel');
+  el.innerHTML = `<div class="cex-head"><div class="cex-total-sub">CEX Funding · tracing origins…</div></div>
+    <div style="display:flex;align-items:center;gap:8px;color:#64748b;font-size:11px"><div class="spinner" style="width:16px;height:16px;border-width:2px"></div>Resolving exchange labels via Helius…</div>`;
+  el.style.display = '';
+  try {
+    const res = await fetch(`/api/cex-funding?mint=${encodeURIComponent(MINT)}`);
+    const d = await res.json();
+    const rows = d.cex_funding || [];
+    if (!res.ok || !rows.length) {
+      el.innerHTML = `<div class="cex-head"><div class="cex-total-sub">CEX Funding</div></div>
+        <div style="font-size:11px;color:#64748b;line-height:1.5">No exchange-funded holders identified among the top ${d.holders_analyzed || 20}. These holders' SOL came from other wallets or sources Helius doesn't label.</div>`;
+      return;
+    }
+    const max = Math.max(...rows.map(r => r.pct), 1);
+    el.innerHTML =
+      `<div class="cex-head">
+         <div class="cex-total">${d.cex_funded_pct}%</div>
+         <div class="cex-total-sub">of supply traced to<br>exchange funding</div>
+       </div>` +
+      rows.map((r, i) => {
+        const col = CEX_COLOURS[i % CEX_COLOURS.length];
+        return `<div class="cex-row">
+            <div class="cex-name" title="${r.exchange} · ${r.wallets} wallet${r.wallets>1?'s':''}">${r.exchange}</div>
+            <div class="cex-bar-bg"><div class="cex-bar" style="width:${Math.max(r.pct/max*100,4)}%;background:${col}"></div></div>
+            <div class="cex-pct">${r.pct}%</div>
+          </div>`;
+      }).join('') +
+      `<div style="font-size:9px;color:#475569;margin-top:8px;line-height:1.4">Origins traced on-chain · labels from Helius (12.5k+ verified). Only confirmed exchanges named.</div>`;
+  } catch {
+    el.style.display = 'none';
+  }
 }
 
 // ── Stale-trace banner — re-evaluates age on a timer ──────────────────────────

@@ -118,7 +118,7 @@ _rpc_semaphore: asyncio.Semaphore | None = None
 def _rpc_sem() -> asyncio.Semaphore:
     global _rpc_semaphore
     if _rpc_semaphore is None:
-        _rpc_semaphore = asyncio.Semaphore(10)
+        _rpc_semaphore = asyncio.Semaphore(18)
     return _rpc_semaphore
 
 
@@ -481,6 +481,49 @@ async def _infra_funder_label(
     return None                          # old-but-active human wallet — keep it
 
 
+async def _find_genesis_sol_funder(
+    session: "aiohttp.ClientSession", wallet: str
+) -> str | None:
+    """Return the wallet's ORIGIN funder — the sender of its earliest SOL
+    inflow. For a CEX-funded wallet that origin is the exchange hot wallet.
+
+    Uses the Helius Enhanced Transactions API: one call returns up to 100
+    pre-parsed txns (with nativeTransfers), so we find the genesis funding in
+    1–3 calls and zero per-tx lookups — ~10× faster than raw getTransaction.
+    Fresh-money wallets (the ones that matter for a launch's distribution) have
+    short histories, so their genesis is reached in a single page.
+    """
+    key = os.getenv("HELIUS_API_KEY", "")
+    if not key:
+        return None
+    oldest_page: list[dict] = []
+    before = ""
+    for _ in range(3):  # up to ~300 txns
+        url = (f"https://api.helius.xyz/v0/addresses/{wallet}/transactions"
+               f"?api-key={key}&limit=100{before}")
+        try:
+            async with _rpc_sem():
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                    txs = await r.json() if r.status == 200 else []
+        except Exception:
+            break
+        if not isinstance(txs, list) or not txs:
+            break
+        oldest_page = txs
+        if len(txs) < 100:
+            break
+        before = f"&before={txs[-1].get('signature', '')}"
+    # Scan oldest → newer for the first meaningful SOL inflow to this wallet
+    for t in reversed(oldest_page):
+        for nt in t.get("nativeTransfers") or []:
+            if (nt.get("toUserAccount") == wallet
+                    and (nt.get("amount") or 0) >= _MIN_SOL_INFLOW):
+                frm = nt.get("fromUserAccount")
+                if frm and frm not in _SKIP_OWNERS:
+                    return frm
+    return None
+
+
 async def _detect_coordinated_exits(
     session: "aiohttp.ClientSession",
     exit_wallets: list[str],
@@ -816,5 +859,91 @@ async def get_cluster_map(
         # must NOT cache this result; serve it once and let the next query retry
         "degraded":         lookup_failures >= max(2, len(accounts) // 3),
         "skip_reason":      None,
+        "computed_at":      time.time(),
+    }
+
+
+async def get_cex_funding(
+    session: aiohttp.ClientSession,
+    mint: str,
+    top_n: int = 20,
+) -> dict:
+    """Standalone CEX-funding breakdown — run lazily (not on every scan).
+
+    Traces each top holder to its genesis SOL funder; if that funder isn't a
+    Helius-labelled exchange, traces ONE more hop (the funder's own genesis) to
+    catch indirect funding (e.g. wallets routed through a market maker). Names
+    come ONLY from Helius identity labels — we never guess an address — so a
+    named exchange is always real. Returns the % of supply funded by each.
+    """
+    from elizaos.plugins.solana.cex_labels import resolve_identities, is_exchange
+
+    empty = {"cex_funding": [], "cex_funded_pct": 0.0, "holders_analyzed": 0,
+             "computed_at": time.time()}
+    h_result = await _rpc(session, "getTokenLargestAccounts",
+                          [mint, {"commitment": "confirmed"}])
+    if not h_result:
+        return empty
+    accounts = (h_result.get("value") or [])[:top_n]
+    top_sum = sum(float(a.get("uiAmount") or 0) for a in accounts)
+    total_supply_est = top_sum / 0.85 if top_sum > 0 else 1.0
+
+    owners = await asyncio.gather(*[_resolve_owner(session, a["address"]) for a in accounts])
+    holders: list[tuple[str, float]] = [
+        (owners[i], float(accounts[i].get("uiAmount") or 0))
+        for i in range(len(accounts)) if owners[i]
+    ]
+    if not holders:
+        return empty
+
+    # Hop 1: genesis funder of each holder
+    try:
+        async with asyncio.timeout(_CHECK_TIMEOUT_SECS * 2):
+            g1 = await asyncio.gather(*[_find_genesis_sol_funder(session, w) for w, _ in holders])
+    except (asyncio.TimeoutError, Exception):
+        g1 = [None] * len(holders)
+    origin = {w: f for (w, _), f in zip(holders, g1) if f}
+
+    # Resolve hop-1 funders; for the unknown ones, hop 2 (funder's own genesis).
+    # Only hop-2 the biggest unknown holders — they move the % most, and it caps
+    # the extra tracing so latency stays reasonable.
+    idents = await resolve_identities(session, list(set(origin.values())))
+    holding_all = {w: amt for w, amt in holders}
+    unknown_all = {w: f for w, f in origin.items() if not is_exchange(idents.get(f) or {})}
+    unknown = dict(sorted(unknown_all.items(),
+                          key=lambda kv: -holding_all.get(kv[0], 0))[:8])
+    if unknown:
+        try:
+            async with asyncio.timeout(_CHECK_TIMEOUT_SECS * 2):
+                g2 = await asyncio.gather(*[_find_genesis_sol_funder(session, f)
+                                           for f in set(unknown.values())])
+        except (asyncio.TimeoutError, Exception):
+            g2 = []
+        hop2 = {f: g for f, g in zip(set(unknown.values()), g2) if g}
+        idents2 = await resolve_identities(session, list(set(hop2.values())))
+        for w, f in unknown.items():
+            f2 = hop2.get(f)
+            if f2 and is_exchange(idents2.get(f2) or {}):
+                origin[w] = f2
+                idents[f2] = idents2[f2]
+
+    agg: dict[str, dict] = {}
+    holding = {w: amt for w, amt in holders}
+    for w, f in origin.items():
+        ident = idents.get(f) or {}
+        if not is_exchange(ident):
+            continue
+        name = ident["base_name"]
+        pct  = round(holding.get(w, 0) / total_supply_est * 100, 2)
+        slot = agg.setdefault(name, {"exchange": name, "pct": 0.0, "wallets": 0,
+                                     "icon": ident.get("icon", "")})
+        slot["pct"]      = round(slot["pct"] + pct, 2)
+        slot["wallets"] += 1
+
+    funding = sorted(agg.values(), key=lambda e: -e["pct"])
+    return {
+        "cex_funding":      funding,
+        "cex_funded_pct":   round(sum(e["pct"] for e in funding), 1),
+        "holders_analyzed": len(holders),
         "computed_at":      time.time(),
     }

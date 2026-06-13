@@ -3079,6 +3079,39 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
     app.router.add_get("/api/cabal/internal", handle_cabal_internal)
 
+    # ── CEX funding breakdown (lazy / on-demand) ─────────────────────────────
+    _cex_cache: dict[str, dict] = {}   # mint → result (30-min TTL)
+    _CEX_TTL = 1800
+
+    async def handle_cex_internal(request: web.Request) -> web.Response:
+        """GET /api/cex/internal?mint=<mint>
+        Per-exchange funding breakdown of the top holders (Helius identity).
+        Heavier than the cabal scan, so it runs only when the map asks for it.
+        """
+        secret = os.getenv("CABAL_INTERNAL_SECRET", "")
+        peer = request.transport.get_extra_info("peername", ("", 0))[0] if request.transport else ""
+        is_local = peer in ("127.0.0.1", "::1", "localhost")
+        if secret and not is_local and request.headers.get("X-Internal-Secret") != secret:
+            return web.json_response({"error": "unauthorized"}, status=401)
+        mint = request.rel_url.query.get("mint", "").strip()
+        if not mint:
+            return web.json_response({"error": "mint required"}, status=400)
+
+        cached = _cex_cache.get(mint)
+        if cached and time.time() - cached.get("computed_at", 0) < _CEX_TTL:
+            return web.json_response(cached)
+        try:
+            import aiohttp as _aio
+            from elizaos.plugins.solana.cluster_check import get_cex_funding
+            async with _aio.ClientSession() as _s:
+                res = await get_cex_funding(_s, mint)
+            _cex_cache[mint] = res
+            return web.json_response(res)
+        except Exception as exc:
+            return web.json_response({"error": str(exc)}, status=500)
+
+    app.router.add_get("/api/cex/internal", handle_cex_internal)
+
     app.router.add_get("/ws", handle_ws)
 
     if os.path.isdir(dashboard_dist):

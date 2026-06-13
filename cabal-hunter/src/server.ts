@@ -75,6 +75,23 @@ export function createApp(): express.Application {
     }
   })
 
+  // ── CEX funding breakdown proxy (lazy — map loads this after the main scan) ──
+  app.get("/api/cex-funding", async (req: Request, res: Response): Promise<void> => {
+    const mint = (req.query.mint as string ?? "").trim()
+    if (!mint || mint.length < 32) { res.status(400).json({ error: "mint required" }); return }
+    try {
+      const botUrl = process.env.BOT_INTERNAL_URL ?? "http://127.0.0.1:3001"
+      const secret = process.env.CABAL_INTERNAL_SECRET ?? ""
+      const upstream = await fetch(`${botUrl}/api/cex/internal?mint=${encodeURIComponent(mint)}`, {
+        headers: secret ? { "X-Internal-Secret": secret } : {},
+      })
+      const data = await upstream.json()
+      res.status(upstream.ok ? 200 : upstream.status).json(data)
+    } catch (err) {
+      res.status(500).json({ error: "cex_lookup_failed", message: err instanceof Error ? err.message : "unknown" })
+    }
+  })
+
   // ── Root landing page — the public face of the product ───────────────────────
   app.get("/", (_req, res) => {
     res.setHeader("Content-Type", "text/html")
@@ -126,7 +143,7 @@ export function createApp(): express.Application {
   <div class="card"><div class="card-title">⚡ Bundle Detection</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Wallets that bought in the exact same block — Jito bundles can't hide</div></div>
   <div class="card"><div class="card-title">🚨 Coordinated Dump</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Multiple holders selling in the EXACT same block — a cabal exiting in real time</div></div>
   <div class="card"><div class="card-title">⛔ Deployer History</div><div class="card-val" style="font-size:13px;color:#e2e8f0">"Launched 14 tokens — 13 dead." Wallets rotate, deployers don't</div></div>
-  <div class="card"><div class="card-title">🛡 CEX-Noise Filter</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Holders funded from the same exchange aren't a cabal — we exclude them, transparently</div></div>
+  <div class="card"><div class="card-title">🏦 CEX Funding Map</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Which exchanges funded the holders, % of supply each — read the distribution (Binance vs MEXC vs Revolut…)</div></div>
   <div class="card"><div class="card-title">⛓ On-Chain Receipts</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Every red flag links to the actual Solscan tx — verify, don't trust the score</div></div>
   <div class="card"><div class="card-title">⚡ Built for Bots</div><div class="card-val" style="font-size:13px;color:#e2e8f0">&lt;100ms pre-indexed · JSON · MCP for Claude / Cursor / Eliza</div></div>
 </div>
@@ -464,6 +481,7 @@ export function createApp(): express.Application {
       mcp_endpoint:    "/mcp",
       rest_endpoint:   "/api/scan-cabal",
       map_endpoint:    "/map?mint=<MINT> — free visual bubble map",
+      cex_funding:     "/api/cex-funding?mint=<MINT> — per-exchange funding breakdown (which CEXes funded the holders, % of supply each). Labels from Helius identity (12.5k+ verified) — only confirmed exchanges named.",
       recheck:         "/api/map-data?mint=<MINT>&fresh=1 — force a live re-trace, bypass cache",
       example_request: {
         method: "POST",
