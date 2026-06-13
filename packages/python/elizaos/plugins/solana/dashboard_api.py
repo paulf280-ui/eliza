@@ -1642,6 +1642,23 @@ When adjusting a filter, always explain your reasoning based on the data above."
     app.on_startup.append(start_broadcast)
     app.on_cleanup.append(stop_broadcast)
 
+    # ── Dump-monitor background loop (emergency webhooks) ────────────────────
+    async def start_dump_monitor(app: web.Application):
+        from elizaos.plugins.solana.dump_monitor import monitor_loop
+        app["_dump_task"] = asyncio.create_task(monitor_loop())
+
+    async def stop_dump_monitor(app: web.Application):
+        task = app.get("_dump_task")
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+    app.on_startup.append(start_dump_monitor)
+    app.on_cleanup.append(stop_dump_monitor)
+
     # ── Static file serving (production) ─────────────────────────────────────
 
     dashboard_dist = os.path.join(
@@ -3199,6 +3216,34 @@ When adjusting a filter, always explain your reasoning based on the data above."
             return web.json_response({"error": str(exc)}, status=500)
 
     app.router.add_get("/api/trade-analysis/internal", handle_trade_analysis)
+
+    # ── Dump-watch registration (emergency webhooks) ─────────────────────────
+    async def handle_watch_internal(request: web.Request) -> web.Response:
+        secret = os.getenv("CABAL_INTERNAL_SECRET", "")
+        peer = request.transport.get_extra_info("peername", ("", 0))[0] if request.transport else ""
+        is_local = peer in ("127.0.0.1", "::1", "localhost")
+        if secret and not is_local and request.headers.get("X-Internal-Secret") != secret:
+            return web.json_response({"error": "unauthorized"}, status=401)
+        from elizaos.plugins.solana.dump_monitor import add_watch, remove_watch, list_watches
+        if request.method == "GET":
+            return web.json_response(list_watches())
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        mint = (body.get("mint") or "").strip()
+        webhook = (body.get("webhook_url") or "").strip()
+        if request.method == "DELETE":
+            return web.json_response(remove_watch(mint, webhook or None))
+        if not mint or not webhook:
+            return web.json_response({"error": "mint and webhook_url required"}, status=400)
+        if not webhook.startswith("https://") and not webhook.startswith("http://"):
+            return web.json_response({"error": "webhook_url must be http(s)"}, status=400)
+        return web.json_response(add_watch(mint, webhook))
+
+    app.router.add_route("GET", "/api/watch/internal", handle_watch_internal)
+    app.router.add_route("POST", "/api/watch/internal", handle_watch_internal)
+    app.router.add_route("DELETE", "/api/watch/internal", handle_watch_internal)
 
     app.router.add_get("/ws", handle_ws)
 

@@ -127,6 +127,29 @@ export function createApp(): express.Application {
     }
   })
 
+  // ── Dump-watch registration proxy (emergency webhooks) ───────────────────────
+  const watchProxy = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const botUrl = process.env.BOT_INTERNAL_URL ?? "http://127.0.0.1:3001"
+      const secret = process.env.CABAL_INTERNAL_SECRET ?? ""
+      const upstream = await fetch(`${botUrl}/api/watch/internal`, {
+        method: req.method,
+        headers: {
+          "Content-Type": "application/json",
+          ...(secret ? { "X-Internal-Secret": secret } : {}),
+        },
+        body: req.method === "GET" ? undefined : JSON.stringify(req.body ?? {}),
+      })
+      const data = await upstream.json()
+      res.status(upstream.status).json(data)
+    } catch (err) {
+      res.status(500).json({ error: "watch_failed", message: err instanceof Error ? err.message : "unknown" })
+    }
+  }
+  app.get("/api/watch", watchProxy)
+  app.post("/api/watch", watchProxy)
+  app.delete("/api/watch", watchProxy)
+
   // ── Root landing page — the public face of the product ───────────────────────
   app.get("/", (_req, res) => {
     res.setHeader("Content-Type", "text/html")
@@ -182,6 +205,7 @@ export function createApp(): express.Application {
   <div class="card"><div class="card-title">👥 Cohort PnL</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Snipers vs Insiders: what they bought, how much they've dumped, and the SOL they've already banked</div></div>
   <div class="card"><div class="card-title">🔁 Wash-Trade Filter</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Catches fake volume — wallets round-tripping tokens to fake momentum and farm trending lists</div></div>
   <div class="card"><div class="card-title">💧 Exit Liquidity</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Price impact of your sell before you buy — will the pool absorb your take-profit, or slip 15%?</div></div>
+  <div class="card"><div class="card-title">🚨 Dump Webhooks</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Your bot subscribes to a mint — we push the instant a dump or rug starts so it can auto-exit. No polling.</div></div>
   <div class="card"><div class="card-title">⛓ On-Chain Receipts</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Every red flag links to the actual Solscan tx — verify, don't trust the score</div></div>
   <div class="card"><div class="card-title">⚡ Built for Bots</div><div class="card-val" style="font-size:13px;color:#e2e8f0">&lt;100ms pre-indexed · JSON · MCP for Claude / Cursor / Eliza</div></div>
 </div>
@@ -522,6 +546,7 @@ export function createApp(): express.Application {
       cex_funding:     "/api/cex-funding?mint=<MINT> — per-exchange funding breakdown (which CEXes funded the holders, % of supply each). Labels from Helius identity (12.5k+ verified) — only confirmed exchanges named.",
       cohorts:         "/api/cohorts?mint=<MINT> — Team/Snipers/Insiders cohort breakdown: initial buy %, % of bag still held, and realized SOL profit per cohort (reconstructed from the pool's full swap history).",
       trade_analysis:  "/api/trade-analysis?mint=<MINT> — combined cohorts + wash-trading score + exit-liquidity price-impact in one call (pool swaps fetched once). wash: {wash_score, wash_volume_pct, offenders}; liquidity: {liquidity_usd, lp_burned, sells:[{sol, impact_pct}]}.",
+      dump_webhook:    "POST /api/watch {mint, webhook_url} — register a live dump watch; we POST your webhook the instant a coordinated dump / liquidity drain starts (payload: {event, mint, reason, coordinated, action}). GET to list, DELETE to remove. The push model for bot auto-exit.",
       recheck:         "/api/map-data?mint=<MINT>&fresh=1 — force a live re-trace, bypass cache",
       example_request: {
         method: "POST",
