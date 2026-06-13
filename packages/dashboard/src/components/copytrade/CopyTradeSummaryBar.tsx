@@ -13,15 +13,13 @@ interface Props {
   paused?: boolean
   pauseLoading?: boolean
   onTogglePause?: () => void
-  velocityOpenCount?: number
   lifecycleOpenCount?: number
-  velocitySize?: number
 }
 
 export default function CopyTradeSummaryBar({
   balance, netPnl, trades, wins, openCount, maxSlots, signalsToday, watchedWallets, tradeSize, liveMode,
   paperMode, paused, pauseLoading, onTogglePause,
-  velocityOpenCount = 0, lifecycleOpenCount, velocitySize,
+  lifecycleOpenCount,
 }: Props) {
   const wr = trades > 0 ? Math.round((wins / trades) * 100) : 0
   const pnlPos = netPnl >= 0
@@ -87,35 +85,21 @@ export default function CopyTradeSummaryBar({
           <Stat label="Win Rate" value={`${wr}% (${wins}/${trades})`}
             valueClass={wr >= 50 ? 'text-emerald-400' : 'text-amber-400'} />
         )}
-        {/* Show lifecycle and velocity slots independently */}
+        {/* Open slots */}
         <div className="flex flex-col items-center gap-0.5">
           <span className="text-[10px] text-zinc-600 uppercase tracking-widest">Open Slots</span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-mono font-semibold"
-                  style={{ color: '#2dd4bf' }}
-                  title="Lifecycle: quiet accumulation strategy">
-              LC {lifecycleOpenCount ?? (openCount - velocityOpenCount)}/{maxSlots ?? 1}
-            </span>
-            <span className="text-zinc-600">|</span>
-            <span className="text-[11px] font-mono font-semibold"
-                  style={{ color: '#fb923c' }}
-                  title="Velocity: 1h entry / +200% TP strategy">
-              ⚡ {velocityOpenCount}/1
-            </span>
-          </div>
+          <span className="text-[11px] font-mono font-semibold"
+                style={{ color: '#2dd4bf' }}
+                title="Lifecycle: quiet accumulation strategy">
+            {lifecycleOpenCount ?? openCount}/{maxSlots ?? 1}
+          </span>
         </div>
-        {/* Trade sizes for each strategy */}
+        {/* Trade size */}
         <div className="flex flex-col items-center gap-0.5">
           <span className="text-[10px] text-zinc-600 uppercase tracking-widest">Trade Size</span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-mono" style={{ color: '#2dd4bf' }}>
-              {tradeSize != null ? tradeSize.toFixed(2) : '0.50'} SOL
-            </span>
-            <span className="text-zinc-600">|</span>
-            <span className="text-[11px] font-mono" style={{ color: '#fb923c' }}>
-              ⚡ {(velocitySize ?? 0.20).toFixed(2)} SOL
-            </span>
-          </div>
+          <span className="text-[11px] font-mono" style={{ color: '#2dd4bf' }}>
+            {tradeSize != null ? tradeSize.toFixed(2) : '0.50'} SOL
+          </span>
         </div>
         <Stat label="Signals Today" value={String(signalsToday)} valueClass="text-zinc-300" />
       </div>

@@ -162,9 +162,7 @@ export default function App() {
           paused={stats.paused}
           pauseLoading={pauseLoading}
           onTogglePause={togglePause}
-          velocityOpenCount={(stats as any).velocity_open_count ?? 0}
           lifecycleOpenCount={(stats as any).lifecycle_open_count ?? stats.open_count}
-          velocitySize={Number((config as any)?.velocity_size_sol ?? 0.20)}
         />
       )}
 
@@ -229,7 +227,6 @@ export default function App() {
           solBalance={wallet?.sol_balance ?? 0}
           currentMaxConcurrent={Number(config?.monster_max_concurrent ?? 1)}
           currentTradeSize={Number(config?.monster_default_size_sol ?? 0.5)}
-          currentVelocitySize={Number((config as any)?.velocity_size_sol ?? 0.20)}
           onApplied={() => fetchStatus().then(setInitialState).catch(() => {})}
         />
       </div>

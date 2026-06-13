@@ -214,7 +214,14 @@ async def _check_compound_tier(session: aiohttp.ClientSession) -> None:
     """Read wallet SOL balance and auto-scale trade size if tier changed.
     Runs at most once every 5 minutes to avoid excess RPC calls.
     """
-    global _compound_last_check, _compound_current_size
+    # PERMANENTLY DISABLED 2026-06-13. This auto-scaler overwrote the
+    # dashboard-set trade size every 5 min (forcing it back to the 0.50 tier),
+    # which is the "drift" the user reported. Trade size is now controlled ONLY
+    # from the dashboard and stays exactly where it is set. Do not re-enable
+    # without an explicit request — re-instate the tiered logic below if so.
+    return
+
+    global _compound_last_check, _compound_current_size  # noqa: unreachable
     import time as _t, os as _os
     now = _t.time()
     if now - _compound_last_check < 300:

@@ -6,7 +6,6 @@ interface Props {
   solBalance: number
   currentMaxConcurrent: number
   currentTradeSize: number
-  currentVelocitySize?: number
   onApplied?: () => void
 }
 
@@ -40,44 +39,34 @@ export default function PositionConfigPanel({
   solBalance,
   currentMaxConcurrent,
   currentTradeSize,
-  currentVelocitySize = 0.20,
   onApplied,
 }: Props) {
   const [maxConc,      setMaxConc]      = useState(currentMaxConcurrent)
   const [tradeSize,    setTradeSize]    = useState(currentTradeSize)
-  const [velSize,      setVelSize]      = useState(currentVelocitySize)
   const [busy,         setBusy]         = useState(false)
   const [msg,          setMsg]          = useState<string | null>(null)
 
   useEffect(() => { setMaxConc(currentMaxConcurrent) },   [currentMaxConcurrent])
   useEffect(() => { setTradeSize(currentTradeSize) },     [currentTradeSize])
-  useEffect(() => { setVelSize(currentVelocitySize) },    [currentVelocitySize])
 
-  // Combined wallet usage: lifecycle (×1.5 slip) + velocity (×1.5 slip)
-  const lcRequired  = maxConc * tradeSize * SLIPPAGE_BUFFER
-  const velRequired = 1 * velSize * SLIPPAGE_BUFFER          // velocity always 1 slot
-  const totalRequired = lcRequired + velRequired
+  // Wallet usage: lifecycle slots × trade size × slippage buffer
+  const totalRequired = maxConc * tradeSize * SLIPPAGE_BUFFER
   const overBudget    = totalRequired > solBalance
   const utilizationPct = solBalance > 0 ? (totalRequired / solBalance) * 100 : 0
 
-  const lcDirty  = maxConc !== currentMaxConcurrent || tradeSize !== currentTradeSize
-  const velDirty = velSize !== currentVelocitySize
-  const dirty    = lcDirty || velDirty
+  const dirty = maxConc !== currentMaxConcurrent || tradeSize !== currentTradeSize
 
   async function apply() {
     setBusy(true)
     setMsg(null)
     try {
       const payload: Record<string, number> = {}
-      if (lcDirty) {
+      if (dirty) {
         payload.monster_max_concurrent    = maxConc
         payload.monster_default_size_sol  = tradeSize
         payload.lifecycle_size_sol        = tradeSize
         payload.creator_alpha_size_sol    = tradeSize
         payload.creator_alpha_max_concurrent = maxConc
-      }
-      if (velDirty) {
-        payload.velocity_size_sol = velSize
       }
       const result = await patchConfig(payload)
       const failed = Object.entries(result).filter(([, v]) => !((v as { ok: boolean }).ok))
@@ -97,7 +86,6 @@ export default function PositionConfigPanel({
   function reset() {
     setMaxConc(currentMaxConcurrent)
     setTradeSize(currentTradeSize)
-    setVelSize(currentVelocitySize)
     setMsg(null)
   }
 
@@ -149,36 +137,9 @@ export default function PositionConfigPanel({
           />
         </div>
 
-        {/* ── VELOCITY section ── */}
-        <div className="rounded-md border border-orange-500/25 p-3 space-y-3"
-             style={{ background: 'rgba(249,115,22,0.04)' }}>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-sm tracking-wide"
-                  style={{ background: 'rgba(249,115,22,0.2)', color: '#fb923c', border: '1px solid rgba(249,115,22,0.5)' }}>
-              ⚡ VELOCITY
-            </span>
-            <span className="text-[10px] text-zinc-500">1h entry · no SL · +200% TP · 1 slot</span>
-          </div>
-          <SizeSlider
-            label="trade size (SOL per position)"
-            value={velSize} onChange={setVelSize} disabled={busy}
-          />
-          <div className="text-[10px] text-zinc-600 italic">
-            Velocity always uses 1 concurrent slot — independent from lifecycle.
-          </div>
-        </div>
-
-        {/* ── Combined wallet usage ── */}
+        {/* ── Wallet usage ── */}
         <div className="bg-zinc-800/40 rounded-md px-3 py-2 text-xs space-y-1">
           <div className="flex justify-between">
-            <span className="text-zinc-400">lifecycle required (×1.5 slippage):</span>
-            <span className="font-mono text-teal-400">{lcRequired.toFixed(3)} SOL</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-400">velocity required (×1.5 slippage):</span>
-            <span className="font-mono text-orange-400">{velRequired.toFixed(3)} SOL</span>
-          </div>
-          <div className="border-t border-zinc-700/50 pt-1 flex justify-between">
             <span className="text-zinc-400">total required:</span>
             <span className={`font-mono font-bold ${overBudget ? 'text-red-400' : 'text-emerald-400'}`}>
               {totalRequired.toFixed(3)} SOL
