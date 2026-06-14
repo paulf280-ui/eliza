@@ -546,13 +546,52 @@ async def open_monster_position(
 
         async def _post_entry_alert():
             try:
-                # Full cabal + deployer analysis (don't block trade execution)
-                cabal_result, _dep = await _asyncio_alert.gather(
+                # Full signal set at entry — cabal + deployer + wash + cohort +
+                # exit-liquidity. Non-blocking (runs after the buy). Stored on the
+                # position so it persists into the closed-trade record → the
+                # signal-vs-PnL proof dataset (Phase 1 dogfooding).
+                from elizaos.plugins.solana.wash_check import get_wash_analysis as _wash
+                from elizaos.plugins.solana.cohort_pnl import get_cohort_pnl as _cohorts
+                from elizaos.plugins.solana.liquidity_check import get_liquidity_sim as _liq
+                cabal_result, _dep, _wash_r, _cohort_r, _liq_r = await _asyncio_alert.gather(
                     _get_cabal(session, mint, time.time()),
                     _get_deployer(session, mint),
+                    _wash(session, mint),
+                    _cohorts(session, mint, time.time()),
+                    _liq(session, mint),
                 )
                 _blend(cabal_result, _dep)  # same score/risk the bubble map shows
                 sym = token_name or mint[:8]
+
+                # Persist the entry signal snapshot onto the position
+                _sni = {c.get("cohort"): c for c in (_cohort_r.get("cohorts") or [])}
+                _sells = _liq_r.get("sells") or []
+                _impact10 = next((s["impact_pct"] for s in _sells if s.get("sol") == 10), None)
+                signals = {
+                    "cabal_score":      cabal_result.get("cabal_score"),
+                    "risk":             cabal_result.get("risk"),
+                    "time_sync":        cabal_result.get("time_sync"),
+                    "coordinated_exit": cabal_result.get("coordinated_exit"),
+                    "deployer_verdict": (_dep or {}).get("verdict"),
+                    "deployer_dead_pct": (_dep or {}).get("dead_pct"),
+                    "wash_score":       _wash_r.get("wash_score"),
+                    "wash_volume_pct":  _wash_r.get("wash_volume_pct"),
+                    "snipers_hold_pct": (_sni.get("Snipers") or {}).get("current_pct_of_buy"),
+                    "insiders_hold_pct": (_sni.get("Insiders") or {}).get("current_pct_of_buy"),
+                    "liquidity_usd":    _liq_r.get("liquidity_usd"),
+                    "exit_impact_10sol_pct": _impact10,
+                    "captured_at":      time.time(),
+                }
+                if mint in _monster_positions:
+                    _monster_positions[mint]["cabal_signals"] = signals
+                    try:
+                        _save_state()
+                    except Exception:
+                        pass
+                print(f"[cabal-signals] {sym}: score={signals['cabal_score']} "
+                      f"wash={signals['wash_score']} dep={signals['deployer_verdict']} "
+                      f"exit10={signals['exit_impact_10sol_pct']}%")
+
                 # Cache for bubble map
                 try:
                     _cache_save_alert(mint, sym, cabal_result, time.time())
@@ -747,6 +786,9 @@ async def open_monster_position(
         "tokens_received_raw": tokens_received_raw,  # 0 in paper; verified >0 in live
         # Cluster/bubble-map data — used by AI brains (Groq/Gemini/Claude) and dashboard
         "cluster_data":     cluster_data,
+        # Full cabal-hunter signal snapshot at entry (filled async by _post_entry_alert).
+        # Flows into the closed-trade record → the signal-vs-PnL proof dataset.
+        "cabal_signals":    {},
         # Lifecycle flags
         "tp1_fired":        False,
         "remaining_fraction": 1.0,

@@ -3241,6 +3241,69 @@ When adjusting a filter, always explain your reasoning based on the data above."
             return web.json_response({"error": "webhook_url must be http(s)"}, status=400)
         return web.json_response(add_watch(mint, webhook))
 
+    async def handle_proof_internal(request: web.Request) -> web.Response:
+        """GET /api/proof/internal — our own bot's closed trades with the
+        cabal-hunter signals captured at entry, correlated against realized PnL.
+        The dogfooding proof: 'tokens we flagged HIGH lost money'."""
+        secret = os.getenv("CABAL_INTERNAL_SECRET", "")
+        peer = request.transport.get_extra_info("peername", ("", 0))[0] if request.transport else ""
+        is_local = peer in ("127.0.0.1", "::1", "localhost")
+        if secret and not is_local and request.headers.get("X-Internal-Secret") != secret:
+            return web.json_response({"error": "unauthorized"}, status=401)
+        import json as _json
+        from pathlib import Path as _P
+        f = _P(__file__).parent / "monster_closed_trades.json"
+        try:
+            trades = _json.loads(f.read_text()) if f.exists() else []
+        except Exception:
+            trades = []
+        with_sig = [t for t in trades if (t.get("cabal_signals") or {}).get("cabal_score") is not None]
+
+        def _bucket_avg(key, buckets):
+            out = []
+            for label, lo, hi in buckets:
+                grp = [t for t in with_sig
+                       if lo <= float((t.get("cabal_signals") or {}).get(key) or 0) < hi]
+                if grp:
+                    avg = sum(float(t.get("final_pnl_pct") or 0) for t in grp) / len(grp)
+                    wins = sum(1 for t in grp if float(t.get("final_pnl_pct") or 0) > 0)
+                    out.append({"label": label, "trades": len(grp),
+                                "avg_pnl_pct": round(avg, 1),
+                                "win_rate": round(wins / len(grp) * 100)})
+            return out
+
+        def _verdict_avg():
+            out = {}
+            for t in with_sig:
+                v = (t.get("cabal_signals") or {}).get("deployer_verdict") or "UNKNOWN"
+                out.setdefault(v, []).append(float(t.get("final_pnl_pct") or 0))
+            return [{"verdict": k, "trades": len(v), "avg_pnl_pct": round(sum(v)/len(v), 1),
+                     "win_rate": round(sum(1 for x in v if x > 0)/len(v)*100)}
+                    for k, v in sorted(out.items(), key=lambda kv: -len(kv[1]))]
+
+        recent = [{
+            "token": t.get("token_name") or t.get("mint", "")[:8],
+            "mint": t.get("mint"),
+            "pnl_pct": round(float(t.get("final_pnl_pct") or 0), 1),
+            "pnl_sol": round(float(t.get("final_pnl_sol") or 0), 4),
+            "cabal_score": (t.get("cabal_signals") or {}).get("cabal_score"),
+            "wash_score": (t.get("cabal_signals") or {}).get("wash_score"),
+            "deployer_verdict": (t.get("cabal_signals") or {}).get("deployer_verdict"),
+            "exit_impact_10sol_pct": (t.get("cabal_signals") or {}).get("exit_impact_10sol_pct"),
+            "close_ts": t.get("close_ts"),
+        } for t in sorted(with_sig, key=lambda t: -(t.get("close_ts") or 0))[:40]]
+
+        return web.json_response({
+            "trades_with_signals": len(with_sig),
+            "total_closed": len(trades),
+            "by_cabal_score": _bucket_avg("cabal_score", [("Low (0-35)", 0, 35), ("Caution (35-65)", 35, 65), ("High (65+)", 65, 101)]),
+            "by_wash_score":  _bucket_avg("wash_score",  [("Clean (0-25)", 0, 25), ("Some (25-50)", 25, 50), ("Heavy (50+)", 50, 101)]),
+            "by_deployer":    _verdict_avg(),
+            "recent":         recent,
+        })
+
+    app.router.add_get("/api/proof/internal", handle_proof_internal)
+
     app.router.add_route("GET", "/api/watch/internal", handle_watch_internal)
     app.router.add_route("POST", "/api/watch/internal", handle_watch_internal)
     app.router.add_route("DELETE", "/api/watch/internal", handle_watch_internal)

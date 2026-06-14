@@ -532,6 +532,35 @@ export function createApp(): express.Application {
     res.json(getPnlStats())
   })
 
+  // ── Dogfooding proof: our own bot's trades vs the cabal signals at entry ─────
+  app.get("/admin/proof", async (req, res) => {
+    const secret = process.env.CABAL_INTERNAL_SECRET ?? ""
+    const key = req.query.key as string ?? ""
+    if (secret && key !== secret) { res.status(401).send("<h1>Unauthorized</h1>"); return }
+    let d: any = {}
+    try {
+      const botUrl = process.env.BOT_INTERNAL_URL ?? "http://127.0.0.1:3001"
+      const r = await fetch(`${botUrl}/api/proof/internal`, { headers: secret ? { "X-Internal-Secret": secret } : {} })
+      d = await r.json()
+    } catch { d = { error: "bot unreachable" } }
+    const col = (v: number) => v > 0 ? "#10b981" : v < 0 ? "#ff4d6d" : "#94a3b8"
+    const bucketRows = (arr: any[], k: string) => (arr || []).map(b =>
+      `<tr><td style="padding:8px">${b[k]}</td><td style="padding:8px">${b.trades}</td><td style="padding:8px;color:${col(b.avg_pnl_pct)};font-weight:700">${b.avg_pnl_pct > 0 ? "+" : ""}${b.avg_pnl_pct}%</td><td style="padding:8px">${b.win_rate}%</td></tr>`).join("")
+    const recentRows = (d.recent || []).map((t: any) =>
+      `<tr><td style="padding:8px"><a href="/map?mint=${t.mint}" target="_blank" style="color:#a78bfa;text-decoration:none">${t.token}</a></td><td style="padding:8px;color:${col(t.pnl_pct)};font-weight:700">${t.pnl_pct > 0 ? "+" : ""}${t.pnl_pct}%</td><td style="padding:8px">${t.cabal_score ?? "–"}</td><td style="padding:8px">${t.wash_score ?? "–"}</td><td style="padding:8px;font-size:11px">${t.deployer_verdict ?? "–"}</td><td style="padding:8px">${t.exit_impact_10sol_pct ?? "–"}%</td></tr>`).join("")
+    res.setHeader("Content-Type", "text/html")
+    res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cabal-Hunter — Live Proof</title>
+<style>body{background:#07080f;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;padding:28px;max-width:920px;margin:0 auto}h1{font-size:22px}.sub{color:#64748b;font-size:12px;margin-bottom:24px}h2{font-size:13px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin:26px 0 8px}table{width:100%;border-collapse:collapse;font-size:13px;background:#0d0f1e;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow:hidden}th{text-align:left;padding:8px;color:#64748b;font-size:11px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.08)}tr td{border-bottom:1px solid rgba(255,255,255,.04)}</style></head>
+<body><h1>Cabal-Hunter runs our own bot 🤖</h1>
+<div class="sub">Every entry, the bot records the cabal-hunter signals, then we measure the realized P&L. ${d.trades_with_signals ?? 0} trades with signals · ${d.total_closed ?? 0} total closed.</div>
+${(d.trades_with_signals ?? 0) === 0 ? `<p style="color:#94a3b8">Dataset is building — signals are captured from the next trade onward. Check back after a few trades.</p>` : `
+<h2>Avg P&L by cabal score</h2><table><tr><th>Cabal score</th><th>Trades</th><th>Avg P&L</th><th>Win rate</th></tr>${bucketRows(d.by_cabal_score, "label")}</table>
+<h2>Avg P&L by wash-trading score</h2><table><tr><th>Volume</th><th>Trades</th><th>Avg P&L</th><th>Win rate</th></tr>${bucketRows(d.by_wash_score, "label")}</table>
+<h2>Avg P&L by deployer verdict</h2><table><tr><th>Deployer</th><th>Trades</th><th>Avg P&L</th><th>Win rate</th></tr>${bucketRows(d.by_deployer, "verdict")}</table>
+<h2>Recent trades</h2><table><tr><th>Token</th><th>P&L</th><th>Cabal</th><th>Wash</th><th>Deployer</th><th>Exit impact (10 SOL)</th></tr>${recentRows}</table>`}
+</body></html>`)
+  })
+
   // ── Site analytics (JSON + dashboard) ────────────────────────────────────────
   app.get("/admin/analytics", (req, res) => {
     const secret = process.env.CABAL_INTERNAL_SECRET ?? ""
