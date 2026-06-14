@@ -35,13 +35,21 @@ export function createApp(): express.Application {
   app.use(cors({ origin: "*", methods: ["GET", "POST", "OPTIONS"] }))
   app.use(express.json({ limit: "512kb" }))
 
+  // ── Outbound-click beacon (which external tools / links visitors jump to) ────
+  app.get("/click", (req, res) => {
+    const to = (req.query.to as string ?? "").slice(0, 40).replace(/[^a-zA-Z0-9_-]/g, "")
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || ""
+    if (to) recordVisit({ category: "click", mint: to, ip, referer: req.headers["referer"] as string })
+    res.status(204).end()
+  })
+
   // ── Visit analytics (Cloudflare can't see us — we're DNS-only) ───────────────
   app.use((req, _res, next) => {
     try {
       const p = req.path
       // Don't log admin, health, static, or internal-noise paths
       if (p.startsWith("/admin") || p === "/health" || p.startsWith("/public") ||
-          p === "/favicon.ico" || p.startsWith("/.well-known")) return next()
+          p === "/favicon.ico" || p.startsWith("/.well-known") || p === "/click") return next()
       let category = "other"
       let mint: string | undefined
       if (p === "/" || p === "/demo" || p === "/compare") category = "landing"
@@ -549,6 +557,9 @@ export function createApp(): express.Application {
 <body><h1>Cabal-Hunter — Traffic</h1><div class="sub">Server-side · counts every visit (Cloudflare can't see us — DNS-only)</div>
 <div class="grid">${card("Total Visits",t.visits,"#e2e8f0")}${card("Unique Visitors",t.unique_visitors,"#10b981")}${card("Map Views",t.map_views,"#7c3aed")}${card("API Calls",t.api_calls,"#0ea5e9")}</div>
 <div class="grid">${card("Today Visits",td.visits,"#e2e8f0")}${card("Today Unique",td.unique_visitors,"#10b981")}${card("Landing Views",t.landing_views,"#f59e0b")}${card("Tokens Searched",(a.top_mints||[]).length,"#ec4899")}</div>
+<div style="font-size:11px;color:#475569;margin-bottom:20px">Note: "total visits" includes automated scanner noise. The real human signal is <b>Landing + Map Views</b> and <b>Unique Visitors</b>.</div>
+<h2>Top countries (real visitors)</h2>${rows(a.top_countries,["Country","Visitors","Hits"],["country","visitors","hits"])}
+<h2>Outbound clicks (where they go next)</h2>${rows(a.outbound_clicks,["Target","Clicks"],["target","n"])}
 <h2>Most-searched tokens</h2>${rows(a.top_mints,["Mint","Searches","Unique"],["mint","n","u"])}
 <h2>Where visitors come from (referrers)</h2>${rows(a.top_referers,["Referrer","Hits"],["referer","n"])}
 <h2>Last 30 days</h2>${rows(a.by_day,["Day","Visits","Unique"],["day","visits","uniques"])}

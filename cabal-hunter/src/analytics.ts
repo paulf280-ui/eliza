@@ -27,6 +27,8 @@ function db(): ReturnType<typeof Database> | null {
       ts INTEGER, day TEXT, category TEXT, mint TEXT, ip_hash TEXT, referer TEXT
     )`)
     _db.exec(`CREATE INDEX IF NOT EXISTS idx_visits_day ON visits(day)`)
+    // Additive migration — country code (privacy-safe: derived from IP, raw IP discarded)
+    try { _db.exec(`ALTER TABLE visits ADD COLUMN country TEXT`) } catch { /* exists */ }
     return _db
   } catch {
     return null
@@ -37,6 +39,33 @@ function hashIp(ip: string): string {
   return crypto.createHash("sha256").update(SALT + ip).digest("hex").slice(0, 16)
 }
 
+// ── Privacy-safe country geo ──────────────────────────────────────────────────
+// Resolve the visitor's COUNTRY (not city/IP) once per IP, cache it, store only
+// the 2-letter code. Raw IPs are never stored. Uses the free ip-api.com endpoint.
+const _countryCache = new Map<string, string>()
+const _countryPending = new Set<string>()
+
+function isPublicIp(ip: string): boolean {
+  return !!ip && !ip.startsWith("10.") && !ip.startsWith("192.168.") &&
+    !ip.startsWith("127.") && !ip.startsWith("172.1") && ip !== "::1" && !ip.startsWith("::ffff:127")
+}
+
+function countryFor(ip: string): string | null {
+  if (!isPublicIp(ip)) return "LO"
+  const hit = _countryCache.get(ip)
+  if (hit) return hit
+  if (!_countryPending.has(ip)) {
+    _countryPending.add(ip)
+    // fire-and-forget; the next request from this IP will carry the code
+    fetch(`http://ip-api.com/json/${ip}?fields=status,countryCode`)
+      .then(r => r.json())
+      .then((d: any) => { if (d?.status === "success" && d.countryCode) _countryCache.set(ip, d.countryCode) })
+      .catch(() => {})
+      .finally(() => _countryPending.delete(ip))
+  }
+  return null
+}
+
 export function recordVisit(opts: {
   category: string; mint?: string; ip?: string; referer?: string
 }): void {
@@ -45,14 +74,15 @@ export function recordVisit(opts: {
   try {
     const now = Date.now()
     d.prepare(
-      "INSERT INTO visits (ts, day, category, mint, ip_hash, referer) VALUES (?,?,?,?,?,?)"
+      "INSERT INTO visits (ts, day, category, mint, ip_hash, referer, country) VALUES (?,?,?,?,?,?,?)"
     ).run(
       now,
       new Date(now).toISOString().slice(0, 10),
       opts.category,
       opts.mint ?? null,
       opts.ip ? hashIp(opts.ip) : null,
-      (opts.referer ?? "").slice(0, 200) || null
+      (opts.referer ?? "").slice(0, 200) || null,
+      opts.ip ? countryFor(opts.ip) : null
     )
   } catch { /* analytics must never break a request */ }
 }
@@ -78,7 +108,10 @@ export function getAnalytics(): Record<string, unknown> {
     },
     by_day:       q("SELECT day, COUNT(*) visits, COUNT(DISTINCT ip_hash) uniques FROM visits WHERE day>=? GROUP BY day ORDER BY day DESC", since30),
     by_category:  q("SELECT category, COUNT(*) n FROM visits GROUP BY category ORDER BY n DESC"),
-    top_mints:    q("SELECT mint, COUNT(*) n, COUNT(DISTINCT ip_hash) u FROM visits WHERE mint IS NOT NULL GROUP BY mint ORDER BY n DESC LIMIT 20"),
+    // Countries of REAL visitors (landing/map only — exclude scanner noise & null)
+    top_countries: q("SELECT country, COUNT(DISTINCT ip_hash) visitors, COUNT(*) hits FROM visits WHERE country IS NOT NULL AND country!='LO' AND category IN ('landing','map') GROUP BY country ORDER BY visitors DESC LIMIT 20"),
+    top_mints:    q("SELECT mint, COUNT(*) n, COUNT(DISTINCT ip_hash) u FROM visits WHERE mint IS NOT NULL AND mint!='' AND category!='click' GROUP BY mint ORDER BY n DESC LIMIT 20"),
+    outbound_clicks: q("SELECT mint AS target, COUNT(*) n FROM visits WHERE category='click' GROUP BY mint ORDER BY n DESC LIMIT 12"),
     top_referers: q("SELECT referer, COUNT(*) n FROM visits WHERE referer IS NOT NULL AND referer!='' AND referer NOT LIKE '%cabal-hunter.com%' GROUP BY referer ORDER BY n DESC LIMIT 15"),
   }
 }

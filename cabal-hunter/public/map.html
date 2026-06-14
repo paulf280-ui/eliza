@@ -495,6 +495,12 @@ function render(data) {
   document.getElementById('ds-link').href    = `https://dexscreener.com/solana/${MINT}`;
   document.getElementById('chart-links').style.display = '';
 
+  // Outbound-click beacons — see where visitors go next (non-blocking)
+  const beacon = (to) => { try { navigator.sendBeacon(`/click?to=${to}`); } catch {} };
+  document.getElementById('axiom-link').addEventListener('click', () => beacon('axiom'));
+  document.getElementById('gmgn-link').addEventListener('click', () => beacon('gmgn'));
+  document.getElementById('ds-link').addEventListener('click', () => beacon('dexscreener'));
+
   // Fetch LP status from DexScreener (non-blocking)
   fetchLpStatus(MINT);
 
