@@ -2572,10 +2572,37 @@ async def lifecycle_scout_loop(runtime: Any,
                     if not (LIFECYCLE_BUY_RATIO_MIN <= br <= LIFECYCLE_BUY_RATIO_MAX):
                         cycle_rejects["buy_ratio"] += 1
                         continue
+
+                    # ── Cabal-Hunter clearance (dogfooding) ──────────────────────
+                    # If our own tool clears the token (no coordinated cabal, no
+                    # serial-rugger dev, not actively dumping), the RUG question is
+                    # answered — so we relax the rug-PROXY gates below (socials,
+                    # holders, velocity, zombie, rugcheck) and enter earlier on the
+                    # first confirmed quiet-accumulation. Concentration (top1/top10),
+                    # timing (exhausted-mover), and reputation gates still apply.
+                    # The cabal result is cache-first so this is cheap.
+                    _cabal_clean = False
+                    try:
+                        from elizaos.plugins.solana.cluster_check import get_cluster_map as _gcm_lc
+                        from elizaos.plugins.solana.deployer_check import get_deployer_report as _gdr_lc
+                        _cab_ts = float(p.get("pairCreatedAt") or 0) / 1000 or time.time()
+                        _cab_lc = await _gcm_lc(session, mint, _cab_ts)
+                        _dep_lc = await _gdr_lc(session, mint)
+                        _cabal_clean = (
+                            _cab_lc.get("risk") != "HIGH"
+                            and not _cab_lc.get("coordinated_exit")
+                            and (_dep_lc or {}).get("verdict") not in ("SERIAL_RUGGER", "POOR_TRACK_RECORD")
+                        )
+                        if _cabal_clean:
+                            print(f"[monster-lifecycle] 🟢 {mint[:8]} cabal-CLEAN — relaxing rug-proxy gates, earlier entry")
+                    except Exception as _cc_err:
+                        print(f"[monster-lifecycle] cabal-clean check error: {_cc_err} — strict path")
+                        _cabal_clean = False
+
                     base_info = (p.get("info") or {})
                     socials = base_info.get("socials") or []
                     websites = base_info.get("websites") or []
-                    if not socials and not websites:
+                    if not _cabal_clean and not socials and not websites:
                         cycle_rejects["no_socials"] += 1
                         continue
 
@@ -2586,14 +2613,14 @@ async def lifecycle_scout_loop(runtime: Any,
                         _lc_holders = int(base_info.get("holders")) if base_info.get("holders") is not None else None
                     except (ValueError, TypeError):
                         _lc_holders = None
-                    if _lc_holders is not None and _lc_holders < MONSTER_MIN_UNIQUE_HOLDERS:
+                    if not _cabal_clean and _lc_holders is not None and _lc_holders < MONSTER_MIN_UNIQUE_HOLDERS:
                         cycle_rejects["holders"] += 1
                         continue
 
                     # Buy velocity — recent 1h vs prior 5h average. Skip
                     # decelerating tokens (entering as momentum dies).
                     _lc_velocity = _buy_velocity_ratio(p)
-                    if _lc_velocity is not None and _lc_velocity < MONSTER_BUY_VELOCITY_MIN_RATIO:
+                    if not _cabal_clean and _lc_velocity is not None and _lc_velocity < MONSTER_BUY_VELOCITY_MIN_RATIO:
                         cycle_rejects["velocity"] += 1
                         continue
 
@@ -2635,7 +2662,7 @@ async def lifecycle_scout_loop(runtime: Any,
                     # DEX. Gap reveals classic P&D on dormant/dead tokens.
                     # Only runs for tokens that cleared all other gates to
                     # minimise extra DexScreener calls. Fails open on API error.
-                    if not priority_rec:  # creator-alpha fast-path skips this
+                    if not priority_rec and not _cabal_clean:  # creator-alpha + cabal-clean skip this
                         if await _is_zombie_token(session, mint):
                             cycle_rejects["zombie"] = cycle_rejects.get("zombie", 0) + 1
                             _lifecycle_deferred.pop(mint, None)
@@ -2674,14 +2701,15 @@ async def lifecycle_scout_loop(runtime: Any,
                     # Rugcheck safety gate — catches unlocked LP, bundled/concentrated
                     # ownership that made it past our top-10 check, and other
                     # structural red flags. Same gate breakout scout uses.
-                    try:
-                        from elizaos.plugins.solana.axiom_copy_trader import _quick_safety_check
-                        _rc_safe, _rc_reason = await _quick_safety_check(mint, session)
-                        if not _rc_safe:
-                            print(f"[monster-lifecycle] 🛡 rugcheck block {mint[:8]}: {_rc_reason}")
-                            continue
-                    except Exception as _rc_err:
-                        print(f"[monster-lifecycle] rugcheck import error: {_rc_err} — allowing")
+                    if not _cabal_clean:
+                        try:
+                            from elizaos.plugins.solana.axiom_copy_trader import _quick_safety_check
+                            _rc_safe, _rc_reason = await _quick_safety_check(mint, session)
+                            if not _rc_safe:
+                                print(f"[monster-lifecycle] 🛡 rugcheck block {mint[:8]}: {_rc_reason}")
+                                continue
+                        except Exception as _rc_err:
+                            print(f"[monster-lifecycle] rugcheck import error: {_rc_err} — allowing")
 
                     _mark_signalled(mint)
                     if priority_rec:
@@ -2790,6 +2818,7 @@ async def lifecycle_scout_loop(runtime: Any,
                                   "buy_velocity_ratio": _lc_velocity,
                                   "creator": _creator,
                                   "creator_tier": _creator_tier,
+                                  "cabal_clean_fast": _cabal_clean,
                                   "smart_money_overlap": await _try_smart_money_overlap(session, mint)},
                         cluster_data=_lc_entry.get("cluster"),
                     )

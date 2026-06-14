@@ -3290,8 +3290,19 @@ When adjusting a filter, always explain your reasoning based on the data above."
             "wash_score": (t.get("cabal_signals") or {}).get("wash_score"),
             "deployer_verdict": (t.get("cabal_signals") or {}).get("deployer_verdict"),
             "exit_impact_10sol_pct": (t.get("cabal_signals") or {}).get("exit_impact_10sol_pct"),
+            "cabal_clean_fast": (t.get("metadata") or {}).get("cabal_clean_fast"),
             "close_ts": t.get("close_ts"),
         } for t in sorted(with_sig, key=lambda t: -(t.get("close_ts") or 0))[:40]]
+
+        # Early-entry (cabal-clean fast path) vs normal — does entering earlier help?
+        fast = [t for t in trades if (t.get("metadata") or {}).get("cabal_clean_fast")]
+        norm = [t for t in trades if (t.get("metadata") or {}).get("cabal_clean_fast") is False]
+        def _avg(g):
+            return round(sum(float(t.get("final_pnl_pct") or 0) for t in g) / len(g), 1) if g else None
+        fast_vs_normal = {
+            "fast_trades": len(fast), "fast_avg_pnl": _avg(fast),
+            "normal_trades": len(norm), "normal_avg_pnl": _avg(norm),
+        }
 
         # Blocks ("saves") — tokens the cabal gate stopped us buying
         bf = _P(__file__).parent / "blocked_tokens.json"
@@ -3332,6 +3343,7 @@ When adjusting a filter, always explain your reasoning based on the data above."
             "blocks_rugged":  rugged,
             "blocks":         blocks_recent,
             "deployer_index": idx,
+            "fast_vs_normal": fast_vs_normal,
         })
 
     app.router.add_get("/api/proof/internal", handle_proof_internal)
