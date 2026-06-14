@@ -3304,6 +3304,26 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
     app.router.add_get("/api/proof/internal", handle_proof_internal)
 
+    async def handle_dump_exit(request: web.Request) -> web.Response:
+        """POST /api/dump-exit/internal — our own dump webhook fires here when a
+        coordinated dump hits a token the bot holds → queue an immediate exit."""
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        mint = (body.get("mint") or "").strip()
+        reason = body.get("reason") or body.get("event") or "dump"
+        if not mint:
+            return web.json_response({"error": "mint required"}, status=400)
+        try:
+            from elizaos.plugins.solana.strategy_e_monster import request_force_exit
+            queued = request_force_exit(mint, f"webhook:{reason}")
+            return web.json_response({"queued": queued, "mint": mint})
+        except Exception as exc:
+            return web.json_response({"error": str(exc)}, status=500)
+
+    app.router.add_post("/api/dump-exit/internal", handle_dump_exit)
+
     app.router.add_route("GET", "/api/watch/internal", handle_watch_internal)
     app.router.add_route("POST", "/api/watch/internal", handle_watch_internal)
     app.router.add_route("DELETE", "/api/watch/internal", handle_watch_internal)

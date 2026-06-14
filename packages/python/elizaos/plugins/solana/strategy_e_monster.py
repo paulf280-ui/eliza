@@ -146,6 +146,20 @@ MONSTER_CLOSED_TRADES_FILE = _BASE / "monster_closed_trades.json"
 _monster_positions: dict[str, dict] = {}
 _monster_closed: list[dict] = []
 
+# Phase 2b: emergency exits requested by the cabal-hunter dump webhook. The
+# monitor loop drains this each cycle and sells the position at full size.
+_force_exit_requests: dict[str, str] = {}   # mint → reason
+
+
+def request_force_exit(mint: str, reason: str = "cabal_dump") -> bool:
+    """Queue an immediate full exit of a held monster position (called by the
+    dump-webhook handler). The monitor loop performs the actual sell."""
+    if mint in _monster_positions:
+        _force_exit_requests[mint] = reason
+        print(f"[monster] 🚨 force-exit queued for {mint[:8]} — {reason}")
+        return True
+    return False
+
 # Per-mint AI cascade + price-snapshot feed for monster positions, so the 3-brain
 # stack (Groq 30s / Gemini 2min / Opus 3min + emergency) rates every open monster
 # trade on the same cadence copy-trade uses. Built lazily on first tick; torn
@@ -529,6 +543,23 @@ async def open_monster_position(
               f"{hrs:.1f}h ago — loser cooldown active, skip")
         return False
 
+    # ── Cabal-Hunter entry gate (Phase 2a — eat our own dogfood) ─────────────
+    # Block on the strongest, fastest signals: a serial-rugger deployer or a
+    # confirmed coordinated cabal controlling supply. Results are cached so the
+    # async signal-logging below reuses them at no extra RPC cost. Gate can be
+    # disabled via live_config cabal_gate_enabled=false.
+    try:
+        from elizaos.plugins.solana import live_config as _lc_gate2
+        if bool(_lc_gate2.get("cabal_gate_enabled", True)):
+            from elizaos.plugins.solana.deployer_check import get_deployer_report as _gdr
+            _gate_dep = await _gdr(session, mint)
+            if (_gate_dep or {}).get("verdict") == "SERIAL_RUGGER":
+                print(f"[monster] ⛔ CABAL GATE: {token_name} ({mint[:8]}) deployer is SERIAL_RUGGER "
+                      f"({_gate_dep.get('dead')}/{_gate_dep.get('sampled')} past launches dead) — skip")
+                return False
+    except Exception as _cg_err:
+        print(f"[cabal-gate] entry-check failure (non-fatal): {_cg_err}")
+
     mode = "PAPER" if MONSTER_PAPER_ONLY else "LIVE"
     print(f"[monster] 🎯 OPENING ({mode}) {token_name} ({mint[:8]}) {sol_size:.3f} SOL — src={signal_source}")
 
@@ -803,6 +834,14 @@ async def open_monster_position(
     }
     _save_state()
     print(f"[monster] ✅ entered {token_name} sig={buy_sig[:16] if buy_sig else 'none'}... price={entry_price}")
+
+    # Phase 2b: subscribe this position to our own dump-webhook so a coordinated
+    # dump auto-exits it (dogfooding the public /api/watch feature on ourselves).
+    try:
+        from elizaos.plugins.solana.dump_monitor import add_watch as _add_watch
+        _add_watch(mint, "http://127.0.0.1:3001/api/dump-exit/internal")
+    except Exception:
+        pass
 
     # ── Telegram buy alert ──
     try:
@@ -1456,6 +1495,13 @@ async def _apply_exit(mint: str, reason: str, sell_fraction: float, runtime: Any
         # Drop any AI cascade / price feed we built for this mint.
         _monster_cascades.pop(mint, None)
         _monster_feeds.pop(mint, None)
+        _force_exit_requests.pop(mint, None)
+        # Stop watching this mint for dumps now that we're out (Phase 2b)
+        try:
+            from elizaos.plugins.solana.dump_monitor import remove_watch as _rm_watch
+            _rm_watch(mint, "http://127.0.0.1:3001/api/dump-exit/internal")
+        except Exception:
+            pass
         # Release holder-flow snapshots for this mint.
         try:
             from elizaos.plugins.solana.holder_guard import flow as _hg_flow
@@ -1600,6 +1646,19 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
             for mint in list(_monster_positions.keys()):
                 pos = _monster_positions.get(mint)
                 if not pos:
+                    continue
+
+                # ── Cabal-Hunter dump webhook force-exit (Phase 2b) ───────────
+                # The dump monitor detected a coordinated dump / liquidity drain
+                # on a token we hold and fired our webhook → exit NOW at full size.
+                _fx_reason = _force_exit_requests.pop(mint, None)
+                if _fx_reason:
+                    try:
+                        _fx_px = float(pos.get("entry_price") or 0.0)
+                        print(f"[monster] 🚨 CABAL DUMP EXIT {mint[:8]} — {_fx_reason}")
+                        await _apply_exit(mint, f"cabal_dump:{_fx_reason}", 1.0, runtime, _fx_px)
+                    except Exception as _fx_err:
+                        print(f"[monster] force-exit failed for {mint[:8]}: {_fx_err}")
                     continue
 
                 # ── Ghost-position detector ───────────────────────────────
