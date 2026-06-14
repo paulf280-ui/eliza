@@ -36,12 +36,15 @@ export function createApp(): express.Application {
   app.use(express.json({ limit: "512kb" }))
 
   // ── Outbound-click beacon (which external tools / links visitors jump to) ────
-  app.get("/click", (req, res) => {
+  // navigator.sendBeacon() always POSTs, so accept both GET and POST.
+  const clickHandler = (req: Request, res: Response) => {
     const to = (req.query.to as string ?? "").slice(0, 40).replace(/[^a-zA-Z0-9_-]/g, "")
     const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || ""
     if (to) recordVisit({ category: "click", mint: to, ip, referer: req.headers["referer"] as string })
     res.status(204).end()
-  })
+  }
+  app.get("/click", clickHandler)
+  app.post("/click", clickHandler)
 
   // ── Visit analytics (Cloudflare can't see us — we're DNS-only) ───────────────
   app.use((req, _res, next) => {
