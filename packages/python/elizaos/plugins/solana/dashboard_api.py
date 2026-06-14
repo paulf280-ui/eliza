@@ -3293,6 +3293,30 @@ When adjusting a filter, always explain your reasoning based on the data above."
             "close_ts": t.get("close_ts"),
         } for t in sorted(with_sig, key=lambda t: -(t.get("close_ts") or 0))[:40]]
 
+        # Blocks ("saves") — tokens the cabal gate stopped us buying
+        bf = _P(__file__).parent / "blocked_tokens.json"
+        try:
+            blocks = _json.loads(bf.read_text()) if bf.exists() else []
+        except Exception:
+            blocks = []
+        blocks_recent = [{
+            "token": b.get("token_name") or b.get("mint", "")[:8],
+            "mint": b.get("mint"),
+            "reason": b.get("reason"),
+            "deployer_verdict": b.get("deployer_verdict"),
+            "deployer_dead": b.get("deployer_dead"),
+            "deployer_sampled": b.get("deployer_sampled"),
+            "blocked_at": b.get("blocked_at"),
+            "outcome": b.get("outcome"),
+        } for b in sorted(blocks, key=lambda b: -(b.get("blocked_at") or 0))[:30]]
+
+        # Deployer-DNA index stats
+        try:
+            from elizaos.plugins.solana import deployer_index as _di
+            idx = _di.stats()
+        except Exception:
+            idx = {}
+
         return web.json_response({
             "trades_with_signals": len(with_sig),
             "total_closed": len(trades),
@@ -3300,6 +3324,9 @@ When adjusting a filter, always explain your reasoning based on the data above."
             "by_wash_score":  _bucket_avg("wash_score",  [("Clean (0-25)", 0, 25), ("Some (25-50)", 25, 50), ("Heavy (50+)", 50, 101)]),
             "by_deployer":    _verdict_avg(),
             "recent":         recent,
+            "blocks_total":   len(blocks),
+            "blocks":         blocks_recent,
+            "deployer_index": idx,
         })
 
     app.router.add_get("/api/proof/internal", handle_proof_internal)

@@ -160,6 +160,36 @@ def request_force_exit(mint: str, reason: str = "cabal_dump") -> bool:
         return True
     return False
 
+
+# Use-case recording: tokens the cabal gate BLOCKED us from buying ("saves").
+# These are sales gold — "our tool blocked this; here's what happened to it."
+_BLOCKED_FILE = _BASE / "blocked_tokens.json"
+
+
+def _record_block(mint: str, token_name: str, reason: str, deployer: dict | None) -> None:
+    try:
+        import json as _j
+        log = []
+        if _BLOCKED_FILE.exists():
+            try:
+                log = _j.loads(_BLOCKED_FILE.read_text())
+            except Exception:
+                log = []
+        log.append({
+            "mint": mint, "token_name": token_name, "reason": reason,
+            "blocked_at": time.time(),
+            "deployer_verdict": (deployer or {}).get("verdict"),
+            "deployer_dead": (deployer or {}).get("dead"),
+            "deployer_sampled": (deployer or {}).get("sampled"),
+            "deployer_launched": (deployer or {}).get("tokens_launched"),
+            # outcome fields filled later by the follow-up checker
+            "outcome": None, "outcome_checked_at": None,
+        })
+        _BLOCKED_FILE.write_text(_j.dumps(log[-500:], indent=2))
+        print(f"[cabal-gate] recorded block: {token_name} ({reason})")
+    except Exception:
+        pass
+
 # Per-mint AI cascade + price-snapshot feed for monster positions, so the 3-brain
 # stack (Groq 30s / Gemini 2min / Opus 3min + emergency) rates every open monster
 # trade on the same cadence copy-trade uses. Built lazily on first tick; torn
@@ -556,6 +586,7 @@ async def open_monster_position(
             if (_gate_dep or {}).get("verdict") == "SERIAL_RUGGER":
                 print(f"[monster] ⛔ CABAL GATE: {token_name} ({mint[:8]}) deployer is SERIAL_RUGGER "
                       f"({_gate_dep.get('dead')}/{_gate_dep.get('sampled')} past launches dead) — skip")
+                _record_block(mint, token_name, "deployer_serial_rugger", _gate_dep)
                 return False
     except Exception as _cg_err:
         print(f"[cabal-gate] entry-check failure (non-fatal): {_cg_err}")

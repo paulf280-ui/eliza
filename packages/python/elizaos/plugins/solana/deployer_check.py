@@ -306,6 +306,22 @@ async def get_deployer_report(session: aiohttp.ClientSession, mint: str) -> dict
         if cached and time.time() - cached[0] < _REP_TTL:
             return cached[1]
 
+        # Persistent deployer-DNA index: if this creator is already known (and
+        # recently scored), reuse it — instant flag, no re-fetch, and it means a
+        # brand-new token from a known rugger is caught before it has holders.
+        try:
+            from elizaos.plugins.solana import deployer_index as _di
+            _known = _di.get_deployer(creator)
+            if _known and _known.get("verdict") and time.time() - (_known.get("last_seen") or 0) < 6 * 3600:
+                _r = {"creator": creator, "creator_short": _known["creator_short"],
+                      "tokens_launched": _known["tokens_launched"], "dead": _known["dead"],
+                      "sampled": _known["sampled"], "dead_pct": _known["dead_pct"],
+                      "verdict": _known["verdict"], "from_index": True}
+                _rep_cache[creator] = (time.time(), _r)
+                return _r
+        except Exception:
+            pass
+
         launches = await _launch_history(session, creator)
         if launches:
             launched = len(launches)
@@ -327,6 +343,12 @@ async def get_deployer_report(session: aiohttp.ClientSession, mint: str) -> dict
             "verdict":         verdict,
         }
         _rep_cache[creator] = (time.time(), report)
+        # Accumulate into the persistent deployer-DNA index (best-effort)
+        try:
+            from elizaos.plugins.solana import deployer_index as _di
+            _di.save_deployer(report, mint)
+        except Exception:
+            pass
         return report
     except Exception:
         return empty

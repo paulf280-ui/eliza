@@ -552,12 +552,18 @@ export function createApp(): express.Application {
     res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cabal-Hunter — Live Proof</title>
 <style>body{background:#07080f;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;padding:28px;max-width:920px;margin:0 auto}h1{font-size:22px}.sub{color:#64748b;font-size:12px;margin-bottom:24px}h2{font-size:13px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin:26px 0 8px}table{width:100%;border-collapse:collapse;font-size:13px;background:#0d0f1e;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow:hidden}th{text-align:left;padding:8px;color:#64748b;font-size:11px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.08)}tr td{border-bottom:1px solid rgba(255,255,255,.04)}</style></head>
 <body><h1>Cabal-Hunter runs our own bot 🤖</h1>
-<div class="sub">Every entry, the bot records the cabal-hunter signals, then we measure the realized P&L. ${d.trades_with_signals ?? 0} trades with signals · ${d.total_closed ?? 0} total closed.</div>
+<div class="sub">Every entry, the bot records the cabal-hunter signals, then we measure the realized P&L. ${d.trades_with_signals ?? 0} trades with signals · ${d.total_closed ?? 0} total closed · ${d.blocks_total ?? 0} bad tokens blocked.</div>
+${(() => { const ix = d.deployer_index || {}; return ix.deployers_indexed ? `<div style="display:flex;gap:14px;margin-bottom:20px;flex-wrap:wrap">
+  <div style="background:#0d0f1e;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px 18px"><div style="font-size:11px;color:#64748b">DEPLOYERS INDEXED</div><div style="font-size:24px;font-weight:800">${ix.deployers_indexed}</div></div>
+  <div style="background:#0d0f1e;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px 18px"><div style="font-size:11px;color:#64748b">SERIAL RUGGERS</div><div style="font-size:24px;font-weight:800;color:#ff4d6d">${ix.serial_ruggers ?? 0}</div></div>
+  <div style="background:#0d0f1e;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px 18px"><div style="font-size:11px;color:#64748b">10+ LAUNCH DEVS</div><div style="font-size:24px;font-weight:800;color:#f59e0b">${ix.prolific_10plus ?? 0}</div></div>
+</div>` : "" })()}
 ${(d.trades_with_signals ?? 0) === 0 ? `<p style="color:#94a3b8">Dataset is building — signals are captured from the next trade onward. Check back after a few trades.</p>` : `
 <h2>Avg P&L by cabal score</h2><table><tr><th>Cabal score</th><th>Trades</th><th>Avg P&L</th><th>Win rate</th></tr>${bucketRows(d.by_cabal_score, "label")}</table>
 <h2>Avg P&L by wash-trading score</h2><table><tr><th>Volume</th><th>Trades</th><th>Avg P&L</th><th>Win rate</th></tr>${bucketRows(d.by_wash_score, "label")}</table>
 <h2>Avg P&L by deployer verdict</h2><table><tr><th>Deployer</th><th>Trades</th><th>Avg P&L</th><th>Win rate</th></tr>${bucketRows(d.by_deployer, "verdict")}</table>
-<h2>Recent trades</h2><table><tr><th>Token</th><th>P&L</th><th>Cabal</th><th>Wash</th><th>Deployer</th><th>Exit impact (10 SOL)</th></tr>${recentRows}</table>`}
+<h2>Recent trades (entered & traded)</h2><table><tr><th>Token</th><th>P&L</th><th>Cabal</th><th>Wash</th><th>Deployer</th><th>Exit impact (10 SOL)</th></tr>${recentRows}</table>`}
+${(d.blocks || []).length ? `<h2>Bad tokens we blocked (saves)</h2><table><tr><th>Token</th><th>Reason</th><th>Deployer record</th></tr>${(d.blocks||[]).map((b:any)=>`<tr><td style="padding:8px"><a href="/map?mint=${b.mint}" target="_blank" style="color:#a78bfa;text-decoration:none">${b.token}</a></td><td style="padding:8px;color:#ff4d6d">${b.reason}</td><td style="padding:8px">${b.deployer_verdict ?? ""} ${b.deployer_dead!=null?`(${b.deployer_dead}/${b.deployer_sampled} dead)`:""}</td></tr>`).join("")}</table>` : ""}
 </body></html>`)
   })
 
