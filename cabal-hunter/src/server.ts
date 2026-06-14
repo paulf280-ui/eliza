@@ -23,7 +23,7 @@ import { dirname, join } from "path"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname  = dirname(__filename)
 import { getCabalReport, getFreshDemoMint } from "./detector.js"
-import { recordVisit, getAnalytics } from "./analytics.js"
+import { recordVisit, getAnalytics, excludeIp } from "./analytics.js"
 import { createPaymentRequest, verifyPayment, validatePaymentConfig, logPayment, getPnlStats, getFreeQueriesRemaining, consumeFreeQuery } from "./payment.js"
 import { CabalReport } from "./types.js"
 
@@ -574,6 +574,20 @@ ${(d.blocks || []).length ? `<h2>Bad tokens we blocked (saves)${d.blocks_checked
       res.status(401).json({ error: "unauthorized" }); return
     }
     res.json(getAnalytics())
+  })
+
+  // Visit FROM the device you want excluded — purges its history + blocks future
+  app.get("/admin/exclude-me", (req, res) => {
+    const secret = process.env.CABAL_INTERNAL_SECRET ?? ""
+    if (secret && req.query.key !== secret) { res.status(401).send("<h1>Unauthorized</h1>"); return }
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || ""
+    const r = excludeIp(ip)
+    res.setHeader("Content-Type", "text/html")
+    res.send(`<body style="background:#07080f;color:#e2e8f0;font-family:system-ui;padding:40px;text-align:center">
+      <h1 style="color:#10b981">✓ This device is now excluded</h1>
+      <p style="color:#94a3b8">Removed <b>${r.removed}</b> of your past visits. Future visits from this network won't be counted.</p>
+      <p style="color:#475569;font-size:12px">On a different network later? Just open this link again from there.</p>
+    </body>`)
   })
 
   app.get("/admin/traffic", (req, res) => {

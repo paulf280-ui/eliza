@@ -29,6 +29,11 @@ function db(): ReturnType<typeof Database> | null {
     _db.exec(`CREATE INDEX IF NOT EXISTS idx_visits_day ON visits(day)`)
     // Additive migration — country code (privacy-safe: derived from IP, raw IP discarded)
     try { _db.exec(`ALTER TABLE visits ADD COLUMN country TEXT`) } catch { /* exists */ }
+    // Excluded visitors (our own traffic) — keeps the dashboard organic-only
+    _db.exec(`CREATE TABLE IF NOT EXISTS excluded_visitors (ip_hash TEXT PRIMARY KEY)`)
+    for (const r of _db.prepare(`SELECT ip_hash FROM excluded_visitors`).all() as { ip_hash: string }[]) {
+      _excluded.add(r.ip_hash)
+    }
     return _db
   } catch {
     return null
@@ -37,6 +42,26 @@ function db(): ReturnType<typeof Database> | null {
 
 function hashIp(ip: string): string {
   return crypto.createHash("sha256").update(SALT + ip).digest("hex").slice(0, 16)
+}
+
+// In-memory set of excluded visitor hashes (our own traffic) — loaded at init
+const _excluded = new Set<string>()
+
+/** Exclude the given IP from all analytics: purge its existing rows, block
+ *  future ones. Returns how many historical rows were removed. */
+export function excludeIp(ip: string): { ip_hash: string; removed: number } {
+  const h = hashIp(ip)
+  _excluded.add(h)
+  const d = db()
+  let removed = 0
+  if (d) {
+    try {
+      d.prepare(`INSERT OR IGNORE INTO excluded_visitors (ip_hash) VALUES (?)`).run(h)
+      const r = d.prepare(`DELETE FROM visits WHERE ip_hash=?`).run(h)
+      removed = r.changes ?? 0
+    } catch { /* noop */ }
+  }
+  return { ip_hash: h, removed }
 }
 
 // ── Privacy-safe country geo ──────────────────────────────────────────────────
@@ -71,6 +96,8 @@ export function recordVisit(opts: {
 }): void {
   const d = db()
   if (!d) return
+  // Skip our own / excluded traffic so the dashboard stays organic-only
+  if (opts.ip && _excluded.has(hashIp(opts.ip))) return
   try {
     const now = Date.now()
     d.prepare(
