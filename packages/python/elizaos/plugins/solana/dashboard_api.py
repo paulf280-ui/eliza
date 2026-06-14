@@ -3317,6 +3317,9 @@ When adjusting a filter, always explain your reasoning based on the data above."
         except Exception:
             idx = {}
 
+        checked = [b for b in blocks if b.get("outcome")]
+        rugged = sum(1 for b in checked if b.get("outcome") == "rugged")
+
         return web.json_response({
             "trades_with_signals": len(with_sig),
             "total_closed": len(trades),
@@ -3325,6 +3328,8 @@ When adjusting a filter, always explain your reasoning based on the data above."
             "by_deployer":    _verdict_avg(),
             "recent":         recent,
             "blocks_total":   len(blocks),
+            "blocks_checked": len(checked),
+            "blocks_rugged":  rugged,
             "blocks":         blocks_recent,
             "deployer_index": idx,
         })

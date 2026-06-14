@@ -190,6 +190,62 @@ def _record_block(mint: str, token_name: str, reason: str, deployer: dict | None
     except Exception:
         pass
 
+
+_blocked_check_last: float = 0.0
+
+
+async def _check_blocked_outcomes(session: aiohttp.ClientSession) -> None:
+    """Revisit blocked tokens >24h old and record whether they died — turns the
+    'saves' list into the killer stat: 'we blocked N, M went to zero'. Runs at
+    most every 30 min, batched via DexScreener."""
+    global _blocked_check_last
+    import json as _j
+    now = time.time()
+    if now - _blocked_check_last < 1800:
+        return
+    _blocked_check_last = now
+    if not _BLOCKED_FILE.exists():
+        return
+    try:
+        log = _j.loads(_BLOCKED_FILE.read_text())
+    except Exception:
+        return
+    pending = [b for b in log if b.get("outcome") is None
+               and now - float(b.get("blocked_at") or 0) > 86400]
+    if not pending:
+        return
+    changed = False
+    for i in range(0, len(pending), 30):
+        chunk = pending[i:i + 30]
+        mints = [b["mint"] for b in chunk if b.get("mint")]
+        try:
+            async with session.get(
+                f"https://api.dexscreener.com/tokens/v1/solana/{','.join(mints)}",
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as r:
+                pairs = await r.json() if r.status == 200 else []
+        except Exception:
+            continue
+        best: dict[str, tuple[float, float]] = {}
+        for p in pairs if isinstance(pairs, list) else []:
+            m = (p.get("baseToken") or {}).get("address", "")
+            liq = float((p.get("liquidity") or {}).get("usd") or 0)
+            mc  = float(p.get("marketCap") or p.get("fdv") or 0)
+            if m and liq > best.get(m, (-1, 0))[0]:
+                best[m] = (liq, mc)
+        for b in chunk:
+            liq, mc = best.get(b["mint"], (0.0, 0.0))
+            b["outcome"] = "rugged" if (liq < 1000 or (0 < mc < 15000)) else "survived"
+            b["outcome_checked_at"] = now
+            changed = True
+            print(f"[cabal-gate] outcome {b.get('token_name')}: {b['outcome']} (liq=${liq:.0f} mc=${mc:.0f})")
+    if changed:
+        try:
+            _BLOCKED_FILE.write_text(_j.dumps(log[-500:], indent=2))
+        except Exception:
+            pass
+
 # Per-mint AI cascade + price-snapshot feed for monster positions, so the 3-brain
 # stack (Groq 30s / Gemini 2min / Opus 3min + emergency) rates every open monster
 # trade on the same cadence copy-trade uses. Built lazily on first tick; torn
@@ -2204,6 +2260,12 @@ async def monitor_positions_loop(runtime: Any, session: aiohttp.ClientSession) -
             _save_state()
         except Exception as e:
             print(f"[monster] monitor loop error: {e}")
+
+        # Follow up on blocked tokens (did they rug?) — throttled to 30 min
+        try:
+            await _check_blocked_outcomes(session)
+        except Exception:
+            pass
 
         await asyncio.sleep(MONITOR_INTERVAL_SECS)
 
