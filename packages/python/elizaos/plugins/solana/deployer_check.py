@@ -273,7 +273,19 @@ def blend_deployer_into_score(result: dict, deployer: dict | None) -> dict:
     confidence = min(1.0, sampled / 10.0)
     dep_component = excess * confidence * 75.0
 
-    score = round(min(100.0, base + dep_component), 1)
+    # ── Single-wallet concentration (the CLOUD miss, 2026-06-14) ─────────────
+    # A lone mega-whale isn't a "cabal" (no coordination) but is the most basic
+    # rug vector: one wallet that can crater the price alone. The coordination
+    # score ignored this and called a 61%-held token "CLEAN 0/100" right before
+    # it went -98%. Concentration now feeds the score directly.
+    non_lp = [h for h in holders if not h.get("is_lp")]
+    top1_pct = max((float(h.get("pct", 0)) for h in non_lp), default=0.0)
+    result["top_holder_pct"] = round(top1_pct, 1)
+    # Kicks in above ~12% (normal distributed tokens stay below); steep enough
+    # that 40%+ = HIGH and 60%+ = near-max.
+    conc_component = max(0.0, (top1_pct - 12.0) * 2.2)
+
+    score = round(min(100.0, max(base + dep_component, conc_component)), 1)
     result["cabal_score"] = score
     result["risk"] = "HIGH" if score >= 65 else "MEDIUM" if score >= 35 else "CLEAN"
     result["is_controlled"] = score >= 35

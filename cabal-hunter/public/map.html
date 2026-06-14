@@ -599,6 +599,11 @@ function render(data) {
     hasExit
       ? ['🚨', '#ff4d6d', 'Coordinated dump — wallets sold in the same block']
       : ['✓', '#10b981', 'No coordinated dump detected'],
+    (data.top_holder_pct >= 30)
+      ? ['🐋', '#ff4d6d', `One wallet holds ${data.top_holder_pct}% — single-wallet rug risk`]
+      : (data.top_holder_pct >= 20)
+      ? ['⚠', '#f59e0b', `Top holder controls ${data.top_holder_pct}% of supply`]
+      : ['✓', '#10b981', 'No single-wallet concentration'],
     filteredList.length
       ? ['ℹ', '#94a3b8', `${filteredList.length} exchange/infra group${filteredList.length>1?'s':''} filtered out`]
       : ['✓', '#10b981', 'No CEX-funded false positives'],
@@ -611,7 +616,7 @@ function render(data) {
       : ['•', '#64748b', 'Deployer: history unavailable'],
   ];
   document.getElementById('detection-summary').innerHTML =
-    `<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Detection Summary — 5 on-chain checks</div>` +
+    `<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Detection Summary — 6 on-chain checks</div>` +
     rows.map(([icon, col, txt]) =>
       `<div style="display:flex;align-items:flex-start;gap:8px;font-size:11px;line-height:1.5;margin-bottom:5px">
          <span style="color:${col};flex-shrink:0;font-weight:700">${icon}</span>

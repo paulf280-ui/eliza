@@ -66,6 +66,10 @@ def _build_message(mint: str, token_name: str, result: dict) -> str:
         f"Cabal Score: *{score:.0f}/100*",
     ]
 
+    top_holder_pct = float(result.get("top_holder_pct") or 0)
+    if top_holder_pct >= 20:
+        lines.append(f"🐋 *CONCENTRATION* — one wallet holds *{top_holder_pct:.0f}%* of supply (single-wallet dump risk)")
+
     if time_sync:
         lines.append("⚡ *BUNDLED LAUNCH* — wallets bought in the same block")
 

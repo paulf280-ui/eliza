@@ -67,8 +67,15 @@ function buildVerdict(report: Partial<CabalReport>): string {
     return `AVOID — coordinated dump in progress: ${exit.wallet_count} wallets sold ${(exit.sold_pct ?? 0).toFixed(1)}% of supply in the EXACT same block.${deployerNote}`
   }
 
-  if (score === 0 || clusters.length === 0) {
-    return `CLEAN — No coordinated wallet clusters detected (${report.wallets_checked ?? 0} wallets traced).${deployerNote}`
+  // Single-wallet concentration — a lone whale that can rug it alone.
+  const topPct = report.top_holder_pct ?? 0
+  if (topPct >= 30) {
+    return `AVOID — one wallet holds ${topPct.toFixed(1)}% of supply. A single holder can crater the price alone, regardless of coordination.${deployerNote}`
+  }
+
+  if (clusters.length === 0) {
+    const concNote = topPct >= 20 ? ` Top holder controls ${topPct.toFixed(1)}% — watch for a single-wallet dump.` : ""
+    return `${score >= 35 ? "CAUTION" : "CLEAN"} — No coordinated wallet clusters detected (${report.wallets_checked ?? 0} wallets traced).${concNote}${deployerNote}`
   }
   const top = clusters[0]
   const how = top.type === "time_sync"
@@ -112,7 +119,11 @@ function readFromCache(mint: string): CabalReport | null {
     const deadPct = Number(deployer?.dead_pct ?? 0)
     const sampled = Number(deployer?.sampled ?? 0)
     const depComponent = (Math.max(0, deadPct - 40) / 60) * Math.min(1, sampled / 10) * 75
-    const score = Math.round(Math.min(100, base + depComponent) * 10) / 10
+    // Single-wallet concentration — a lone mega-whale is a rug vector even with
+    // zero coordination (mirrors Python blend; the CLOUD 61%-held miss).
+    const topHolderPct = Math.max(0, ...holders.filter(h => !h.is_lp).map(h => h.pct || 0))
+    const concComponent = Math.max(0, (topHolderPct - 12) * 2.2)
+    const score = Math.round(Math.min(100, Math.max(base + depComponent, concComponent)) * 10) / 10
     const risk: "HIGH" | "MEDIUM" | "CLEAN" =
       score >= 65 ? "HIGH" : score >= 35 ? "MEDIUM" : "CLEAN"
 
@@ -124,8 +135,9 @@ function readFromCache(mint: string): CabalReport | null {
       is_controlled:        score >= 35,
       time_sync:            timeSync,
       coordinated_exit:     coordExit,
+      top_holder_pct:       Math.round(topHolderPct * 10) / 10,
       deployer,
-      verdict:              buildVerdict({ risk, cabal_score: score, coordinated_clusters: clusters, deployer, wallets_checked: Number(row.wallets_checked ?? 0) }),
+      verdict:              buildVerdict({ risk, cabal_score: score, coordinated_clusters: clusters, deployer, top_holder_pct: topHolderPct, wallets_checked: Number(row.wallets_checked ?? 0) }),
       coordinated_clusters: clusters,
       filtered_clusters:    filtered,
       holders,
@@ -178,8 +190,9 @@ async function fetchFromBot(mint: string, createdTs?: number): Promise<CabalRepo
     is_controlled:        Boolean(data.is_controlled),
     time_sync:            timeSync,
     coordinated_exit:     coordExit,
+    top_holder_pct:       Number(data.top_holder_pct ?? 0),
     deployer,
-    verdict:              buildVerdict({ risk, cabal_score: score, coordinated_clusters: clusters, deployer, wallets_checked: Number(data.wallets_checked ?? 0) }),
+    verdict:              buildVerdict({ risk, cabal_score: score, coordinated_clusters: clusters, deployer, top_holder_pct: Number(data.top_holder_pct ?? 0), wallets_checked: Number(data.wallets_checked ?? 0) }),
     coordinated_clusters: clusters,
     filtered_clusters:    filtered,
     holders,

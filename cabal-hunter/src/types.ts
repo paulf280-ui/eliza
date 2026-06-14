@@ -64,6 +64,8 @@ export interface CabalReport {
   time_sync: boolean
   /** true if ≥2 holders dumped a meaningful chunk in the exact same block */
   coordinated_exit: boolean
+  /** % of supply held by the single largest non-LP holder (concentration risk) */
+  top_holder_pct?: number
   /** deployer wallet track record — null when creator can't be resolved */
   deployer: DeployerReport | null
   wallets_checked: number
