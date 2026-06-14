@@ -1245,6 +1245,47 @@ def evaluate_exit(pos: dict, current_price: float, current_liq: float | None,
 
 
 # ─── Execution helpers ────────────────────────────────────────────────────
+async def _real_sol_from_sig(sig: str, wallet: str, retries: int = 5) -> float | None:
+    """Read the EXACT SOL this wallet gained from a specific sell tx, straight
+    from the blockchain (getTransaction pre/post balances). Deterministic and
+    isolated to this one tx — immune to fees/concurrent activity that pollute a
+    whole-wallet balance snapshot. Retries while the tx confirms/indexes."""
+    rpc = os.getenv("SOLANA_RPC_URL", "")
+    if not rpc or not sig or not wallet:
+        return None
+    try:
+        import aiohttp as _aio
+        async with _aio.ClientSession() as s:
+            for _ in range(retries):
+                try:
+                    async with s.post(rpc, json={
+                        "jsonrpc": "2.0", "id": 1, "method": "getTransaction",
+                        "params": [sig, {"encoding": "jsonParsed",
+                                         "maxSupportedTransactionVersion": 0,
+                                         "commitment": "confirmed"}]},
+                        timeout=_aio.ClientTimeout(total=8)) as r:
+                        tx = (await r.json()).get("result") if r.status == 200 else None
+                    if not tx:
+                        await asyncio.sleep(2)   # not landed yet
+                        continue
+                    meta = tx.get("meta") or {}
+                    keys = [k["pubkey"] if isinstance(k, dict) else k
+                            for k in ((tx.get("transaction") or {}).get("message") or {}).get("accountKeys", [])]
+                    if wallet not in keys:
+                        return None
+                    idx = keys.index(wallet)
+                    pre, post = meta.get("preBalances") or [], meta.get("postBalances") or []
+                    if idx >= len(pre) or idx >= len(post):
+                        return None
+                    delta = (post[idx] - pre[idx]) / 1e9   # real SOL the wallet gained
+                    return delta if delta > 0 else None
+                except Exception:
+                    await asyncio.sleep(2)
+    except Exception:
+        return None
+    return None
+
+
 async def _execute_monster_sell(mint: str, sell_fraction: float, runtime: Any) -> tuple[bool, str | None, float]:
     """Sell a fraction of the monster position. Returns (ok, sig, est_sol_received).
 
@@ -1347,27 +1388,20 @@ async def _execute_monster_sell(mint: str, sell_fraction: float, runtime: Any) -
                 print(f"[monster] SELL TX {pos.get('token_name', mint[:8])} "
                       f"amount={sell_amount} pool={try_pool} slip={slip_pct}% sig={str(sig)[:20]}...")
 
-                # Read ACTUAL SOL received from wallet balance change.
-                # The est_sol_out is a mark-to-market estimate that ignores
-                # bonding-curve slippage and can be wildly wrong (e.g. we
-                # estimated +0.3155 SOL but only received 0.034 SOL on-chain).
-                # Wait for the tx to land then read the real balance delta.
-                actual_sol_out = est_sol_out  # fallback if balance read fails
-                try:
-                    bal_before = await wallet_svc.get_sol_balance()
-                    await asyncio.sleep(4)  # wait for tx to land on-chain
-                    bal_after  = await wallet_svc.get_sol_balance()
-                    delta = bal_after - bal_before
-                    if delta > 0.0001:
-                        actual_sol_out = delta
-                        print(f"[monster] 💰 actual SOL received: {actual_sol_out:.4f} "
-                              f"(estimate was {est_sol_out:.4f}, "
-                              f"diff={actual_sol_out-est_sol_out:+.4f})")
-                    else:
-                        print(f"[monster] ⚠️  balance check inconclusive "
-                              f"(delta={delta:.4f}) — using estimate {est_sol_out:.4f}")
-                except Exception as _bal_err:
-                    print(f"[monster] balance read failed ({_bal_err}) — using estimate")
+                # Read the EXACT SOL received straight from this sell tx on-chain.
+                # The est_sol_out is a mark-to-market estimate that ignores real
+                # slippage/price-impact/fees and can be wrong by 8%+ on a thin
+                # pool (MRTRUMP: estimate −9.4%, actual fill −18%). Deterministic
+                # per-tx read replaces the old fragile whole-wallet snapshot.
+                actual_sol_out = est_sol_out  # fallback only if the chain read fails
+                _wallet_pk = os.getenv("WALLET_PUBLIC_KEY") or os.getenv("SOLANA_PUBLIC_KEY", "")
+                _real = await _real_sol_from_sig(str(sig), _wallet_pk)
+                if _real and _real > 0.0001:
+                    actual_sol_out = _real
+                    print(f"[monster] 💰 on-chain SOL received: {actual_sol_out:.4f} "
+                          f"(estimate was {est_sol_out:.4f}, diff={actual_sol_out-est_sol_out:+.4f})")
+                else:
+                    print(f"[monster] ⚠️  on-chain read failed for sell {str(sig)[:16]} — using estimate {est_sol_out:.4f}")
 
                 return True, str(sig), actual_sol_out
             except Exception as e:
@@ -1392,7 +1426,15 @@ async def _apply_exit(mint: str, reason: str, sell_fraction: float, runtime: Any
         return
     is_full = sell_fraction >= 0.999
     now = time.time()
-    pnl_pct = ((current_price / (pos["entry_price"] or 1)) - 1.0) * 100
+    # Real, on-chain P&L for THIS sale: SOL actually received vs the cost basis
+    # of the fraction sold. Falls back to mark-to-market only if the chain read
+    # failed (sol_out == estimate). This is what the dashboard/Telegram report.
+    _remaining_before = float(pos.get("remaining_fraction", 1.0))
+    _cost_basis = float(pos.get("sol_spent") or 0.0) * _remaining_before * sell_fraction
+    if _cost_basis > 0 and sol_out > 0:
+        pnl_pct = (sol_out / _cost_basis - 1.0) * 100.0
+    else:
+        pnl_pct = ((current_price / (pos["entry_price"] or 1)) - 1.0) * 100
 
     if sell_fraction >= 0.5 and reason.startswith("tp1"):
         pos["tp1_fired"] = True
