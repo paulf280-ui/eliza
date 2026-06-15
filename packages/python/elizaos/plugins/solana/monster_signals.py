@@ -2591,6 +2591,7 @@ async def lifecycle_scout_loop(runtime: Any,
                         _cabal_clean = (
                             _cab_lc.get("risk") != "HIGH"
                             and not _cab_lc.get("coordinated_exit")
+                            and not _cab_lc.get("degraded")  # never relax safety on an incomplete/unverified scan
                             and (_dep_lc or {}).get("verdict") not in ("SERIAL_RUGGER", "POOR_TRACK_RECORD")
                         )
                         if _cabal_clean:
