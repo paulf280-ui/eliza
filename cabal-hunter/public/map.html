@@ -413,6 +413,27 @@ function showError(title, detail) {
     `<strong>${title}</strong>` + (detail ? `<br><span style="font-size:12px;color:#475569">${detail}</span>` : '');
 }
 
+// Power-user nudge: once someone crosses the monthly manual-scan threshold they
+// clearly rely on the tool — point them at the API/MCP so they integrate it into
+// their bot. Soft, dismissible, shown once per page load.
+function showIntegratePrompt(p) {
+  if (document.getElementById('integrate-banner')) return;
+  const b = document.createElement('div');
+  b.id = 'integrate-banner';
+  b.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:9999;'
+    + 'max-width:560px;width:calc(100% - 32px);background:linear-gradient(135deg,#10b981,#0ea5e9);'
+    + 'color:#04121a;border-radius:12px;padding:14px 16px;box-shadow:0 8px 30px rgba(0,0,0,.45);'
+    + 'font-family:Inter,system-ui,sans-serif;display:flex;gap:12px;align-items:center';
+  b.innerHTML =
+    `<div style="flex:1">
+       <div style="font-weight:800;font-size:13px">⚡ ${p.scans} scans this month — you live in here.</div>
+       <div style="font-size:12px;opacity:.85;margin-top:2px">Stop pasting mints by hand. Wire Cabal-Hunter straight into your bot — JSON API + MCP for Claude/Cursor/Eliza.</div>
+     </div>
+     <a href="${p.docs}" target="_blank" rel="noopener" style="background:#04121a;color:#fff;text-decoration:none;font-weight:700;font-size:12px;padding:8px 12px;border-radius:8px;white-space:nowrap">Integrate →</a>
+     <span onclick="this.parentElement.remove()" style="cursor:pointer;font-size:18px;opacity:.6;padding:0 4px">×</span>`;
+  document.body.appendChild(b);
+}
+
 if (!MINT) {
   showError('No mint address provided', 'Usage: /map?mint=&lt;SOLANA_MINT_ADDRESS&gt;');
 } else if (!MINT_VALID) {
@@ -448,6 +469,7 @@ async function fetchData() {
       data._partial = true;
     }
     render(data);
+    if (data._integrate_prompt) showIntegratePrompt(data._integrate_prompt);
     fetchCexFunding();   // lazy — heavier trace, loads into the bottom-left panel
     fetchTradeAnalysis(data.pair_created_ts);   // lazy — cohorts + wash + liquidity
   } catch(e) {

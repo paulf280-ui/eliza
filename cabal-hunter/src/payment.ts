@@ -49,8 +49,36 @@ function getFreeDb(): ReturnType<typeof Database> {
       count INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (ip, month)
     );
+    CREATE TABLE IF NOT EXISTS map_usage (
+      ip    TEXT NOT NULL,
+      month TEXT NOT NULL,
+      count INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (ip, month)
+    );
   `)
   return _freeDb
+}
+
+// ── Map (manual web tool) metering ────────────────────────────────────────────
+// The bubble map is free. But 100 manual scans/month = a power user who clearly
+// finds it useful — exactly the moment to nudge them to integrate the API into
+// their bot (where real volume lives, and where billing kicks in). Soft nudge:
+// we never block the map, we just surface the prompt once they cross the line.
+export const MAP_SCAN_LIMIT = Number(process.env.MAP_FREE_SCANS ?? 100)
+
+/** Increment this IP's monthly map-scan counter; return the new running count. */
+export function recordMapScan(ip: string): number {
+  try {
+    const db    = getFreeDb()
+    const month = new Date().toISOString().slice(0, 7)
+    db.prepare(`
+      INSERT INTO map_usage (ip, month, count) VALUES (?, ?, 1)
+      ON CONFLICT(ip, month) DO UPDATE SET count = count + 1
+    `).run(ip, month)
+    const row = db.prepare("SELECT count FROM map_usage WHERE ip=? AND month=?")
+      .get(ip, month) as { count: number } | undefined
+    return row?.count ?? 0
+  } catch { return 0 }
 }
 
 /** Returns how many free queries this IP has remaining this month (0 = none left). */
@@ -129,12 +157,43 @@ export function getPnlStats(): Record<string, unknown> {
       "SELECT mint_queried, COUNT(*) as cnt FROM payments GROUP BY mint_queried ORDER BY cnt DESC LIMIT 10"
     ).all() as Array<{ mint_queried: string; cnt: number }>
 
+    // ── REAL token queries (de-botted) ────────────────────────────────────────
+    // A genuine scan carries a real mint (≥32 chars). Endpoint-enumeration bots
+    // hit /api/* with NO mint, so this filter drops them automatically. We also
+    // exclude our own/blocked traffic. This is what people actually queried —
+    // shown even before any of it converts to paid.
+    const REAL = "mint IS NOT NULL AND length(mint)>=32 AND category IN ('map','api') " +
+      "AND (ip_hash IS NULL OR ip_hash NOT IN (SELECT ip_hash FROM excluded_visitors))"
+    const nowMs = Date.now()
+    const realCnt = (sinceMs: number) => {
+      try {
+        return (db.prepare(
+          `SELECT COUNT(*) c FROM visits WHERE ${REAL} AND ts > ?`
+        ).get(sinceMs) as { c: number }).c
+      } catch { return 0 }
+    }
+    let topQueried: Array<{ mint_queried: string; cnt: number; users: number }> = []
+    try {
+      topQueried = db.prepare(
+        `SELECT mint AS mint_queried, COUNT(*) AS cnt, COUNT(DISTINCT ip_hash) AS users
+         FROM visits WHERE ${REAL} GROUP BY mint ORDER BY cnt DESC LIMIT 12`
+      ).all() as Array<{ mint_queried: string; cnt: number; users: number }>
+    } catch { topQueried = [] }
+
     return {
       today:  { queries: today.cnt,  revenue_usdc: +(today.rev  || 0).toFixed(4) },
       week:   { queries: week.cnt,   revenue_usdc: +(week.rev   || 0).toFixed(4) },
       month:  { queries: month.cnt,  revenue_usdc: +(month.rev  || 0).toFixed(4) },
       total:  { queries: total.cnt,  revenue_usdc: +(total.rev  || 0).toFixed(4) },
       top_mints: top,
+      // real usage (free + paid scans of actual tokens, bots excluded)
+      real_queries: {
+        today: realCnt(nowMs - 86400e3),
+        week:  realCnt(nowMs - 7 * 86400e3),
+        month: realCnt(nowMs - 30 * 86400e3),
+        total: realCnt(0),
+      },
+      top_queried: topQueried,
     }
   } catch (e) {
     return { error: String(e) }

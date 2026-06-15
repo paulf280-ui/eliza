@@ -24,7 +24,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname  = dirname(__filename)
 import { getCabalReport, getFreshDemoMint } from "./detector.js"
 import { recordVisit, getAnalytics, excludeIp } from "./analytics.js"
-import { createPaymentRequest, verifyPayment, validatePaymentConfig, logPayment, getPnlStats, getFreeQueriesRemaining, consumeFreeQuery } from "./payment.js"
+import { createPaymentRequest, verifyPayment, validatePaymentConfig, logPayment, getPnlStats, getFreeQueriesRemaining, consumeFreeQuery, recordMapScan, MAP_SCAN_LIMIT } from "./payment.js"
 import { CabalReport } from "./types.js"
 
 const PRICE_USDC = parseFloat(process.env.PRICE_PER_QUERY_USDC ?? "0.05")
@@ -99,7 +99,22 @@ export function createApp(): express.Application {
         res.status(upstream.status).json({ error: `upstream error: ${txt}` })
         return
       }
-      const data = await upstream.json()
+      const data = await upstream.json() as Record<string, unknown>
+      // Meter this manual scan. Map stays free (soft nudge) — but once a user
+      // crosses the monthly threshold they clearly rely on it, so prompt them to
+      // integrate the API/MCP into their bot rather than pasting mints by hand.
+      const clientIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
+                       || req.socket.remoteAddress || ""
+      const scans = recordMapScan(clientIp)
+      data._scans_this_month = scans
+      if (scans > MAP_SCAN_LIMIT) {
+        data._integrate_prompt = {
+          scans,
+          limit: MAP_SCAN_LIMIT,
+          message: `You've run ${scans} scans this month — you clearly rely on this. Wire it straight into your bot with the API/MCP so you stop pasting mints by hand.`,
+          docs: "/api/info",
+        }
+      }
       res.json(data)
     } catch (err) {
       res.status(500).json({
@@ -723,8 +738,8 @@ function buildPnlPage(key: string): string {
 <div class="sub">Revenue dashboard · Cabal Risk Tool wallet · Auto-refreshes every 60s</div>
 
 <div class="grid" id="grid"><div class="card"><div class="card-label">Loading…</div></div></div>
-<div class="section-title">Top Queried Tokens</div>
-<table><thead><tr><th>#</th><th>Mint Address</th><th>Queries</th><th>Revenue</th></tr></thead>
+<div class="section-title">Top Queried Tokens <span style="color:#475569;font-weight:400;text-transform:none;letter-spacing:0">· real scans, bots excluded</span></div>
+<table><thead><tr><th>#</th><th>Mint Address</th><th>Scans</th><th>Unique Users</th></tr></thead>
 <tbody id="top-table"><tr><td colspan="4" style="color:#64748b;text-align:center;padding:24px">Loading…</td></tr></tbody>
 </table>
 <div class="refresh" id="refresh-label">—</div>
@@ -738,24 +753,24 @@ async function load(){
     document.getElementById('grid').innerHTML=\`
       <div class="card"><div class="card-label">Today</div>
         <div class="card-val green">\${(d.today?.revenue_usdc||0).toFixed(4)} <span style="font-size:16px;font-weight:500">USDC</span></div>
-        <div class="card-sub">\${d.today?.queries||0} queries</div></div>
+        <div class="card-sub">\${d.real_queries?.today||0} real scans · \${d.today?.queries||0} paid</div></div>
       <div class="card"><div class="card-label">This Week</div>
         <div class="card-val blue">\${(d.week?.revenue_usdc||0).toFixed(4)} <span style="font-size:16px;font-weight:500">USDC</span></div>
-        <div class="card-sub">\${d.week?.queries||0} queries</div></div>
+        <div class="card-sub">\${d.real_queries?.week||0} real scans · \${d.week?.queries||0} paid</div></div>
       <div class="card"><div class="card-label">This Month</div>
         <div class="card-val amber">\${(d.month?.revenue_usdc||0).toFixed(4)} <span style="font-size:16px;font-weight:500">USDC</span></div>
-        <div class="card-sub">\${d.month?.queries||0} queries</div></div>
+        <div class="card-sub">\${d.real_queries?.month||0} real scans · \${d.month?.queries||0} paid</div></div>
       <div class="card"><div class="card-label">All Time</div>
         <div class="card-val purple">\${(d.total?.revenue_usdc||0).toFixed(4)} <span style="font-size:16px;font-weight:500">USDC</span></div>
-        <div class="card-sub">\${d.total?.queries||0} total queries</div></div>
+        <div class="card-sub">\${d.real_queries?.total||0} real scans · \${d.total?.queries||0} paid</div></div>
     \`;
-    const tops=d.top_mints||[];
+    const tops=d.top_queried||[];
     document.getElementById('top-table').innerHTML=tops.length?tops.map((t,i)=>\`
       <tr><td style="color:#64748b">\${i+1}</td>
       <td class="mono">\${t.mint_queried}</td>
       <td style="font-weight:700">\${t.cnt}</td>
-      <td class="green">\${(t.cnt*0.05).toFixed(4)} USDC</td></tr>\`).join('')
-      :'<tr><td colspan="4" style="color:#64748b;text-align:center;padding:20px">No queries yet — share the API to start earning</td></tr>';
+      <td class="blue">\${t.users}</td></tr>\`).join('')
+      :'<tr><td colspan="4" style="color:#64748b;text-align:center;padding:20px">No real scans yet — share the tool to start</td></tr>';
     document.getElementById('refresh-label').textContent='Last updated: '+new Date().toLocaleTimeString()+' · Auto-refreshes every 60s';
   }catch(e){console.error(e)}
 }
