@@ -99,6 +99,20 @@ def _db() -> sqlite3.Connection:
             mint TEXT, ts REAL, price_usd REAL, mcap_usd REAL, liq_usd REAL
         );
         CREATE INDEX IF NOT EXISTS idx_path_mint ON price_path(mint, ts);
+        -- Cluster MASTER/funder wallets — the operator who funds a coordinated push
+        -- (often doesn't hold tokens directly, so not in `holdings`). Build their
+        -- reputation across tokens: a funder whose pushes keep running = follow them
+        -- into fresh launches. Capture now; can't backfill once the cache evicts.
+        CREATE TABLE IF NOT EXISTS cluster_masters (
+            mint TEXT,
+            master TEXT,
+            cluster_type TEXT,
+            wallet_count INTEGER,
+            combined_pct REAL,
+            snapshot_ts REAL,
+            PRIMARY KEY (mint, master)
+        );
+        CREATE INDEX IF NOT EXISTS idx_masters_master ON cluster_masters(master);
         """
     )
     db.commit()
@@ -122,7 +136,7 @@ def collect_new(db: sqlite3.Connection) -> int:
     try:
         rows = cache.execute(
             "SELECT mint, token_name, cabal_score, holders_json, "
-            "pair_created_ts, wallets_checked FROM cabal_cache"
+            "pair_created_ts, wallets_checked, clusters_json FROM cabal_cache"
         ).fetchall()
     except Exception as e:
         log.warning("cache read failed: %s", e)
@@ -133,7 +147,8 @@ def collect_new(db: sqlite3.Connection) -> int:
     known = {r[0] for r in db.execute("SELECT mint FROM tokens").fetchall()}
     now = time.time()
     added = 0
-    for mint, name, score, hjson, pair_ts, wchecked in rows:
+    masters_added = 0
+    for mint, name, score, hjson, pair_ts, wchecked, cjson in rows:
         if mint in known:
             continue
         holders = json.loads(hjson or "[]")
@@ -157,10 +172,23 @@ def collect_new(db: sqlite3.Connection) -> int:
             "VALUES (?,?,?,?,?,?)",
             snaps,
         )
+        # Cluster master/funder wallets — only 'funding' clusters carry a real wallet
+        # in master_full (time_sync/coordinated_exit use a "slot N" placeholder).
+        for c in json.loads(cjson or "[]"):
+            master = (c.get("master_full") or "").strip()
+            if c.get("type") == "funding" and 32 <= len(master) <= 44:
+                db.execute(
+                    "INSERT OR IGNORE INTO cluster_masters "
+                    "(mint, master, cluster_type, wallet_count, combined_pct, snapshot_ts) "
+                    "VALUES (?,?,?,?,?,?)",
+                    (mint, master, c.get("type"), c.get("wallet_count"),
+                     float(c.get("combined_pct") or 0), now),
+                )
+                masters_added += 1
         added += 1
     db.commit()
     if added:
-        log.info("collected %d new tokens (snapshotted early holders)", added)
+        log.info("collected %d new tokens (holders + %d cluster masters)", added, masters_added)
     return added
 
 
@@ -293,6 +321,9 @@ def stats(db: sqlite3.Connection) -> dict:
         "graduated": one("SELECT COUNT(*) FROM outcomes WHERE graduated=1"),
         "died": one("SELECT COUNT(*) FROM outcomes WHERE status='DIED'"),
         "tracking": one("SELECT COUNT(*) FROM outcomes WHERE status='TRACKING'"),
+        "masters": one("SELECT COUNT(DISTINCT master) FROM cluster_masters"),
+        "recurring_masters": one(
+            "SELECT COUNT(*) FROM (SELECT master FROM cluster_masters GROUP BY master HAVING COUNT(DISTINCT mint)>=2)"),
     }
 
 

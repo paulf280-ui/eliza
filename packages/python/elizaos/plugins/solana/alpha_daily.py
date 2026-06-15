@@ -169,6 +169,25 @@ def digest(db: sqlite3.Connection, day: str):
         print("    (none yet — needs ≥2 days of snapshots; check back tomorrow)")
     for w, d, ar, mt in persistent:
         print(f"    {w[:6]}..{w[-4:]}  on board {d} days  avg win {ar:.0%}  up to {mt} tokens")
+
+    # MASTER/FUNDER wallets — the operators funding coordinated pushes. A funder
+    # whose tokens keep graduating/running is one to FOLLOW into fresh launches.
+    print(f"\n— MASTER/FUNDER wallets (funded ≥2 tokens, ranked by wins)")
+    try:
+        masters = db.execute(
+            """SELECT cm.master, COUNT(DISTINCT cm.mint) tokens,
+                      SUM(CASE WHEN o.graduated=1 OR COALESCE(o.peak_multiple,0)>=? THEN 1 ELSE 0 END) wins,
+                      MAX(cm.combined_pct) max_pct
+               FROM cluster_masters cm LEFT JOIN outcomes o ON o.mint=cm.mint
+               GROUP BY cm.master HAVING tokens>=2 ORDER BY wins DESC, tokens DESC LIMIT 15""",
+            (WIN_PEAK_MULT,),
+        ).fetchall()
+        if not masters:
+            print("    (none recurring yet — funders need to appear on ≥2 scanned tokens)")
+        for m, t, wn, mp in masters:
+            print(f"    {m[:6]}..{m[-4:]}  funded {t} tokens, {wn or 0} won  (up to {mp:.0f}% supply/push)")
+    except Exception as e:
+        print(f"    (master table not ready: {e})")
     print()
 
 
