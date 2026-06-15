@@ -92,6 +92,13 @@ def _db() -> sqlite3.Connection:
             graduated INTEGER DEFAULT 0,
             status TEXT
         );
+        -- price PATH per poll — needed to derive SL/TP later: how deep winners
+        -- dip before they run (max adverse excursion) and time-to-peak. This
+        -- CANNOT be reconstructed after the fact, so capture it as it happens.
+        CREATE TABLE IF NOT EXISTS price_path (
+            mint TEXT, ts REAL, price_usd REAL, mcap_usd REAL, liq_usd REAL
+        );
+        CREATE INDEX IF NOT EXISTS idx_path_mint ON price_path(mint, ts);
         """
     )
     db.commit()
@@ -262,6 +269,12 @@ def poll_outcomes(db: sqlite3.Connection) -> int:
                 """,
                 (mint, first_ts, now, first_price, first_mcap, s["liq"], s["mcap"],
                  s["price"], max_mcap, max_price, peak_multiple, s["dex"], grad, status),
+            )
+            # record one path point per poll (only live/due tokens reach here)
+            db.execute(
+                "INSERT INTO price_path (mint, ts, price_usd, mcap_usd, liq_usd) "
+                "VALUES (?,?,?,?,?)",
+                (mint, now, s["price"], s["mcap"], s["liq"]),
             )
             updated += 1
         db.commit()
