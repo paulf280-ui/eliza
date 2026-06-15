@@ -42,6 +42,31 @@ _SKIP_OWNERS: frozenset[str] = frozenset({
     "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe8bv",  # Associated Token program
 })
 
+# AMM programs whose POOL PDAs hold token-side liquidity. A graduated token's
+# pool shows up as a big "holder" whose token account is owned by a per-pool PDA
+# that is in turn owned by one of these programs. Detecting this prevents a
+# normal liquidity pool from being scored as single-wallet concentration (the
+# CHATONTRUMP false-HIGH: PumpSwap pool held 66.7% and read as a whale).
+# Safe by construction: real user wallets are System-owned, never in this set.
+_POOL_PROGRAMS: frozenset[str] = frozenset({
+    "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",  # PumpSwap (pump-amm)
+    "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",  # Pump.fun bonding curve
+    "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",  # Raydium AMM v4
+    "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",  # Raydium CLMM
+    "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",  # Raydium CPMM
+    "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",   # Meteora DLMM
+    "Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB",  # Meteora Dynamic AMM
+})
+
+
+async def _is_pool_pda(session: aiohttp.ClientSession, addr: str) -> bool:
+    """True if `addr` is a pool PDA owned by a known AMM program (= liquidity,
+    not a whale). Only call for sizable holders to bound RPC cost."""
+    info = await _rpc(session, "getAccountInfo",
+                      [addr, {"encoding": "jsonParsed", "commitment": "confirmed"}])
+    val = (info or {}).get("value") or {}
+    return bool(val) and val.get("owner") in _POOL_PROGRAMS
+
 # Known CEX hot/withdrawal wallets. If several holders were funded from one of
 # these, that is NOT coordination — it is just people withdrawing from the same
 # exchange. These are excluded as cluster masters and shown as filtered noise.
@@ -671,6 +696,26 @@ async def get_cluster_map(
         if owner is not None:
             owner_wallets.append((addr, ui))
             owner_token_accts[addr] = acc["address"]
+
+    # ── Second-level LP detection (graduated AMM pools) ───────────────────────
+    # A pool's token account is owned by a per-pool PDA (non-None owner), so the
+    # one-level check above marks it is_lp=False and it reads as a mega-whale.
+    # Re-check sizable non-LP holders: if the holder is itself a pool PDA owned by
+    # a known AMM program, it's liquidity — flag it and drop it as a cluster head.
+    big_unflagged = [h for h in raw_holders if not h["is_lp"] and h["pct"] >= 10.0]
+    if big_unflagged:
+        pool_flags = await asyncio.gather(
+            *[_is_pool_pda(session, h["address"]) for h in big_unflagged]
+        )
+        pool_addrs = {h["address"] for h, is_pool in zip(big_unflagged, pool_flags) if is_pool}
+        if pool_addrs:
+            for h in raw_holders:
+                if h["address"] in pool_addrs:
+                    h["is_lp"] = True
+                    h["label"] = "LP Pool"
+            owner_wallets = [(w, ui) for (w, ui) in owner_wallets if w not in pool_addrs]
+            for w in pool_addrs:
+                owner_token_accts.pop(w, None)
 
     # ── Cluster detection ────────────────────────────────────────────────────
     # No age cap here (unlike check_holder_clusters): the SaaS bubble map must
