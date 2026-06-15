@@ -624,7 +624,7 @@ ${(d.blocks || []).length ? `<h2>Bad tokens we blocked (saves)${d.blocks_checked
 <style>body{background:#07080f;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;padding:28px;max-width:1000px;margin:0 auto}h1{font-size:22px;margin-bottom:4px}.sub{color:#64748b;font-size:12px;margin-bottom:24px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}h2{font-size:13px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin:28px 0 10px}</style></head>
 <body><h1>Cabal-Hunter — Traffic</h1><div class="sub">Server-side · counts every visit (Cloudflare can't see us — DNS-only)</div>
 <div class="grid">${card("Total Visits",t.visits,"#e2e8f0")}${card("Unique Visitors",t.unique_visitors,"#10b981")}${card("Map Views",t.map_views,"#7c3aed")}${card("API Calls",t.api_calls,"#0ea5e9")}</div>
-<div class="grid">${card("Today Visits",td.visits,"#e2e8f0")}${card("Today Unique",td.unique_visitors,"#10b981")}${card("Landing Views",t.landing_views,"#f59e0b")}${card("Tokens Searched",(a.top_mints||[]).length,"#ec4899")}</div>
+<div class="grid">${card("Today Visits",td.visits,"#e2e8f0")}${card("Today Unique",td.unique_visitors,"#10b981")}${card("Landing Views",t.landing_views,"#f59e0b")}${card("Tokens Scanned",t.tokens_scanned,"#ec4899")}</div>
 <div style="font-size:11px;color:#475569;margin-bottom:20px">Note: "total visits" includes automated scanner noise. The real human signal is <b>Landing + Map Views</b> and <b>Unique Visitors</b>.</div>
 <h2>Top countries (real visitors)</h2>${rows(a.top_countries,["Country","Visitors","Hits"],["country","visitors","hits"])}
 <h2>Outbound clicks (where they go next)</h2>${rows(a.outbound_clicks,["Target","Clicks"],["target","n"])}

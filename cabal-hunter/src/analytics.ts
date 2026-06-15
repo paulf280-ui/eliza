@@ -147,6 +147,10 @@ export function getAnalytics(): Record<string, unknown> {
       map_views:       (one("SELECT COUNT(*) c FROM visits WHERE category='map'").c as number) ?? 0,
       landing_views:   (one("SELECT COUNT(*) c FROM visits WHERE category='landing'").c as number) ?? 0,
       api_calls:       (one("SELECT COUNT(*) c FROM visits WHERE category='api'").c as number) ?? 0,
+      // REAL distinct tokens scanned (de-botted: a real mint carries ≥32 chars).
+      // The dashboard card used top_mints.length, which is LIMIT 20 — so it was
+      // permanently stuck at "20" once ≥20 tokens had been scanned.
+      tokens_scanned:  (one("SELECT COUNT(DISTINCT mint) c FROM visits WHERE mint IS NOT NULL AND length(mint)>=32 AND category IN ('map','api')").c as number) ?? 0,
     },
     today: {
       visits:          (one("SELECT COUNT(*) c FROM visits WHERE day=?", today).c as number) ?? 0,
