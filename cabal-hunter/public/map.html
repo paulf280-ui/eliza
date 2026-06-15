@@ -386,7 +386,7 @@
 <script>
 // ── Colour palette ────────────────────────────────────────────────────────────
 const CLUSTER_COLOURS = ['#ff4d6d','#7c3aed','#0ea5e9','#f59e0b','#10b981','#ec4899','#06b6d4'];
-const LP_COLOUR   = '#1e293b';
+const LP_COLOUR   = '#0d9488';   // calm teal = liquidity / "the house" (safe, not a threat)
 const RISK_COLOURS = { HIGH: '#ff4d6d', MEDIUM: '#f59e0b', CLEAN: '#10b981' };
 
 // Each independent (non-cluster) holder gets a unique muted colour by rank
@@ -611,6 +611,9 @@ function render(data) {
   const hasBundle2 = (data.time_sync) || clusters.some(c => c.type === 'time_sync');
   const hasExit = (data.coordinated_exit) || clusters.some(c => c.type === 'coordinated_exit');
   const fundingClusters = clusters.filter(c => c.type === 'funding' || (!c.type));
+  // Biggest liquidity-pool holder — reassure that a large LP bubble is the
+  // tradeable liquidity ("the house"), NOT single-wallet concentration.
+  const lpPct = Math.max(0, ...(holders || []).filter(h => h.is_lp).map(h => h.pct || 0));
   const rows = [
     fundingClusters.length
       ? ['⛔', '#ff4d6d', `${fundingClusters.length} shared-funder cluster${fundingClusters.length>1?'s':''} found`]
@@ -626,6 +629,9 @@ function render(data) {
       : (data.top_holder_pct >= 20)
       ? ['⚠', '#f59e0b', `Top holder controls ${data.top_holder_pct}% of supply`]
       : ['✓', '#10b981', 'No single-wallet concentration'],
+    lpPct >= 25
+      ? ['🏦', '#5eead4', `${lpPct.toFixed(0)}% sits in the liquidity pool (the house) — tradeable liquidity, not a holder. Excluded from concentration.`]
+      : null,
     filteredList.length
       ? ['ℹ', '#94a3b8', `${filteredList.length} exchange/infra group${filteredList.length>1?'s':''} filtered out`]
       : ['✓', '#10b981', 'No CEX-funded false positives'],
@@ -639,7 +645,7 @@ function render(data) {
   ];
   document.getElementById('detection-summary').innerHTML =
     `<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Detection Summary — 6 on-chain checks</div>` +
-    rows.map(([icon, col, txt]) =>
+    rows.filter(Boolean).map(([icon, col, txt]) =>
       `<div style="display:flex;align-items:flex-start;gap:8px;font-size:11px;line-height:1.5;margin-bottom:5px">
          <span style="color:${col};flex-shrink:0;font-weight:700">${icon}</span>
          <span style="color:#cbd5e1">${txt}</span></div>`).join('');
@@ -793,7 +799,7 @@ function render(data) {
     let html = `<div class="section-title">Top Holders — click to research on Solscan</div>`;
     holders.forEach(h => {
       const col   = h.is_lp ? LP_COLOUR : clusterColour(h.cluster_id, h.rank);
-      const extra = h.is_lp ? '<span class="lp-badge">LP</span>' : '';
+      const extra = h.is_lp ? '<span class="lp-badge" style="background:rgba(13,148,136,.2);color:#5eead4" title="Liquidity pool — the tradeable liquidity, not a holder. Not a rug risk.">🏦 LP POOL · safe</span>' : '';
       const addr  = h.address || h.address_short;
       // On-chain receipt: link straight to the funding transaction we traced
       const receipt = h.funding_tx
@@ -1117,18 +1123,21 @@ function drawGraph(holders, clusters, totalSupply) {
     .attr('font-weight', 700)
     .attr('pointer-events','none')
     .attr('dy', d => d.r >= 26 ? '-0.3em' : '0')
-    .text(d => d.label || d.address_short);
+    .text(d => d.is_lp ? '🏦 LIQUIDITY' : (d.label || d.address_short));
 
-  // % below label for bigger bubbles
+  // second line below label for bigger bubbles. For an LP pool we DON'T show a
+  // scary holder %, we reframe it as what it actually is: the tradeable
+  // liquidity ("the house"), which is safe — not a wallet that can rug.
   nodeSel.filter(d => d.r >= 26)
     .append('text')
     .attr('text-anchor','middle')
-    .attr('fill','white')
-    .attr('fill-opacity',0.55)
+    .attr('fill', d => d.is_lp ? '#5eead4' : 'white')
+    .attr('fill-opacity', d => d.is_lp ? 0.95 : 0.55)
     .attr('font-size', d => Math.min(d.r * 0.25, 10))
+    .attr('font-weight', d => d.is_lp ? 700 : 400)
     .attr('pointer-events','none')
     .attr('dy', '1em')
-    .text(d => d.pct.toFixed(1)+'%');
+    .text(d => d.is_lp ? 'the house · safe' : d.pct.toFixed(1)+'%');
 
   // Tooltip + click interaction
   const tt = document.getElementById('tooltip');
@@ -1151,9 +1160,16 @@ function drawGraph(holders, clusters, totalSupply) {
       } else {
         cEl.style.display = 'none';
       }
+      // LP pool gets a plain-English reassurance instead of a cluster line
+      if (d.is_lp) {
+        cEl.style.display = '';
+        cEl.innerHTML = `<span style="color:#5eead4">🏦</span> Liquidity pool (the house) — this is the tradeable liquidity, <b>not a holder</b>. It can't rug; it's what you trade against.`;
+      }
       // Show "click to research" hint
       const hintEl = document.getElementById('tt-hint');
-      if (hintEl) hintEl.textContent = `🔗 Click to view ${(addr).slice(0,8)}… on Solscan`;
+      if (hintEl) hintEl.textContent = d.is_lp
+        ? `🔗 Click to view the pool on Solscan`
+        : `🔗 Click to view ${(addr).slice(0,8)}… on Solscan`;
       const x = Math.min(evt.clientX + 16, window.innerWidth  - 230);
       const y = Math.min(evt.clientY + 16, window.innerHeight - 130);
       tt.style.left = x+'px'; tt.style.top = y+'px'; tt.style.display = '';

@@ -66,9 +66,18 @@ def _build_message(mint: str, token_name: str, result: dict) -> str:
         f"Cabal Score: *{score:.0f}/100*",
     ]
 
+    # top_holder_pct already EXCLUDES liquidity pools (is_lp), so this only fires
+    # for a real single-wallet whale — never for normal AMM liquidity.
     top_holder_pct = float(result.get("top_holder_pct") or 0)
     if top_holder_pct >= 20:
         lines.append(f"🐋 *CONCENTRATION* — one wallet holds *{top_holder_pct:.0f}%* of supply (single-wallet dump risk)")
+
+    # A large liquidity pool ("the house") is NOT concentration — say so plainly so
+    # the channel never frightens anyone out of a healthy graduated token.
+    _holders = result.get("holders") or []
+    _lp_pct = max((float(h.get("pct") or 0) for h in _holders if h.get("is_lp")), default=0.0)
+    if _lp_pct >= 25:
+        lines.append(f"🏦 *LIQUIDITY* — *{_lp_pct:.0f}%* sits in the AMM pool (the house — tradeable liquidity, not a holder, not a rug risk)")
 
     if time_sync:
         lines.append("⚡ *BUNDLED LAUNCH* — wallets bought in the same block")
