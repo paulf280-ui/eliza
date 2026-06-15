@@ -96,6 +96,15 @@ def save_result(
         print(f"[cabal-cache] skip caching degraded result for {mint[:8]}")
         return
 
+    # Never cache an empty/incomplete scan as a result — an rpc_error returns
+    # CLEAN/0 with no holders, and caching that would serve a FALSE "clean" for
+    # hours. Only cache scans that actually traced holders.
+    if (cluster_result.get("skip_reason")
+            or not cluster_result.get("holders")
+            or cluster_result.get("wallets_checked", 0) == 0):
+        print(f"[cabal-cache] skip caching empty/incomplete result for {mint[:8]}")
+        return
+
     now = time.time()
     risk     = cluster_result.get("risk", "CLEAN")
     clusters = cluster_result.get("clusters") or []

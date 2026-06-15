@@ -59,13 +59,35 @@ _POOL_PROGRAMS: frozenset[str] = frozenset({
 })
 
 
-async def _is_pool_pda(session: aiohttp.ClientSession, addr: str) -> bool:
-    """True if `addr` is a pool PDA owned by a known AMM program (= liquidity,
-    not a whale). Only call for sizable holders to bound RPC cost."""
-    info = await _rpc(session, "getAccountInfo",
-                      [addr, {"encoding": "jsonParsed", "commitment": "confirmed"}])
-    val = (info or {}).get("value") or {}
-    return bool(val) and val.get("owner") in _POOL_PROGRAMS
+# Pool-ownership NEVER changes, so cache the verdict per address. This makes
+# repeat scans deterministic and removes RPC load on re-checks — critical, because
+# a flaky lookup here is what made the SAME token score HIGH on one scan and CLEAN
+# on the next (a pool missed = scored as a 60% whale).
+_pool_status_cache: dict[str, bool] = {}
+
+
+async def _is_pool_pda(session: aiohttp.ClientSession, addr: str) -> bool | None:
+    """Is `addr` a pool PDA owned by a known AMM program (= liquidity, not a whale)?
+
+    Returns True (pool), False (confirmed NOT a pool), or None (could not verify —
+    every RPC attempt failed). Callers MUST treat None as "unknown" and degrade the
+    result rather than silently scoring an unverified mega-holder as a whale.
+    Result is cached because pool ownership is immutable.
+    """
+    if addr in _pool_status_cache:
+        return _pool_status_cache[addr]
+    # Hard retry — getting this wrong flips the whole score, so it's worth the cost.
+    for attempt in range(4):
+        info = await _rpc(session, "getAccountInfo",
+                          [addr, {"encoding": "jsonParsed", "commitment": "confirmed"}],
+                          timeout=8.0)
+        if info is not None:                      # RPC succeeded (value may be null)
+            owner = ((info.get("value") or {}).get("owner"))
+            is_pool = owner in _POOL_PROGRAMS
+            _pool_status_cache[addr] = is_pool    # immutable — cache forever
+            return is_pool
+        await asyncio.sleep(0.25 * (attempt + 1))
+    return None                                   # every attempt failed — unknown
 
 # Known CEX hot/withdrawal wallets. If several holders were funded from one of
 # these, that is NOT coordination — it is just people withdrawing from the same
@@ -703,11 +725,20 @@ async def get_cluster_map(
     # Re-check sizable non-LP holders: if the holder is itself a pool PDA owned by
     # a known AMM program, it's liquidity — flag it and drop it as a cluster head.
     big_unflagged = [h for h in raw_holders if not h["is_lp"] and h["pct"] >= 10.0]
+    lp_unverified = False
     if big_unflagged:
         pool_flags = await asyncio.gather(
             *[_is_pool_pda(session, h["address"]) for h in big_unflagged]
         )
-        pool_addrs = {h["address"] for h, is_pool in zip(big_unflagged, pool_flags) if is_pool}
+        pool_addrs: set[str] = set()
+        for h, is_pool in zip(big_unflagged, pool_flags):
+            if is_pool is True:
+                pool_addrs.add(h["address"])
+            elif is_pool is None and h["pct"] >= 25.0:
+                # Could not verify a MEGA-holder as pool-or-whale. Most big holders
+                # ARE pools, so don't fabricate a "60% whale" HIGH — but don't hide
+                # it silently either. Mark degraded so the map shows a recheck prompt.
+                lp_unverified = True
         if pool_addrs:
             for h in raw_holders:
                 if h["address"] in pool_addrs:
@@ -900,10 +931,11 @@ async def get_cluster_map(
         "funders_found":    len(funder_map),
         "lookup_failures":  lookup_failures,
         "lookups_total":    len(accounts),
-        # degraded = too many owner lookups failed (RPC trouble) — callers
-        # must NOT cache this result; serve it once and let the next query retry
-        "degraded":         lookup_failures >= max(2, len(accounts) // 3),
-        "skip_reason":      None,
+        # degraded = too many owner lookups failed (RPC trouble) OR a mega-holder's
+        # pool-vs-whale status couldn't be verified — callers must NOT cache this
+        # result; serve it once, show a recheck prompt, and let the next query retry.
+        "degraded":         (lookup_failures >= max(2, len(accounts) // 3)) or lp_unverified,
+        "skip_reason":      "lp_unverified" if lp_unverified else None,
         "computed_at":      time.time(),
     }
 
