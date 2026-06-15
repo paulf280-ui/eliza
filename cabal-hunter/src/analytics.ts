@@ -75,16 +75,35 @@ function isPublicIp(ip: string): boolean {
     !ip.startsWith("127.") && !ip.startsWith("172.1") && ip !== "::1" && !ip.startsWith("::ffff:127")
 }
 
+/** Backfill the resolved country onto rows already written for this visitor.
+ *  Most visitors hit once, so the row is inserted with a null country before
+ *  the async lookup returns — without this, ~77% of geo data is lost. We key
+ *  by ip_hash (raw IP is never stored), so privacy is preserved. */
+function backfillCountry(ip: string, code: string): void {
+  const d = db()
+  if (!d) return
+  try {
+    d.prepare("UPDATE visits SET country=? WHERE ip_hash=? AND (country IS NULL OR country='')")
+      .run(code, hashIp(ip))
+  } catch { /* analytics must never break a request */ }
+}
+
 function countryFor(ip: string): string | null {
   if (!isPublicIp(ip)) return "LO"
   const hit = _countryCache.get(ip)
   if (hit) return hit
   if (!_countryPending.has(ip)) {
     _countryPending.add(ip)
-    // fire-and-forget; the next request from this IP will carry the code
+    // fire-and-forget; resolves a beat after the row is inserted, then we
+    // backfill the country onto that row (and any earlier null rows for this IP)
     fetch(`http://ip-api.com/json/${ip}?fields=status,countryCode`)
       .then(r => r.json())
-      .then((d: any) => { if (d?.status === "success" && d.countryCode) _countryCache.set(ip, d.countryCode) })
+      .then((d: any) => {
+        if (d?.status === "success" && d.countryCode) {
+          _countryCache.set(ip, d.countryCode)
+          backfillCountry(ip, d.countryCode)
+        }
+      })
       .catch(() => {})
       .finally(() => _countryPending.delete(ip))
   }
