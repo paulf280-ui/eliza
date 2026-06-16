@@ -47,6 +47,84 @@ DEAD_GIVEUP_SECS = 3 * 86400  # stop polling tokens dead for >3 days
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 
+REACHED_30K_MCAP = float(os.environ.get("ALPHA_REACHED_MCAP", "30000"))  # the swing target
+
+# ── Master-funder tracing ────────────────────────────────────────────────────
+# The operator behind a token is identified by the wallet that funded the
+# DEPLOYER (works for every token, serial-rugger or not). Trace deployer -> its
+# oldest SOL inflow -> the funding wallet. Cached per wallet (immutable history).
+import json as _json
+import re as _re
+
+def _rpc_url() -> str | None:
+    u = os.environ.get("SOLANA_RPC_URL") or os.environ.get("HELIUS_RPC")
+    if u:
+        return u
+    for f in (BASE / ".env", Path("/home/ubuntu/eliza/.env")):
+        try:
+            for line in open(f):
+                m = _re.search(r"https://[^\s\"']*helius[^\s\"']*", line)
+                if m:
+                    return m.group(0)
+        except Exception:
+            pass
+    return None
+
+_RPC = _rpc_url()
+_funder_cache: dict[str, str | None] = {}
+
+def _rpc_call(method: str, params: list, timeout: float = 8.0):
+    if not _RPC:
+        return None
+    try:
+        req = urllib.request.Request(
+            _RPC,
+            data=_json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return _json.load(r).get("result")
+    except Exception:
+        return None
+
+def _sol_sender(tx: dict, target: str) -> str | None:
+    """Account that sent SOL to `target` in this tx (largest balance decrease)."""
+    if not tx:
+        return None
+    meta = tx.get("meta") or {}
+    msg = (tx.get("transaction") or {}).get("message") or {}
+    keys = [k if isinstance(k, str) else k.get("pubkey") for k in (msg.get("accountKeys") or [])]
+    pre, post = meta.get("preBalances") or [], meta.get("postBalances") or []
+    if target not in keys:
+        return None
+    ti = keys.index(target)
+    if ti >= len(post) or ti >= len(pre) or post[ti] <= pre[ti]:
+        return None  # target didn't actually receive SOL
+    best, best_drop = None, 0
+    for i, k in enumerate(keys):
+        if k == target or i >= len(pre) or i >= len(post):
+            continue
+        drop = pre[i] - post[i]
+        if drop > best_drop:
+            best, best_drop = k, drop
+    return best
+
+def trace_funder(wallet: str | None) -> str | None:
+    """The wallet that first funded `wallet` (its oldest SOL inflow)."""
+    if not wallet:
+        return None
+    if wallet in _funder_cache:
+        return _funder_cache[wallet]
+    funder = None
+    sigs = _rpc_call("getSignaturesForAddress", [wallet, {"limit": 1000}])
+    if sigs:
+        oldest = sigs[-1].get("signature")
+        tx = _rpc_call("getTransaction",
+                       [oldest, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}])
+        funder = _sol_sender(tx, wallet)
+    _funder_cache[wallet] = funder
+    return funder
+
 log = logging.getLogger("alpha_engine")
 
 
@@ -113,6 +191,20 @@ def _db() -> sqlite3.Connection:
             PRIMARY KEY (mint, master)
         );
         CREATE INDEX IF NOT EXISTS idx_masters_master ON cluster_masters(master);
+        -- The OPERATOR behind every token: its deployer + the wallet that funded
+        -- the deployer (the master funding wallet). This is the consistent thread
+        -- across an operator's many launches. When a known operator funds a fresh
+        -- launch, that's the snipe trigger. deployer_verdict lets us split serial
+        -- ruggers from genuine devs.
+        CREATE TABLE IF NOT EXISTS token_operators (
+            mint TEXT PRIMARY KEY,
+            deployer TEXT,
+            deployer_funder TEXT,
+            deployer_verdict TEXT,
+            snapshot_ts REAL
+        );
+        CREATE INDEX IF NOT EXISTS idx_ops_deployer ON token_operators(deployer);
+        CREATE INDEX IF NOT EXISTS idx_ops_funder ON token_operators(deployer_funder);
         """
     )
     db.commit()
@@ -136,7 +228,7 @@ def collect_new(db: sqlite3.Connection) -> int:
     try:
         rows = cache.execute(
             "SELECT mint, token_name, cabal_score, holders_json, "
-            "pair_created_ts, wallets_checked, clusters_json FROM cabal_cache"
+            "pair_created_ts, wallets_checked, clusters_json, deployer_json FROM cabal_cache"
         ).fetchall()
     except Exception as e:
         log.warning("cache read failed: %s", e)
@@ -145,10 +237,28 @@ def collect_new(db: sqlite3.Connection) -> int:
         cache.close()
 
     known = {r[0] for r in db.execute("SELECT mint FROM tokens").fetchall()}
+    ops_known = {r[0] for r in db.execute("SELECT mint FROM token_operators").fetchall()}
     now = time.time()
     added = 0
     masters_added = 0
-    for mint, name, score, hjson, pair_ts, wchecked, cjson in rows:
+    ops_added = 0
+    for mint, name, score, hjson, pair_ts, wchecked, cjson, djson in rows:
+        # Operator capture runs for EVERY cached token we haven't captured yet
+        # (backfills already-scanned tokens too, not just new ones) — the master
+        # funding wallet is the whole point of the reverse-engineering.
+        if mint not in ops_known:
+            dep = json.loads(djson or "{}") if djson else {}
+            deployer = dep.get("creator")
+            if deployer:
+                funder = trace_funder(deployer)  # cached per deployer; RPC-bounded
+                db.execute(
+                    "INSERT OR IGNORE INTO token_operators "
+                    "(mint, deployer, deployer_funder, deployer_verdict, snapshot_ts) "
+                    "VALUES (?,?,?,?,?)",
+                    (mint, deployer, funder, dep.get("verdict"), now),
+                )
+                ops_added += 1
+                ops_known.add(mint)
         if mint in known:
             continue
         holders = json.loads(hjson or "[]")
@@ -188,7 +298,8 @@ def collect_new(db: sqlite3.Connection) -> int:
         added += 1
     db.commit()
     if added:
-        log.info("collected %d new tokens (holders + %d cluster masters)", added, masters_added)
+        log.info("collected %d new tokens (holders + %d cluster-masters + %d operators)",
+                 added, masters_added, ops_added)
     return added
 
 

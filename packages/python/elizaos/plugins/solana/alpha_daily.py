@@ -188,6 +188,32 @@ def digest(db: sqlite3.Connection, day: str):
             print(f"    {m[:6]}..{m[-4:]}  funded {t} tokens, {wn or 0} won  (up to {mp:.0f}% supply/push)")
     except Exception as e:
         print(f"    (master table not ready: {e})")
+
+    # OPERATORS — deployer + the wallet that funded the deployer. The snipe thesis:
+    # an operator whose tokens KEEP hitting 30K is one to follow into fresh launches,
+    # even if the tokens ultimately rug (we exit at the swing). 30K = the target.
+    REACHED = 30000.0
+    for role, col in [("deployer_funder", "MASTER FUNDERS (funded the deployer)"),
+                      ("deployer", "DEPLOYERS (the operator wallet)")]:
+        print(f"\n— {col} — funded ≥2 tokens, ranked by how many hit 30K")
+        try:
+            rows = db.execute(
+                f"""SELECT op.{role}, COUNT(DISTINCT op.mint) tokens,
+                       SUM(CASE WHEN COALESCE(oc.max_mcap_usd,0)>=? THEN 1 ELSE 0 END) hit30k,
+                       MAX(op.deployer_verdict) verdict
+                    FROM token_operators op LEFT JOIN outcomes oc ON oc.mint=op.mint
+                    WHERE op.{role} IS NOT NULL
+                    GROUP BY op.{role} HAVING tokens>=2
+                    ORDER BY hit30k DESC, tokens DESC LIMIT 15""",
+                (REACHED,),
+            ).fetchall()
+            if not rows:
+                print("    (none recurring yet — needs the same operator on ≥2 scanned tokens)")
+            for w, t, hit, vd in rows:
+                tag = "⛔serial" if vd == "SERIAL_RUGGER" else ("⚠poor" if vd == "POOR_TRACK_RECORD" else "")
+                print(f"    {w[:6]}..{w[-4:]}  {t} tokens, {hit or 0} hit 30K  {tag}")
+        except Exception as e:
+            print(f"    (operators table not ready: {e})")
     print()
 
 
