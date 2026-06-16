@@ -2588,8 +2588,20 @@ async def lifecycle_scout_loop(runtime: Any,
                         _cab_ts = float(p.get("pairCreatedAt") or 0) / 1000 or time.time()
                         _cab_lc = await _gcm_lc(session, mint, _cab_ts)
                         _dep_lc = await _gdr_lc(session, mint)
+                        # HARD dogfood gate: don't enter what our own tool flags as
+                        # risky. A confident MEDIUM/HIGH score = real coordination OR
+                        # concentration — including program-held positions (e.g. a
+                        # 20% Token-2022 account) that the System-only holder gate
+                        # misses entirely. This is the ALGOPUB case: gate saw top1
+                        # 2.2% but the tool scored 61. Skip unless genuinely CLEAN.
+                        _cab_risk = _cab_lc.get("risk")
+                        if not _cab_lc.get("degraded") and _cab_risk in ("MEDIUM", "HIGH"):
+                            print(f"[monster-lifecycle] ⛔ {mint[:8]} cabal {_cab_risk} "
+                                  f"(score {_cab_lc.get('cabal_score')}) — skip, don't enter a flagged token")
+                            cycle_rejects["cabal_flagged"] += 1
+                            continue
                         _cabal_clean = (
-                            _cab_lc.get("risk") != "HIGH"
+                            _cab_risk == "CLEAN"  # only relax gates on a genuinely clean read, not MEDIUM
                             and not _cab_lc.get("coordinated_exit")
                             and not _cab_lc.get("degraded")  # never relax safety on an incomplete/unverified scan
                             and (_dep_lc or {}).get("verdict") not in ("SERIAL_RUGGER", "POOR_TRACK_RECORD")

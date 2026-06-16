@@ -19,7 +19,7 @@ function LivePositionRow({
   onClose: (e: React.MouseEvent) => void
   connected: boolean
 }) {
-  const live = useLivePrice(pos.mint, pos.entry_price_sol, pos.entry_sol_spent, 3000)
+  const live = useLivePrice(pos.mint, pos.entry_price_sol, pos.entry_sol_spent, 1500)
 
   const pnlPct  = live.pnlPct  ?? pos.pnl_pct
   const pnlSol  = live.pnlSol  ?? pos.unrealized_pnl_sol

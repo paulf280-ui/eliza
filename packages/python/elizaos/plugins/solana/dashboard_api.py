@@ -36,6 +36,8 @@ MONSTER_PAPER_ONLY: bool = os.getenv("MONSTER_PAPER_ONLY", "true").lower() in ("
 # positions are open. Falls back to the monitor's stale DexScreener price if
 # Helius is unavailable.
 _helius_px_cache: dict[str, tuple[float, float]] = {}  # mint → (price_sol, ts)
+_live_pool_cache: dict[str, tuple[str | None, float]] = {}  # mint → (pool_addr, resolved_ts)
+_live_vault_cache: dict[str, tuple[str, str]] = {}          # pool_addr → (base_vault, quote_vault)
 _helius_sol_px_cache: tuple[float, float] = (0.0, 0.0) # (sol_usd, ts)
 _HELIUS_PX_TTL = 3.0   # seconds — refresh every 3s, well within 5s dashboard cycle
 _HELIUS_SOL_TTL = 10.0  # SOL price changes slowly; re-fetch every 10s
@@ -309,11 +311,33 @@ def _generate_report(pos_mgr, wallet_data: dict, session_start: float) -> dict[s
     buys  = [t for t in trades if t["side"] == "buy"]
     sells = [t for t in trades if t["side"] == "sell" and t.get("pnl_sol") is not None]
 
+    # MONSTER trades live in strategy_e (_monster_closed), NOT in pos_mgr — without
+    # merging them the dashboard WR reads 0 even while monster is winning. Classify
+    # by final_pnl_pct (pnl_sol is often null on monster records); derive pnl_sol
+    # from pct × size when missing so realized P&L is still counted.
+    try:
+        from elizaos.plugins.solana.strategy_e_monster import _monster_closed
+        for mt in _monster_closed:
+            pct = mt.get("final_pnl_pct")
+            if pct is None:
+                continue
+            psol = mt.get("pnl_sol")
+            if psol is None:
+                psol = (float(pct) / 100.0) * float(mt.get("sol_spent") or 0)
+            sells.append({"side": "sell", "pnl_pct": float(pct), "pnl_sol": psol,
+                          "sol_amount": mt.get("sol_spent", 0)})
+    except Exception:
+        pass
+
+    def _pnl(t):  # prefer pct (always set), fall back to sol
+        p = t.get("pnl_pct")
+        return p if p is not None else (t.get("pnl_sol") or 0)
+
     total_invested = sum(t.get("sol_amount", 0) for t in buys)
     realized_pnl   = sum(t.get("pnl_sol", 0) or 0 for t in sells)
 
-    winners = [t for t in sells if (t.get("pnl_sol") or 0) > 0]
-    losers  = [t for t in sells if (t.get("pnl_sol") or 0) < 0]
+    winners = [t for t in sells if _pnl(t) > 0]
+    losers  = [t for t in sells if _pnl(t) < 0]
 
     win_rate = len(winners) / len(sells) * 100 if sells else 0
     avg_win  = sum(t.get("pnl_pct", 0) or 0 for t in winners) / len(winners) if winners else 0
@@ -3007,6 +3031,74 @@ When adjusting a filter, always explain your reasoning based on the data above."
             return web.json_response({"error": str(exc)}, status=500)
 
     app.router.add_get("/api/cluster-map", handle_cluster_map)
+
+    # ── Real-time price endpoint (GMGN-grade) ─────────────────────────────────
+    # The dashboard's P&L was polling DexScreener, whose price lags the pool by
+    # 10-30s — so closing a 20% TP against the live GMGN chart was impossible.
+    # This reads the POOL RESERVES via Helius (same as the monitor's TP engine and
+    # GMGN itself), so price/% on the dashboard moves at chart speed.
+    async def handle_live_price(request: web.Request) -> web.Response:
+        import aiohttp, base64
+        mint = request.rel_url.query.get("mint", "").strip()
+        if not mint or len(mint) < 32:
+            return web.json_response({"error": "mint required"}, status=400)
+        price, src = 0.0, None
+        pool_addr, ts = _live_pool_cache.get(mint, (None, 0.0))
+        now = time.time()
+        rpc = os.getenv("SOLANA_RPC_URL", "")
+        try:
+            async with aiohttp.ClientSession() as session:
+                # resolve pool once (cache: found=1h, miss-retry=30s) — pools never move
+                if (pool_addr is None and now - ts > 30) or (pool_addr and now - ts > 3600):
+                    from elizaos.plugins.solana.axiom_copy_trader import _resolve_pool_address
+                    try:
+                        pool_addr = await asyncio.wait_for(_resolve_pool_address(mint, session), timeout=4.0)
+                    except Exception:
+                        pool_addr = None
+                    _live_pool_cache[mint] = (pool_addr, now)
+                # Decode the PumpSwap pool directly (same as the monitor's TP engine /
+                # GMGN): pool account -> vault addresses -> reserves -> price. Done in
+                # the endpoint so it never depends on a service's session/env.
+                if pool_addr and rpc:
+                    async def _rpc(method, params):
+                        async with session.post(rpc, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+                                                timeout=aiohttp.ClientTimeout(total=3)) as r:
+                            return (await r.json()).get("result")
+                        return None
+                    bv, qv = _live_vault_cache.get(pool_addr, (None, None))
+                    if not bv:
+                        res = await _rpc("getAccountInfo", [pool_addr, {"encoding": "base64"}])
+                        val = (res or {}).get("value") or {}
+                        raw_b64 = (val.get("data") or [None])[0]
+                        if raw_b64:
+                            raw = base64.b64decode(raw_b64)
+                            if len(raw) >= 203 and val.get("owner") == "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA":
+                                from solders.pubkey import Pubkey as _Pk
+                                bv = str(_Pk.from_bytes(raw[139:171]))
+                                qv = str(_Pk.from_bytes(raw[171:203]))
+                                _live_vault_cache[pool_addr] = (bv, qv)
+                    if bv and qv:
+                        res = await _rpc("getMultipleAccounts", [[bv, qv], {"encoding": "jsonParsed"}])
+                        accs = (res or {}).get("value") or []
+                        if len(accs) == 2 and accs[0] and accs[1]:
+                            base_amt = float(accs[0]["data"]["parsed"]["info"]["tokenAmount"]["uiAmount"] or 0)
+                            quote_amt = float(accs[1]["data"]["parsed"]["info"]["tokenAmount"]["uiAmount"] or 0)
+                            if base_amt > 0 and quote_amt > 0:
+                                price, src = quote_amt / base_amt, "pool_reserves"
+        except Exception:
+            pass
+        if price <= 0:  # pre-graduation: bonding-curve price from virtual reserves
+            try:
+                pump = _get_pump_svc(runtime)
+                if pump:
+                    bc = await pump.get_bonding_curve(mint)
+                    if bc and bc.get("price_sol", 0) > 0 and not bc.get("complete"):
+                        price, src = float(bc["price_sol"]), "bonding_curve"
+            except Exception:
+                pass
+        return web.json_response({"mint": mint, "price_sol": price, "source": src, "ts": time.time()})
+
+    app.router.add_get("/api/live-price", handle_live_price)
 
     # ── Cabal-Hunter internal bridge (for MCP server) ─────────────────────────
     # Called by the Node.js cabal-hunter service. Returns full analysis including

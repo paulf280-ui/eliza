@@ -27,7 +27,7 @@ interface ChartSlot {
 }
 
 function LiveChartCard({ slot, onDismiss }: { slot: ChartSlot; onDismiss: () => void }) {
-  const live = useLivePrice(slot.mint, slot.entry_price_sol, slot.entry_sol_spent, 3000)
+  const live = useLivePrice(slot.mint, slot.entry_price_sol, slot.entry_sol_spent, 1500)
   const pnlPct = live.pnlPct ?? slot.pnl_pct
   const pnlSol = live.pnlSol
   const pnlPositive = pnlPct >= 0
