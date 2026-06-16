@@ -22,12 +22,13 @@ from pathlib import Path
 BASE = Path(__file__).parent
 SIM_DB = str(BASE / "shadow_sim.db")
 ALPHA_DB = str(BASE / "alpha_engine.db")
+CACHE_DB = str(BASE / "cabal_cache.db")
 PRICE_URL = "http://127.0.0.1:3001/api/live-price"
 
 TP_MULT      = float(os.environ.get("SHADOW_TP", "1.75"))   # +75%
 RUG_MULT     = 0.40                                          # -60% before TP = rugged
 HOLD_CAP_H   = 2.0                                           # close if no TP/rug in 2h
-DETECT_EVERY = 20                                            # seconds between detect sweeps
+DETECT_EVERY = 12                                            # seconds between detect sweeps
 FUNDER_WINDOW = 30 * 60                                      # funder→deploy must be <30 min
 DORMANT_DAYS = 30
 
@@ -155,19 +156,20 @@ async def main():
             if now - wl_ts > 600:   # refresh watchlist every 10 min
                 wl = watchlist(a); deployers = [w for w,r in wl.items() if r=="deployer"]; funders=[w for w,r in wl.items() if r=="funder"]; wl_ts = now
 
-            # ── DETECT: deployer launches (round-robin a few per sweep) ──────────
-            for w in (deployers[di:di+5] or deployers[:5]):
-                for t in await helius(s, w, "CREATE", 8):
-                    ts = t.get("timestamp") or 0
-                    if ts < sim_start: continue
-                    m = _new_mint(t)
-                    if m and m not in seen:
-                        await enter(s, db, m, w, "deployer", ts)
-                        seen.add(m); db.execute("INSERT OR IGNORE INTO seen_mints VALUES (?,?)", (m, now))
-            di = (di + 5) % max(1, len(deployers))
+            # ── DETECT: deployer launches (cover ALL each sweep, 10 concurrent) ──
+            for ci in range(0, len(deployers), 10):
+                chunk = deployers[ci:ci+10]
+                for w, txs in zip(chunk, await asyncio.gather(*[helius(s, w, "CREATE", 6) for w in chunk])):
+                    for t in txs:
+                        ts = t.get("timestamp") or 0
+                        if ts < sim_start: continue
+                        m = _new_mint(t)
+                        if m and m not in seen:
+                            await enter(s, db, m, w, "deployer", ts)
+                            seen.add(m); db.execute("INSERT OR IGNORE INTO seen_mints VALUES (?,?)", (m, now))
 
             # ── DETECT: funder → fresh wallet → deploy ───────────────────────────
-            for w in (funders[fi:fi+5] or funders[:5]):
+            for w in funders:
                 for t in await helius(s, w, None, 8):
                     ts = t.get("timestamp") or 0
                     if ts < sim_start: continue
@@ -187,6 +189,24 @@ async def main():
                         await enter(s, db, m, fund, "funder", ts)
                         seen.add(m); db.execute("INSERT OR IGNORE INTO seen_mints VALUES (?,?)", (m, now))
             db.execute("DELETE FROM funder_candidates WHERE ? - since > ?", (now, FUNDER_WINDOW))
+
+            # ── DETECT: TG-channel flags (HIGH/MEDIUM scored since sim start) ─────
+            # The Telegram channel posts HIGH/MEDIUM tokens — feed those into the sim
+            # too, tagged 'tg_flag', so over 48h we also measure the flag-time signal.
+            try:
+                cc = sqlite3.connect(f"file:{CACHE_DB}?mode=ro", uri=True, timeout=5)
+                for mint, dep_json, ca in cc.execute(
+                        "SELECT mint, deployer_json, computed_at FROM cabal_cache "
+                        "WHERE risk IN ('HIGH','MEDIUM') AND computed_at > ?", (max(sim_start, now - 1800),)).fetchall():
+                    if mint not in seen:
+                        op = ""
+                        try: op = (json.loads(dep_json or "{}") or {}).get("creator") or mint[:8]
+                        except Exception: op = mint[:8]
+                        await enter(s, db, mint, op, "tg_flag", ca)
+                        seen.add(mint); db.execute("INSERT OR IGNORE INTO seen_mints VALUES (?,?)", (mint, now))
+                cc.close()
+            except Exception:
+                pass
 
             # ── TRACK open shadow trades ─────────────────────────────────────────
             for mint, op, role, ets, ep, peak in db.execute(
