@@ -205,6 +205,12 @@ def _db() -> sqlite3.Connection:
         );
         CREATE INDEX IF NOT EXISTS idx_ops_deployer ON token_operators(deployer);
         CREATE INDEX IF NOT EXISTS idx_ops_funder ON token_operators(deployer_funder);
+        -- CEX/infra classification — a funder behind many deployers is usually an
+        -- EXCHANGE (people withdrew from it), not an operator. Filter these out so
+        -- the watchlist is real operators only. klass = 'infra' | 'operator'.
+        CREATE TABLE IF NOT EXISTS wallet_class (
+            wallet TEXT PRIMARY KEY, klass TEXT, label TEXT, checked_ts REAL
+        );
         """
     )
     db.commit()
@@ -438,6 +444,52 @@ def stats(db: sqlite3.Connection) -> dict:
     }
 
 
+# ── CEX/infra classification (reuse the cabal tool's thresholds) ────────────────
+try:
+    from cluster_check import (_CEX_FUNDERS as _CEX_KNOWN,
+                               _INFRA_MIN_SIGS as _IMS, _INFRA_MIN_RATE_PER_H as _IMR)
+except Exception:
+    _CEX_KNOWN, _IMS, _IMR = {}, 900, 50
+
+def classify_wallet(wallet: str) -> tuple[str, str | None]:
+    """('infra', label) if exchange/high-volume wallet, else ('operator', None)."""
+    known = _CEX_KNOWN.get(wallet)
+    if known:
+        return "infra", known
+    sigs = _rpc_call("getSignaturesForAddress", [wallet, {"limit": 1000}])
+    if not isinstance(sigs, list) or len(sigs) < _IMS:
+        return "operator", None
+    times = [s.get("blockTime") for s in sigs if s.get("blockTime")]
+    if len(times) < 2:
+        return "operator", None
+    span_h = (max(times) - min(times)) / 3600.0
+    if span_h <= 0 or (len(times) / span_h) >= _IMR:
+        return "infra", "high-volume wallet"
+    return "operator", None
+
+def classify_operators(db: sqlite3.Connection, limit: int = 40) -> int:
+    """Classify un-classified RECURRING deployers/funders (the watchlist set),
+    bounded per cycle to cap RPC. Result cached permanently in wallet_class."""
+    done = {r[0] for r in db.execute("SELECT wallet FROM wallet_class").fetchall()}
+    cand: set[str] = set()
+    for r in db.execute("SELECT deployer FROM token_operators GROUP BY deployer HAVING COUNT(DISTINCT mint)>=2"):
+        if r[0]: cand.add(r[0])
+    for r in db.execute("SELECT deployer_funder FROM token_operators WHERE deployer_funder IS NOT NULL "
+                        "GROUP BY deployer_funder HAVING COUNT(DISTINCT mint)>=2"):
+        if r[0]: cand.add(r[0])
+    todo = [w for w in cand if w not in done][:limit]
+    n = 0
+    for w in todo:
+        klass, label = classify_wallet(w)
+        db.execute("INSERT OR REPLACE INTO wallet_class VALUES (?,?,?,?)", (w, klass, label, time.time()))
+        n += 1
+        time.sleep(0.15)
+    if n:
+        db.commit()
+        log.info("CEX-filter: classified %d recurring operators", n)
+    return n
+
+
 def run_once(db: sqlite3.Connection) -> None:
     try:
         collect_new(db)
@@ -447,6 +499,10 @@ def run_once(db: sqlite3.Connection) -> None:
         poll_outcomes(db)
     except Exception:
         log.exception("poll_outcomes failed")
+    try:
+        classify_operators(db)
+    except Exception:
+        log.exception("classify_operators failed")
 
 
 def main() -> None:

@@ -193,18 +193,26 @@ def digest(db: sqlite3.Connection, day: str):
     # an operator whose tokens KEEP hitting 30K is one to follow into fresh launches,
     # even if the tokens ultimately rug (we exit at the swing). 30K = the target.
     REACHED = 30000.0
+    try:
+        infra = g("SELECT COUNT(*) FROM wallet_class WHERE klass='infra'")
+        ops = g("SELECT COUNT(*) FROM wallet_class WHERE klass='operator'")
+        print(f"\n  [CEX-filter: {infra} infra/exchange wallets removed, {ops} confirmed operators]")
+    except Exception:
+        pass
     for role, col in [("deployer_funder", "MASTER FUNDERS (funded the deployer)"),
                       ("deployer", "DEPLOYERS (the operator wallet)")]:
-        print(f"\n— {col} — funded ≥2 tokens, ranked by how many hit 30K")
+        print(f"\n— {col} — real operators only (CEX/infra excluded), ≥2 tokens")
         try:
+            # exclude wallets classified as infra/exchange; show operators + not-yet-classified
             rows = db.execute(
                 f"""SELECT op.{role}, COUNT(DISTINCT op.mint) tokens,
                        SUM(CASE WHEN COALESCE(oc.max_mcap_usd,0)>=? THEN 1 ELSE 0 END) hit30k,
                        MAX(op.deployer_verdict) verdict
                     FROM token_operators op LEFT JOIN outcomes oc ON oc.mint=op.mint
                     WHERE op.{role} IS NOT NULL
+                      AND op.{role} NOT IN (SELECT wallet FROM wallet_class WHERE klass='infra')
                     GROUP BY op.{role} HAVING tokens>=2
-                    ORDER BY hit30k DESC, tokens DESC LIMIT 15""",
+                    ORDER BY tokens DESC, hit30k DESC LIMIT 15""",
                 (REACHED,),
             ).fetchall()
             if not rows:
