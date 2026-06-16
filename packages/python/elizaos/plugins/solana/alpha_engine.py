@@ -213,6 +213,11 @@ def _db() -> sqlite3.Connection:
         );
         """
     )
+    # additive migration — last on-chain activity of the wallet (liveness)
+    try:
+        db.execute("ALTER TABLE wallet_class ADD COLUMN last_active REAL")
+    except Exception:
+        pass
     db.commit()
     return db
 
@@ -451,42 +456,55 @@ try:
 except Exception:
     _CEX_KNOWN, _IMS, _IMR = {}, 900, 50
 
-def classify_wallet(wallet: str) -> tuple[str, str | None]:
-    """('infra', label) if exchange/high-volume wallet, else ('operator', None)."""
+def classify_wallet(wallet: str) -> tuple[str, str | None, float | None]:
+    """('infra'|'operator', label, last_active_ts). last_active = newest tx time
+    (liveness) — captured free from the same getSignaturesForAddress call."""
     known = _CEX_KNOWN.get(wallet)
     if known:
-        return "infra", known
+        return "infra", known, None
     sigs = _rpc_call("getSignaturesForAddress", [wallet, {"limit": 1000}])
+    last_active = None
+    if isinstance(sigs, list) and sigs:
+        bts = [s.get("blockTime") for s in sigs if s.get("blockTime")]
+        if bts:
+            last_active = float(max(bts))
     if not isinstance(sigs, list) or len(sigs) < _IMS:
-        return "operator", None
+        return "operator", None, last_active
     times = [s.get("blockTime") for s in sigs if s.get("blockTime")]
     if len(times) < 2:
-        return "operator", None
+        return "operator", None, last_active
     span_h = (max(times) - min(times)) / 3600.0
     if span_h <= 0 or (len(times) / span_h) >= _IMR:
-        return "infra", "high-volume wallet"
-    return "operator", None
+        return "infra", "high-volume wallet", last_active
+    return "operator", None, last_active
 
 def classify_operators(db: sqlite3.Connection, limit: int = 40) -> int:
-    """Classify un-classified RECURRING deployers/funders (the watchlist set),
-    bounded per cycle to cap RPC. Result cached permanently in wallet_class."""
-    done = {r[0] for r in db.execute("SELECT wallet FROM wallet_class").fetchall()}
+    """Classify recurring deployers/funders + refresh their liveness. Processes
+    un-classified wallets AND ones whose liveness is stale (>3 days) so dormant
+    operators get dropped from the live watchlist. Bounded per cycle."""
+    state = {r[0]: (r[1], r[2]) for r in
+             db.execute("SELECT wallet, checked_ts, last_active FROM wallet_class").fetchall()}
     cand: set[str] = set()
     for r in db.execute("SELECT deployer FROM token_operators GROUP BY deployer HAVING COUNT(DISTINCT mint)>=2"):
         if r[0]: cand.add(r[0])
     for r in db.execute("SELECT deployer_funder FROM token_operators WHERE deployer_funder IS NOT NULL "
                         "GROUP BY deployer_funder HAVING COUNT(DISTINCT mint)>=2"):
         if r[0]: cand.add(r[0])
-    todo = [w for w in cand if w not in done][:limit]
+    now = time.time()
+    # new wallets first, then ones with stale/missing liveness
+    todo = [w for w in cand if w not in state]
+    todo += [w for w in cand if w in state and (state[w][1] is None or now - (state[w][0] or 0) > 3 * 86400)]
+    todo = todo[:limit]
     n = 0
     for w in todo:
-        klass, label = classify_wallet(w)
-        db.execute("INSERT OR REPLACE INTO wallet_class VALUES (?,?,?,?)", (w, klass, label, time.time()))
+        klass, label, last_active = classify_wallet(w)
+        db.execute("INSERT OR REPLACE INTO wallet_class (wallet, klass, label, checked_ts, last_active) "
+                   "VALUES (?,?,?,?,?)", (w, klass, label, now, last_active))
         n += 1
         time.sleep(0.15)
     if n:
         db.commit()
-        log.info("CEX-filter: classified %d recurring operators", n)
+        log.info("CEX-filter: classified/refreshed %d operators", n)
     return n
 
 

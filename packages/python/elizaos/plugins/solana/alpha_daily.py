@@ -199,11 +199,12 @@ def digest(db: sqlite3.Connection, day: str):
         print(f"\n  [CEX-filter: {infra} infra/exchange wallets removed, {ops} confirmed operators]")
     except Exception:
         pass
+    DORMANT_DAYS = 30
+    now_ts = time.time()
     for role, col in [("deployer_funder", "MASTER FUNDERS (funded the deployer)"),
                       ("deployer", "DEPLOYERS (the operator wallet)")]:
-        print(f"\n— {col} — real operators only (CEX/infra excluded), ≥2 tokens")
+        print(f"\n— {col} — LIVE operators only (CEX excluded, dormant >{DORMANT_DAYS}d dropped), ≥2 tokens")
         try:
-            # exclude wallets classified as infra/exchange; show operators + not-yet-classified
             rows = db.execute(
                 f"""SELECT op.{role}, COUNT(DISTINCT op.mint) tokens,
                        SUM(CASE WHEN COALESCE(oc.max_mcap_usd,0)>=? THEN 1 ELSE 0 END) hit30k,
@@ -212,14 +213,28 @@ def digest(db: sqlite3.Connection, day: str):
                     WHERE op.{role} IS NOT NULL
                       AND op.{role} NOT IN (SELECT wallet FROM wallet_class WHERE klass='infra')
                     GROUP BY op.{role} HAVING tokens>=2
-                    ORDER BY tokens DESC, hit30k DESC LIMIT 15""",
+                    ORDER BY tokens DESC, hit30k DESC LIMIT 40""",
                 (REACHED,),
             ).fetchall()
-            if not rows:
-                print("    (none recurring yet — needs the same operator on ≥2 scanned tokens)")
+            shown = dormant = 0
             for w, t, hit, vd in rows:
+                la = db.execute("SELECT last_active FROM wallet_class WHERE wallet=?", (w,)).fetchone()
+                last = la[0] if la and la[0] else None
+                days = (now_ts - last) / 86400 if last else None
+                if days is not None and days > DORMANT_DAYS:
+                    dormant += 1
+                    continue  # dead data — keep off the live watchlist
+                act = (f"{days*24:.0f}h ago" if days is not None and days < 1
+                       else f"{days:.0f}d ago" if days is not None else "unchecked")
                 tag = "⛔serial" if vd == "SERIAL_RUGGER" else ("⚠poor" if vd == "POOR_TRACK_RECORD" else "")
-                print(f"    {w[:6]}..{w[-4:]}  {t} tokens, {hit or 0} hit 30K  {tag}")
+                print(f"    {w[:6]}..{w[-4:]}  {t} tokens, {hit or 0} hit 30K · active {act}  {tag}")
+                shown += 1
+                if shown >= 15:
+                    break
+            if not shown:
+                print("    (no live recurring operators yet)")
+            if dormant:
+                print(f"    [{dormant} dormant >{DORMANT_DAYS}d dropped — dead data]")
         except Exception as e:
             print(f"    (operators table not ready: {e})")
     print()
