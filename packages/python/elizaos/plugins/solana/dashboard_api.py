@@ -3100,6 +3100,52 @@ When adjusting a filter, always explain your reasoning based on the data above."
 
     app.router.add_get("/api/live-price", handle_live_price)
 
+    # ── Shadow copy-trade sim — live feed for the dashboard panel ─────────────
+    async def handle_shadow(request: web.Request) -> web.Response:
+        import sqlite3 as _sq
+        path = os.path.join(os.path.dirname(__file__), "shadow_sim.db")
+        if not os.path.exists(path):
+            return web.json_response({"running": False})
+        try:
+            db = _sq.connect(f"file:{path}?mode=ro", uri=True)
+            srow = db.execute("SELECT v FROM sim_meta WHERE k='start'").fetchone()
+            start = srow[0] if srow else time.time()
+            counts = {st: n for st, n in db.execute("SELECT status, COUNT(*) FROM shadow_trades GROUP BY status").fetchall()}
+            closed = sum(counts.get(s, 0) for s in ("WIN", "RUG", "TIMEOUT"))
+            wins = counts.get("WIN", 0)
+            trades = [
+                {"mint": m, "operator": op, "role": role, "status": st,
+                 "peak_mult": pm, "entry_ts": ets, "time_to_tp": ttp, "lag": lag}
+                for m, op, role, st, pm, ets, ttp, lag in db.execute(
+                    "SELECT mint,operator,role,status,peak_mult,entry_ts,time_to_tp_s,detect_lag_s "
+                    "FROM shadow_trades ORDER BY (status='open') DESC, entry_ts DESC LIMIT 50").fetchall()]
+            per_op = [
+                {"operator": op, "role": role, "total": t, "wins": w}
+                for op, role, t, w in db.execute(
+                    "SELECT operator,role,COUNT(*) t,SUM(CASE WHEN status='WIN' THEN 1 ELSE 0 END) w "
+                    "FROM shadow_trades WHERE status IN ('WIN','RUG','TIMEOUT') "
+                    "GROUP BY operator ORDER BY w DESC, t DESC LIMIT 12").fetchall()]
+            avg_ttp = db.execute("SELECT AVG(time_to_tp_s) FROM shadow_trades WHERE status='WIN'").fetchone()[0]
+            avg_lag = db.execute("SELECT AVG(detect_lag_s) FROM shadow_trades").fetchone()[0]
+            db.close()
+            return web.json_response({
+                "running": True,
+                "elapsed_h": round((time.time() - start) / 3600, 1),
+                "tp_pct": 75,
+                "summary": {"total": sum(counts.values()), "open": counts.get("open", 0),
+                            "wins": wins, "rugs": counts.get("RUG", 0),
+                            "timeout": counts.get("TIMEOUT", 0), "no_price": counts.get("no_price", 0)},
+                "closed": closed,
+                "hit_rate": round(100 * wins / closed, 0) if closed else None,
+                "avg_time_to_tp_min": round(avg_ttp / 60, 1) if avg_ttp else None,
+                "avg_lag_s": round(avg_lag) if avg_lag else None,
+                "trades": trades, "per_operator": per_op,
+            })
+        except Exception as exc:
+            return web.json_response({"running": False, "error": str(exc)})
+
+    app.router.add_get("/api/shadow", handle_shadow)
+
     # ── Cabal-Hunter internal bridge (for MCP server) ─────────────────────────
     # Called by the Node.js cabal-hunter service. Returns full analysis including
     # pre-cached results. Internal-only — protected by CABAL_INTERNAL_SECRET env var.
