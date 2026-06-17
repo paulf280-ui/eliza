@@ -331,6 +331,7 @@
       </div>
       <div class="verdict-text" id="verdict-text"></div>
       <div id="bundle-badge" style="display:none;margin-top:10px"></div>
+      <div id="exit-liq-risk" style="display:none;margin-top:10px;padding:12px;border-radius:8px;text-align:left"></div>
       <div id="score-guide" style="margin-top:12px;padding:12px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid rgba(255,255,255,.06)"></div>
       <div id="deployer-panel" style="display:none;margin-top:10px;padding:12px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid rgba(255,255,255,.06);text-align:left"></div>
     </div>
@@ -560,6 +561,45 @@ function render(data) {
   document.getElementById('gauge-num').textContent = score;
   document.getElementById('gauge-num').style.color = arcColour;
   document.getElementById('verdict-text').textContent = verdict;
+
+  // ── EXIT-LIQUIDITY RISK — the single most actionable question: if you buy,
+  // are you the exit liquidity? Synthesises the signals that mean insiders are
+  // positioned to dump on a buyer (bundle, concentration, shared funder,
+  // coordinated dump, serial-rug dev). This is the headline a trader needs.
+  (function renderExitRisk() {
+    const el = document.getElementById('exit-liq-risk');
+    if (!el) return;
+    const cl = clusters || [];
+    const bundled  = data.time_sync || cl.some(c => c.type === 'time_sync');
+    const coordEx  = data.coordinated_exit || cl.some(c => c.type === 'coordinated_exit');
+    const topPct   = data.top_holder_pct || 0;
+    const serial   = (data.deployer || {}).verdict === 'SERIAL_RUGGER';
+    const funder   = cl.filter(c => c.type === 'funding' || !c.type).sort((a,b)=>(b.combined_pct||0)-(a.combined_pct||0))[0];
+    const reasons = [];
+    if (coordEx)            reasons.push('a cluster is dumping in the same block right now');
+    if (bundled)            reasons.push('the launch was bundled — insiders bought the same block and are holding to sell into buyers');
+    if (topPct >= 25)       reasons.push(`one wallet holds ${topPct.toFixed(0)}% — it can crater the price alone`);
+    if (funder && (funder.combined_pct||0) >= 15) reasons.push(`${funder.wallet_count} wallets from one funder hold ${funder.combined_pct.toFixed(0)}% — coordinated supply`);
+    if (serial)             reasons.push(`the dev is a serial rugger (${(data.deployer||{}).dead}/${(data.deployer||{}).sampled} past launches dead)`);
+    let level, col;
+    if (coordEx || bundled || topPct >= 30 || serial)               { level = 'HIGH';   col = '#ef4444'; }
+    else if (reasons.length || score >= 35 || topPct >= 20)         { level = 'ELEVATED'; col = '#f59e0b'; }
+    else                                                            { level = 'LOW';    col = '#10b981'; }
+    const headline = level === 'LOW'
+      ? 'No coordinated insiders positioned to dump on you. Standard due diligence still applies.'
+      : (reasons[0] ? reasons[0].charAt(0).toUpperCase() + reasons[0].slice(1) + '.' : 'Signs that insiders are positioned to dump on buyers.');
+    const extra = reasons.slice(1).map(r => `<div style="font-size:11px;color:#cbd5e1;margin-top:3px">• ${r}</div>`).join('');
+    el.style.display = '';
+    el.style.background = col + '14';
+    el.style.border = '1px solid ' + col + '55';
+    el.innerHTML =
+      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+         <span style="font-size:13px">${level === 'LOW' ? '✅' : '🩸'}</span>
+         <span style="font-size:12px;font-weight:800;letter-spacing:.5px;color:${col}">EXIT-LIQUIDITY RISK: ${level}</span>
+       </div>
+       <div style="font-size:11px;color:#e2e8f0;line-height:1.45">${headline}</div>${extra}
+       <div style="font-size:9px;color:#64748b;margin-top:6px">Are you the buyer the insiders sell to? ${level==='LOW'?'Not the obvious one here.':'Likely — size accordingly.'}</div>`;
+  })();
 
   // Plain-English score guide
   const guideEl = document.getElementById('score-guide');

@@ -240,12 +240,13 @@ export function createApp(): express.Application {
   </div>
 </div>
 
-<h1>Detect coordinated wallet<br>cabals before your bot buys.</h1>
-<p class="sub">Three on-chain detection layers screeners don't have: <strong style="color:#e2e8f0">funding-source tracing</strong>, <strong style="color:#e2e8f0">same-block bundle detection</strong>, and <strong style="color:#e2e8f0">deployer track record</strong> — every red flag linked to its on-chain proof.<br>One call, one 0–100 score. <strong style="color:#10b981">100 free queries/month</strong> — then $0.05 USDC per query. No API key. No account.</p>
+<h1>Know if you're the exit liquidity —<br>before you buy.</h1>
+<p class="sub">On Solana, <strong style="color:#e2e8f0">over half of pump.fun launches are sniped in the creation block by wallets the deployer funded</strong> — they buy at the bottom and dump on you. Cabal-Hunter traces the funding, catches the same-block bundles, flags the serial-rug devs, and gives you one verdict: <strong style="color:#f87171">are the insiders positioned to dump on you?</strong><br>One call, one 0–100 score, every flag linked to its on-chain proof. <strong style="color:#10b981">100 free queries/month</strong> — then $0.05 USDC per query. No API key. No account.</p>
 
 <p style="font-size:13px;color:#64748b;margin:-20px 0 36px;line-height:1.6"><strong style="color:#94a3b8">The complete on-chain X-ray for any Solana token.</strong> In one scan: trace holder funding, catch same-block bundles and coordinated dumps, pull the deployer's track record, map which exchanges funded the holders, and see which cohorts are actually in profit — every red flag linked to its on-chain proof. Works on any mint, graduated or still on the curve.</p>
 
 <div class="cards" style="grid-template-columns:1fr 1fr 1fr">
+  <div class="card" style="border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.06)"><div class="card-title" style="color:#f87171">🩸 Exit-Liquidity Risk</div><div class="card-val" style="font-size:13px;color:#e2e8f0">The one question that matters: <strong>are YOU the buyer the insiders sell to?</strong> One verdict from the bundle, concentration, shared-funder and dump signals — designed-to-dump launches, flagged before you ape.</div></div>
   <div class="card"><div class="card-title">🔍 Funding Trace</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Top holders walked back to shared funding wallets</div></div>
   <div class="card"><div class="card-title">⚡ Bundle Detection</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Wallets that bought in the exact same block — Jito bundles can't hide</div></div>
   <div class="card"><div class="card-title">🚨 Coordinated Dump</div><div class="card-val" style="font-size:13px;color:#e2e8f0">Multiple holders selling in the EXACT same block — a cabal exiting in real time</div></div>
@@ -648,8 +649,9 @@ ${(d.blocks || []).length ? `<h2>Bad tokens we blocked (saves)${d.blocks_checked
   app.get("/api/info", (_req, res) => {
     res.json({
       service:         "Cabal-Hunter",
-      description:     "On-chain coordinated wallet detection for Solana meme tokens",
+      description:     "On-chain coordinated wallet detection for Solana meme tokens — tells you if you'd be the exit liquidity before you buy",
       detection_layers: {
+        exit_liquidity_risk: "Headline verdict (LOW | ELEVATED | HIGH) synthesising the signals that mean insiders are positioned to dump on a buyer — bundled launch, single-wallet concentration, shared-funder cluster, coordinated dump, serial-rug deployer. The one number a trader needs.",
         funding_trace:  "Top holders walked back to shared funding wallets (clusters[].type='funding'). Each cluster carries evidence_txs[] — the actual funding transactions.",
         bundle_detect:  "Holders that bought in the exact same block — Jito bundle signature (time_sync:true, clusters[].type='time_sync')",
         coordinated_exit: "Multiple holders that DUMPED (≥25% of their bag each) in the exact same block — a cabal exiting in real time (coordinated_exit:true, clusters[].type='coordinated_exit', sold_pct = % of supply dumped)",
