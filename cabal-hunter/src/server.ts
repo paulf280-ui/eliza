@@ -207,11 +207,43 @@ export function createApp(): express.Application {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Cabal-Hunter — Solana Token Cabal Detection</title>
+<title>Cabal-Hunter — Solana Rug & Cabal Detector | Are You Exit Liquidity?</title>
+<meta name="description" content="Free Solana token safety scanner. Before you buy, trace coordinated wallets, same-block Jito bundles, serial-rug deployers and live dumps — one Exit-Liquidity Risk verdict. MCP + REST API for AI trading agents (Claude, Cursor, ElizaOS).">
+<meta name="keywords" content="solana cabal detector, solana rug checker, pump.fun bundle detection, exit liquidity, am i exit liquidity, coordinated wallet detection, solana token safety, rug check, sniper bundle detection, serial rugger, deployer history, solana MCP server, on-chain funding trace, coordinated dump detection">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="author" content="PF Capital">
+<meta name="theme-color" content="#07080f">
+<link rel="canonical" href="https://api.cabal-hunter.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Cabal-Hunter">
+<meta property="og:title" content="Cabal-Hunter — Solana Rug & Cabal Detector">
+<meta property="og:description" content="Know if you're the exit liquidity before you buy. Traces coordinated wallets, same-block bundles, serial-rug deployers and live dumps on any Solana token. Free tier + MCP/API for AI agents.">
+<meta property="og:url" content="https://api.cabal-hunter.com/">
+<meta property="og:image" content="https://api.cabal-hunter.com/og.svg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@CabalhunterAPI">
+<meta name="twitter:title" content="Cabal-Hunter — Solana Rug & Cabal Detector">
+<meta name="twitter:description" content="Know if you're the exit liquidity before you buy. On-chain cabal, bundle, rug-deployer & dump detection for any Solana token. Free + MCP/API for AI agents.">
+<meta name="twitter:image" content="https://api.cabal-hunter.com/og.svg">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23ff4d6d'/><text x='50' y='70' font-size='54' font-weight='900' text-anchor='middle' fill='white' font-family='Arial'>CH</text></svg>">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Cabal-Hunter","applicationCategory":"DeveloperApplication","operatingSystem":"Web, MCP, REST API","description":"On-chain Solana token safety scanner: traces coordinated wallet funding, same-block Jito bundles, serial-rug deployers and coordinated dumps into a single Exit-Liquidity Risk verdict before you buy.","url":"https://api.cabal-hunter.com/","offers":{"@type":"Offer","price":"0","priceCurrency":"USD","description":"100 free queries per month per IP, then 0.05 USDC per query"},"featureList":["Funding-source tracing","Same-block Jito bundle detection","Coordinated dump detection","Serial-rug deployer history","CEX-noise filter","Exit-Liquidity Risk verdict","MCP server for Claude, Cursor and ElizaOS"],"creator":{"@type":"Organization","name":"PF Capital","url":"https://api.cabal-hunter.com/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What is a Solana cabal?","acceptedAnswer":{"@type":"Answer","text":"A cabal is a group of wallets — often funded from the same source and buying in the same block — that quietly accumulate a large share of a token's supply before retail, then dump simultaneously into the buyers who pile in after launch."}},{"@type":"Question","name":"How do I check if a Solana token is a rug?","acceptedAnswer":{"@type":"Answer","text":"Scan the mint with Cabal-Hunter. It traces holder funding back to shared sources, detects same-block bundle buys, flags serial-rug deployers and live coordinated dumps, and returns an Exit-Liquidity Risk verdict of LOW, ELEVATED or HIGH."}},{"@type":"Question","name":"Is Cabal-Hunter free?","acceptedAnswer":{"@type":"Answer","text":"Yes — 100 free queries per month per IP, with no signup or API key. Beyond that it is 0.05 USDC per query, paid natively on Solana."}},{"@type":"Question","name":"Can AI trading agents use Cabal-Hunter?","acceptedAnswer":{"@type":"Answer","text":"Yes. Cabal-Hunter exposes an MCP server at api.cabal-hunter.com/mcp so Claude, Cursor and ElizaOS agents can call check_cabal_risk automatically before a swap, plus a REST API for any language."}}]}</script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:#07080f;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;padding:40px 24px;max-width:780px;margin:0 auto}
-  .logo{display:flex;align-items:center;gap:12px;margin-bottom:40px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+  .logo{display:flex;align-items:center;gap:12px}
+  .socials{display:flex;gap:10px;flex-shrink:0}
+  .social{display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border-radius:10px;font-size:13.5px;font-weight:800;text-decoration:none;white-space:nowrap;transition:transform .15s,box-shadow .15s}
+  .social:hover{transform:translateY(-2px)}
+  .social-x{background:#fff;color:#000;box-shadow:0 0 0 1px rgba(255,255,255,.15)}
+  .social-x:hover{box-shadow:0 8px 22px rgba(255,255,255,.28)}
+  .social-tg{background:linear-gradient(135deg,#2AABEE,#229ED9);color:#fff;box-shadow:0 0 20px rgba(34,158,217,.5)}
+  .social-tg:hover{box-shadow:0 8px 26px rgba(34,158,217,.65)}
+  .social .pill{font-size:9.5px;font-weight:800;background:rgba(0,0,0,.22);padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:.4px}
+  .tg-nudge{font-size:12.5px;color:#94a3b8;margin-bottom:34px;display:flex;align-items:center;gap:7px}
+  .tg-nudge a{color:#2dd4bf;font-weight:700;text-decoration:none}
+  .tg-nudge a:hover{text-decoration:underline}
   .icon{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#ff4d6d,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:white;flex-shrink:0}
   h1{font-size:32px;font-weight:900;line-height:1.1;margin-bottom:12px;letter-spacing:-0.5px}
   .sub{font-size:16px;color:#94a3b8;margin-bottom:36px;line-height:1.6}
@@ -232,13 +264,20 @@ export function createApp(): express.Application {
 </style>
 </head>
 <body>
-<div class="logo">
-  <div class="icon">CH</div>
-  <div>
-    <div style="font-size:20px;font-weight:800">Cabal-Hunter</div>
-    <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px">Solana Token Cabal Detection</div>
+<div class="topbar">
+  <div class="logo">
+    <div class="icon">CH</div>
+    <div>
+      <div style="font-size:20px;font-weight:800">Cabal-Hunter</div>
+      <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px">Solana Token Cabal Detection</div>
+    </div>
+  </div>
+  <div class="socials">
+    <a class="social social-x" href="https://x.com/CabalhunterAPI" target="_blank" rel="noopener">𝕏 Follow</a>
+    <a class="social social-tg" href="https://t.me/CabalHunterAlerts" target="_blank" rel="noopener">✈ Telegram <span class="pill">Free alerts</span></a>
   </div>
 </div>
+<div class="tg-nudge">📡 <span>Live cabal &amp; rug alerts the moment we catch them — <a href="https://t.me/CabalHunterAlerts" target="_blank" rel="noopener">join the free Telegram →</a> no signup, no cost.</span></div>
 
 <h1>Know if you're the exit liquidity —<br>before you buy.</h1>
 <p class="sub">On Solana, <strong style="color:#e2e8f0">over half of pump.fun launches are sniped in the creation block by wallets the deployer funded</strong> — they buy at the bottom and dump on you. Cabal-Hunter traces the funding, catches the same-block bundles, flags the serial-rug devs, and gives you one verdict: <strong style="color:#f87171">are the insiders positioned to dump on you?</strong><br>One call, one 0–100 score, every flag linked to its on-chain proof. <strong style="color:#10b981">100 free queries/month</strong> — then $0.05 USDC per query. No API key. No account.</p>
@@ -315,6 +354,121 @@ export function createApp(): express.Application {
       version: "1.1.0",
       time:    new Date().toISOString(),
     })
+  })
+
+  // ── Search-engine ownership verification (served at site root) ───────────────
+  app.get("/googleaef63eaa6f1142c1.html", (_req, res) => {
+    res.type("text/html").send("google-site-verification: googleaef63eaa6f1142c1.html")
+  })
+  app.get("/BingSiteAuth.xml", (_req, res) => {
+    res.type("application/xml").send(
+`<?xml version="1.0"?>
+<users>
+	<user>A380827E3A6B42BA593572BCFB069AA9</user>
+</users>`)
+  })
+
+  // ── SEO / crawler discovery ──────────────────────────────────────────────────
+  // robots.txt — explicitly WELCOME search + AI crawlers (we WANT to be in their
+  // index/retrieval). Many sites block GPTBot/ClaudeBot/etc; we allow them so the
+  // tool surfaces when someone asks an AI "how do I check a Solana token for a rug".
+  app.get("/robots.txt", (_req, res) => {
+    res.type("text/plain").send(
+`User-agent: *
+Allow: /
+
+# AI crawlers — explicitly allowed for discovery & retrieval
+User-agent: GPTBot
+Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: Claude-Web
+Allow: /
+User-agent: anthropic-ai
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: Google-Extended
+Allow: /
+User-agent: CCBot
+Allow: /
+User-agent: Applebot-Extended
+Allow: /
+
+# Keep crawlers out of admin only
+Disallow: /admin/
+
+Sitemap: https://api.cabal-hunter.com/sitemap.xml`)
+  })
+
+  // sitemap.xml — the indexable public pages
+  app.get("/sitemap.xml", (_req, res) => {
+    const today = new Date().toISOString().slice(0, 10)
+    const urls = ["/", "/compare", "/api/info", "/demo", "/llms.txt"]
+    res.type("application/xml").send(
+`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.map(u => `  <url><loc>https://api.cabal-hunter.com${u}</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq></url>`).join("\n")}
+</urlset>`)
+  })
+
+  // llms.txt — the AI-tool discovery file (llmstxt.org). Gives LLMs a clean,
+  // factual summary of what Cabal-Hunter is and how an agent calls it.
+  app.get("/llms.txt", (_req, res) => {
+    res.type("text/plain").send(
+`# Cabal-Hunter
+
+> On-chain Solana token safety scanner. Tells you if you're the exit liquidity BEFORE you buy: it traces coordinated wallet funding, same-block Jito bundles, serial-rug deployers and live coordinated dumps, and returns one Exit-Liquidity Risk verdict (LOW | ELEVATED | HIGH).
+
+Cabal-Hunter is built for both humans (a visual bubble map) and AI trading agents (an MCP server + REST API). It works on any Solana mint — pre-graduation on the pump.fun bonding curve or after, on PumpSwap/Raydium.
+
+## What it detects
+- Funding trace: top holders walked back to shared funding wallets (classic cabal signature), each with on-chain evidence transactions.
+- Same-block bundle detection: wallets that bought in one Jito bundle (stealth launches).
+- Coordinated dump detection: multiple holders selling a meaningful chunk in the exact same block — a cabal exiting in real time.
+- Deployer track record: the creator wallet's full launch history (e.g. "launched 14 tokens, 13 dead" = SERIAL_RUGGER).
+- CEX-noise filter: holders funded from a shared exchange are excluded so you don't get false positives.
+- Exit-Liquidity Risk: the headline verdict synthesising all of the above.
+
+## For AI agents (MCP)
+- MCP endpoint: https://api.cabal-hunter.com/mcp
+- Tool: check_cabal_risk(mintAddress) — call it before any Solana swap; abort if cabalScore >= 35 or isControlled is true.
+- Works with Claude (Claude Code / Desktop), Cursor, and ElizaOS (x402 auto-payment).
+
+## REST API
+- POST https://api.cabal-hunter.com/api/scan-cabal {"mintAddress":"..."} — full analysis.
+- GET https://api.cabal-hunter.com/map?mint=... — free visual bubble map.
+- GET https://api.cabal-hunter.com/api/info — pricing, endpoints, response schema.
+
+## Pricing
+- Free: 100 queries/month per IP, no account, no API key.
+- Then $0.05 USDC per query, paid natively on Solana (x402). No subscription.
+
+## Links
+- Site: https://api.cabal-hunter.com/
+- X/Twitter: https://x.com/CabalhunterAPI
+- Telegram (free live cabal alerts): https://t.me/CabalHunterAlerts
+- GitHub template: https://github.com/paulf280-ui/solana-safe-sniper-mcp-template`)
+  })
+
+  // og.svg — branded social/share image (1200x630)
+  app.get("/og.svg", (_req, res) => {
+    res.type("image/svg+xml").set("Cache-Control", "public,max-age=86400").send(
+`<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+<rect width="1200" height="630" fill="#07080f"/>
+<rect x="60" y="60" width="84" height="84" rx="18" fill="url(#g)"/>
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff4d6d"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs>
+<text x="168" y="118" font-family="Arial,sans-serif" font-size="42" font-weight="900" fill="#e2e8f0">Cabal-Hunter</text>
+<text x="60" y="300" font-family="Arial,sans-serif" font-size="76" font-weight="900" fill="#e2e8f0">Are you the</text>
+<text x="60" y="392" font-family="Arial,sans-serif" font-size="76" font-weight="900" fill="#f87171">exit liquidity?</text>
+<text x="60" y="476" font-family="Arial,sans-serif" font-size="32" fill="#94a3b8">On-chain Solana cabal, bundle, rug-deployer &amp; dump detection</text>
+<text x="60" y="520" font-family="Arial,sans-serif" font-size="32" fill="#94a3b8">— before you buy. Free + MCP/API for AI agents.</text>
+<text x="60" y="585" font-family="Arial,sans-serif" font-size="26" font-weight="700" fill="#2dd4bf">api.cabal-hunter.com</text>
+</svg>`)
   })
 
   // ── Main analysis endpoint ────────────────────────────────────────────────────
