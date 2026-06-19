@@ -471,6 +471,16 @@ Cabal-Hunter is built for both humans (a visual bubble map) and AI trading agent
 </svg>`)
   })
 
+  // avatar.svg — square logo for directory listings (mcp.so, registries)
+  app.get("/avatar.svg", (_req, res) => {
+    res.type("image/svg+xml").set("Cache-Control", "public,max-age=86400").send(
+`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+<defs><linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff4d6d"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs>
+<rect width="400" height="400" rx="84" fill="url(#a)"/>
+<text x="200" y="278" font-family="Arial,sans-serif" font-size="220" font-weight="900" text-anchor="middle" fill="#ffffff">CH</text>
+</svg>`)
+  })
+
   // ── Main analysis endpoint ────────────────────────────────────────────────────
   const handleScan = async (req: Request, res: Response): Promise<void> => {
     const t0 = Date.now()
