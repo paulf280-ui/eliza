@@ -5,13 +5,13 @@
  *
  * Flow:
  *  1. Client requests analysis → server returns HTTP 402 with payment instructions
- *  2. Client sends 0.05 USDC to our receiving wallet with a nonce in the memo
+ *  2. Client sends 0.02 USDC to our receiving wallet with a nonce in the memo
  *  3. Client resubmits with X-Payment-Signature header
  *  4. We verify the transaction on-chain via Helius RPC
  *  5. Verified → run analysis and return results
  *
  * USDC SPL token on Solana mainnet: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
- * Decimals: 6  (so 0.05 USDC = 50000 raw units)
+ * Decimals: 6  (so 0.02 USDC = 50000 raw units)
  */
 
 import crypto from "crypto"
@@ -24,7 +24,7 @@ const HELIUS_RPC  = process.env.HELIUS_RPC_URL ?? ""
 const HELIUS_KEY  = process.env.HELIUS_API_KEY ?? ""
 const RECIPIENT   = process.env.RECEIVING_WALLET ?? ""
 const USDC_MINT   = process.env.USDC_MINT ?? "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-const PRICE_USDC  = parseFloat(process.env.PRICE_PER_QUERY_USDC ?? "0.05")
+const PRICE_USDC  = parseFloat(process.env.PRICE_PER_QUERY_USDC ?? "0.02")
 const PRICE_RAW   = Math.round(PRICE_USDC * 1_000_000)   // USDC has 6 decimals
 const TX_MAX_AGE  = 120   // seconds — reject old payment proofs
 
@@ -33,7 +33,7 @@ const _usedNonces = new Map<string, number>()
 
 // ── Free tier tracking (SQLite) ───────────────────────────────────────────────
 // 100 free queries per IP per calendar month. No account required.
-// After 100, the standard $0.05 USDC payment gate applies.
+// After 100, the standard $0.02 USDC payment gate applies.
 const FREE_QUERIES_PER_MONTH = 100
 
 let _freeDb: ReturnType<typeof Database> | null = null

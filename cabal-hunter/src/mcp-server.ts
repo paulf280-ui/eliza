@@ -30,7 +30,7 @@ import { getCabalReport } from "./detector.js"
 import { createPaymentRequest, verifyPayment } from "./payment.js"
 import crypto from "crypto"
 
-const PRICE_USDC = parseFloat(process.env.PRICE_PER_QUERY_USDC ?? "0.05")
+const PRICE_USDC = parseFloat(process.env.PRICE_PER_QUERY_USDC ?? "0.02")
 
 /** Create and configure the MCP server instance */
 export function createMcpServer() {
@@ -63,7 +63,7 @@ export function createMcpServer() {
       "plain-English verdict, e.g. \"AVOID — 5 wallets bought in the EXACT same",
       "block, controlling 23% of supply. DEPLOYER ALERT: 13 of 13 previous launches dead.\"",
       "",
-      "COST: $0.05 USDC per query (paid on Solana mainnet).",
+      "COST: $0.02 USDC per query (paid on Solana mainnet).",
       "PAYMENT: Include X-Payment-Signature header with a valid USDC transaction",
       "signature, or call GET /api/info for payment instructions.",
       "",

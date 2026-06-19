@@ -3,7 +3,7 @@
  *
  * Endpoints:
  *   GET  /health          — uptime check (no auth)
- *   POST /api/scan-cabal  — paid endpoint, $0.05 USDC per query
+ *   POST /api/scan-cabal  — paid endpoint, $0.02 USDC per query
  *   GET  /api/scan-cabal  — same, for GET-friendly clients
  *
  * Payment flow:
@@ -27,7 +27,7 @@ import { recordVisit, getAnalytics, excludeIp } from "./analytics.js"
 import { createPaymentRequest, verifyPayment, validatePaymentConfig, logPayment, getPnlStats, getFreeQueriesRemaining, consumeFreeQuery, recordMapScan, MAP_SCAN_LIMIT } from "./payment.js"
 import { CabalReport } from "./types.js"
 
-const PRICE_USDC = parseFloat(process.env.PRICE_PER_QUERY_USDC ?? "0.05")
+const PRICE_USDC = parseFloat(process.env.PRICE_PER_QUERY_USDC ?? "0.02")
 
 export function createApp(): express.Application {
   const app = express()
@@ -226,8 +226,8 @@ export function createApp(): express.Application {
 <meta name="twitter:description" content="Know if you're the exit liquidity before you buy. On-chain cabal, bundle, rug-deployer & dump detection for any Solana token. Free + MCP/API for AI agents.">
 <meta name="twitter:image" content="https://api.cabal-hunter.com/og.svg">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23ff4d6d'/><text x='50' y='70' font-size='54' font-weight='900' text-anchor='middle' fill='white' font-family='Arial'>CH</text></svg>">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Cabal-Hunter","applicationCategory":"DeveloperApplication","operatingSystem":"Web, MCP, REST API","description":"On-chain Solana token safety scanner: traces coordinated wallet funding, same-block Jito bundles, serial-rug deployers and coordinated dumps into a single Exit-Liquidity Risk verdict before you buy.","url":"https://api.cabal-hunter.com/","offers":{"@type":"Offer","price":"0","priceCurrency":"USD","description":"100 free queries per month per IP, then 0.05 USDC per query"},"featureList":["Funding-source tracing","Same-block Jito bundle detection","Coordinated dump detection","Serial-rug deployer history","CEX-noise filter","Exit-Liquidity Risk verdict","MCP server for Claude, Cursor and ElizaOS"],"creator":{"@type":"Organization","name":"PF Capital","url":"https://api.cabal-hunter.com/"}}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What is a Solana cabal?","acceptedAnswer":{"@type":"Answer","text":"A cabal is a group of wallets — often funded from the same source and buying in the same block — that quietly accumulate a large share of a token's supply before retail, then dump simultaneously into the buyers who pile in after launch."}},{"@type":"Question","name":"How do I check if a Solana token is a rug?","acceptedAnswer":{"@type":"Answer","text":"Scan the mint with Cabal-Hunter. It traces holder funding back to shared sources, detects same-block bundle buys, flags serial-rug deployers and live coordinated dumps, and returns an Exit-Liquidity Risk verdict of LOW, ELEVATED or HIGH."}},{"@type":"Question","name":"Is Cabal-Hunter free?","acceptedAnswer":{"@type":"Answer","text":"Yes — 100 free queries per month per IP, with no signup or API key. Beyond that it is 0.05 USDC per query, paid natively on Solana."}},{"@type":"Question","name":"Can AI trading agents use Cabal-Hunter?","acceptedAnswer":{"@type":"Answer","text":"Yes. Cabal-Hunter exposes an MCP server at api.cabal-hunter.com/mcp so Claude, Cursor and ElizaOS agents can call check_cabal_risk automatically before a swap, plus a REST API for any language."}}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Cabal-Hunter","applicationCategory":"DeveloperApplication","operatingSystem":"Web, MCP, REST API","description":"On-chain Solana token safety scanner: traces coordinated wallet funding, same-block Jito bundles, serial-rug deployers and coordinated dumps into a single Exit-Liquidity Risk verdict before you buy.","url":"https://api.cabal-hunter.com/","offers":{"@type":"Offer","price":"0","priceCurrency":"USD","description":"100 free queries per month per IP, then 0.02 USDC per query"},"featureList":["Funding-source tracing","Same-block Jito bundle detection","Coordinated dump detection","Serial-rug deployer history","CEX-noise filter","Exit-Liquidity Risk verdict","MCP server for Claude, Cursor and ElizaOS"],"creator":{"@type":"Organization","name":"PF Capital","url":"https://api.cabal-hunter.com/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What is a Solana cabal?","acceptedAnswer":{"@type":"Answer","text":"A cabal is a group of wallets — often funded from the same source and buying in the same block — that quietly accumulate a large share of a token's supply before retail, then dump simultaneously into the buyers who pile in after launch."}},{"@type":"Question","name":"How do I check if a Solana token is a rug?","acceptedAnswer":{"@type":"Answer","text":"Scan the mint with Cabal-Hunter. It traces holder funding back to shared sources, detects same-block bundle buys, flags serial-rug deployers and live coordinated dumps, and returns an Exit-Liquidity Risk verdict of LOW, ELEVATED or HIGH."}},{"@type":"Question","name":"Is Cabal-Hunter free?","acceptedAnswer":{"@type":"Answer","text":"Yes — 100 free queries per month per IP, with no signup or API key. Beyond that it is 0.02 USDC per query, paid natively on Solana."}},{"@type":"Question","name":"Can AI trading agents use Cabal-Hunter?","acceptedAnswer":{"@type":"Answer","text":"Yes. Cabal-Hunter exposes an MCP server at api.cabal-hunter.com/mcp so Claude, Cursor and ElizaOS agents can call check_cabal_risk automatically before a swap, plus a REST API for any language."}}]}</script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:#07080f;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;padding:40px 24px;max-width:780px;margin:0 auto}
@@ -280,7 +280,7 @@ export function createApp(): express.Application {
 <div class="tg-nudge">📡 <span>Live cabal &amp; rug alerts the moment we catch them — <a href="https://t.me/CabalHunterAlerts" target="_blank" rel="noopener">join the free Telegram →</a> no signup, no cost.</span></div>
 
 <h1>Know if you're the exit liquidity —<br>before you buy.</h1>
-<p class="sub">On Solana, <strong style="color:#e2e8f0">over half of pump.fun launches are sniped in the creation block by wallets the deployer funded</strong> — they buy at the bottom and dump on you. Cabal-Hunter traces the funding, catches the same-block bundles, flags the serial-rug devs, and gives you one verdict: <strong style="color:#f87171">are the insiders positioned to dump on you?</strong><br>One call, one 0–100 score, every flag linked to its on-chain proof. <strong style="color:#10b981">100 free queries/month</strong> — then $0.05 USDC per query. No API key. No account.</p>
+<p class="sub">On Solana, <strong style="color:#e2e8f0">over half of pump.fun launches are sniped in the creation block by wallets the deployer funded</strong> — they buy at the bottom and dump on you. Cabal-Hunter traces the funding, catches the same-block bundles, flags the serial-rug devs, and gives you one verdict: <strong style="color:#f87171">are the insiders positioned to dump on you?</strong><br>One call, one 0–100 score, every flag linked to its on-chain proof. <strong style="color:#10b981">100 free queries/month</strong> — then $0.02 USDC per query. No API key. No account.</p>
 
 <p style="font-size:13px;color:#64748b;margin:-20px 0 36px;line-height:1.6"><strong style="color:#94a3b8">The complete on-chain X-ray for any Solana token.</strong> In one scan: trace holder funding, catch same-block bundles and coordinated dumps, pull the deployer's track record, map which exchanges funded the holders, and see which cohorts are actually in profit — every red flag linked to its on-chain proof. Works on any mint, graduated or still on the curve.</p>
 
@@ -446,7 +446,7 @@ Cabal-Hunter is built for both humans (a visual bubble map) and AI trading agent
 
 ## Pricing
 - Free: 100 queries/month per IP, no account, no API key.
-- Then $0.05 USDC per query, paid natively on Solana (x402). No subscription.
+- Then $0.02 USDC per query, paid natively on Solana (x402). No subscription.
 
 ## Links
 - Site: https://api.cabal-hunter.com/
@@ -512,7 +512,7 @@ Cabal-Hunter is built for both humans (a visual bubble map) and AI trading agent
           free_tier:            true,
           free_queries_remaining: freeLeft - 1,
           note: freeLeft === 1
-            ? "Last free query used. Future queries require $0.05 USDC payment."
+            ? "Last free query used. Future queries require $0.02 USDC payment."
             : `${freeLeft - 1} free queries remaining this month.`,
           request_time_ms: Date.now() - t0,
         })
@@ -651,7 +651,7 @@ Cabal-Hunter is built for both humans (a visual bubble map) and AI trading agent
     <tr><td><strong>Top holder distribution</strong></td><td class="ch"><span class="yes">✅ YES</span><br><small>Top 20 with cluster assignments</small></td><td><span class="partial">⚡ Basic</span></td><td><span class="partial">⚡ Basic</span></td></tr>
     <tr><td><strong>Visual bubble map</strong></td><td class="ch"><span class="yes">✅ YES — Free</span><br><small>Interactive, clickable wallet links</small></td><td><span class="no">❌ NO</span></td><td><span class="no">❌ NO</span></td></tr>
     <tr><td><strong>MCP server (Claude/Cursor/ElizaOS)</strong></td><td class="ch"><span class="yes">✅ YES</span><br><small>Native AI agent integration</small></td><td><span class="no">❌ NO</span></td><td><span class="no">❌ NO</span></td></tr>
-    <tr><td><strong>Pricing</strong></td><td class="ch"><span class="yes">$0.05 USDC/query</span><br><small>No account · No subscription</small></td><td><span class="yes">Free</span></td><td><span class="yes">Free</span></td></tr>
+    <tr><td><strong>Pricing</strong></td><td class="ch"><span class="yes">$0.02 USDC/query</span><br><small>No account · No subscription</small></td><td><span class="yes">Free</span></td><td><span class="yes">Free</span></td></tr>
     <tr><td><strong>Payment method</strong></td><td class="ch">Native Solana USDC</td><td>Free</td><td>Free / Enterprise</td></tr>
   </tbody>
 </table>
